@@ -23,6 +23,8 @@ from typing import Optional
 
 import numpy as np
 
+from contextforge.embeddings.embedding_engine import EmbeddingEngine
+
 logger = logging.getLogger(__name__)
 
 # Length compatibility tolerance (10%)
@@ -36,12 +38,20 @@ EMBEDDING_DIM = 128
 
 
 @dataclass
+class AnchorOffsetResult:
+    """Result of approximate_offset() - contains placeholder offset and optional prefix offset."""
+    placeholder_offset: np.ndarray
+    prefix_offset: Optional[np.ndarray]  # None if no neighbor data yet
+
+
+@dataclass
 class Anchor:
     """A stored anchor for KV offset estimation."""
     base_kv_hash: int
     agent_offsets: dict[str, np.ndarray]
     embedding: np.ndarray  # shape (EMBEDDING_DIM,)
     token_length: int
+    prefix_offsets: dict[str, np.ndarray] = field(default_factory=dict)
     access_count: int = 0
     created_at: float = field(default_factory=time.monotonic)
 
@@ -76,22 +86,23 @@ class AnchorPool:
         token_ids: list[int],
         agent_id: str,
         real_kv_offset: np.ndarray,
+        neighbor_prefix_offset: Optional[np.ndarray] = None,
     ) -> None:
         """Add a new anchor to the pool (or update existing)."""
         loop = asyncio.get_event_loop()
 
-        block_hash = await loop.run_in_executor(
-            None, self._simhash_token_ids, tuple(token_ids)
-        )
+        # Use EmbeddingEngine.simhash() for block_hash computation
+        engine = await EmbeddingEngine.get_instance()
+        block_hash = await engine.simhash(token_ids)
 
-        embedding = await loop.run_in_executor(
-            None, self._token_ids_to_embedding, token_ids
-        )
+        embedding = await engine.encode(token_ids)
 
         async with self._lock:
             if block_hash in self._anchors:
                 anchor = self._anchors[block_hash]
                 anchor.agent_offsets[agent_id] = real_kv_offset
+                if neighbor_prefix_offset is not None:
+                    anchor.prefix_offsets[agent_id] = neighbor_prefix_offset
                 anchor.access_count += 1
             else:
                 anchor = Anchor(
@@ -101,6 +112,8 @@ class AnchorPool:
                     token_length=len(token_ids),
                     access_count=1,
                 )
+                if neighbor_prefix_offset is not None:
+                    anchor.prefix_offsets[agent_id] = neighbor_prefix_offset
                 self._anchors[block_hash] = anchor
 
                 if agent_id not in self._agent_anchors:
@@ -140,13 +153,14 @@ class AnchorPool:
             diff = abs(ref_len - target_length) / target_length
             return 1.0 - (diff / self._length_tolerance)
 
-        target_embedding = await loop.run_in_executor(
-            None, self._token_ids_to_embedding, token_ids
-        )
+        # Use EmbeddingEngine for real embeddings
+        engine = await EmbeddingEngine.get_instance()
 
         best_score = 0.0
         for anchor in candidates:
             L_phi = length_compatibility(anchor.token_length)
+
+            target_embedding = await engine.encode(token_ids)
 
             distances = []
             for other_anchor in candidates:
@@ -173,13 +187,10 @@ class AnchorPool:
         self,
         token_ids: list[int],
         target_agent_id: str,
-    ) -> Optional[np.ndarray]:
+    ) -> Optional[AnchorOffsetResult]:
         """Approximate KV offset for token_ids when used by target_agent_id."""
-        loop = asyncio.get_event_loop()
-
-        target_embedding = await loop.run_in_executor(
-            None, self._token_ids_to_embedding, token_ids
-        )
+        engine = await EmbeddingEngine.get_instance()
+        target_embedding = await engine.encode(token_ids)
 
         async with self._lock:
             candidates = [
@@ -206,7 +217,14 @@ class AnchorPool:
         for w, offset in zip(softmax_weights, offsets):
             result += w * offset
 
-        return result
+        # Get prefix_offset from anchor if available
+        prefix_offset = None
+        for anchor, _ in candidates:
+            if target_agent_id in anchor.prefix_offsets:
+                prefix_offset = anchor.prefix_offsets[target_agent_id]
+                break
+
+        return AnchorOffsetResult(placeholder_offset=result, prefix_offset=prefix_offset)
 
     async def apply_rope_derotation(
         self,
@@ -293,28 +311,6 @@ class AnchorPool:
             result |= (int(b) << i)
 
         return result
-
-    def _token_ids_to_embedding(self, token_ids: list[int]) -> np.ndarray:
-        """Convert token IDs to fixed-dim embedding via pseudo-random projection."""
-        embedding = np.zeros(EMBEDDING_DIM, dtype=np.float32)
-
-        for i, tid in enumerate(token_ids[:1024]):
-            h = int(tid)
-            for _ in range(4):
-                h ^= h << 13
-                h ^= h >> 7
-                h ^= h << 17
-                h = h & 0xFFFFFFFF
-
-            for dim in range(EMBEDDING_DIM):
-                if (h >> (dim % 32)) & 1:
-                    embedding[dim] += 1.0
-
-        norm = np.linalg.norm(embedding)
-        if norm > 0:
-            embedding = embedding / norm
-
-        return embedding
 
     async def get_stats(self) -> dict:
         """Return anchor pool statistics."""

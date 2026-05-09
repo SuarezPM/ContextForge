@@ -16,7 +16,10 @@ import heapq
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from contextforge.scheduling.step_graph import AgentStepGraph
 
 from contextforge.metrics.vram_monitor import VRAMMonitor
 
@@ -27,6 +30,7 @@ class EvictionMode(Enum):
     PRESSURE = "pressure"
     CRITICAL = "critical"
     EMERGENCY = "emergency"
+    WORKFLOW_AWARE = "workflow_aware"
 
 
 @dataclass(order=True)
@@ -57,10 +61,11 @@ class VRAMAwareCache:
     
     VRAM_CHECK_INTERVAL = 2.0  # seconds between VRAM pressure checks
     
-    def __init__(self, max_token_budget: int = 50_000_000):
+    def __init__(self, max_token_budget: int = 50_000_000, step_graph: Optional["AgentStepGraph"] = None):
         """
         Args:
             max_token_budget: Maximum tokens to hold in cache (~3GB for 64-layer model)
+            step_graph: Optional workflow dependency graph for WORKFLOW_AWARE eviction
         """
         self._store: dict[str, CacheEntry] = {}
         self._heap: list[CacheEntry] = []
@@ -71,6 +76,7 @@ class VRAMAwareCache:
         self._lock = asyncio.Lock()
         self._monitor_task: Optional[asyncio.Task] = None
         self._blocked = False
+        self._step_graph = step_graph
     
     async def start(self) -> None:
         """Start background VRAM monitor."""
@@ -93,7 +99,7 @@ class VRAMAwareCache:
         while True:
             try:
                 pressure = self._vram.get_pressure()
-                new_mode = self._pressure_to_mode(pressure)
+                new_mode = self._pressure_to_mode(pressure, self._step_graph)
                 if new_mode != self._mode:
                     self._mode = new_mode
                     if new_mode == EvictionMode.EMERGENCY:
@@ -108,12 +114,13 @@ class VRAMAwareCache:
                 await asyncio.sleep(1)  # Brief backoff on error
     
     @staticmethod
-    def _pressure_to_mode(pressure: float) -> EvictionMode:
+    def _pressure_to_mode(pressure: float, step_graph=None) -> EvictionMode:
         """Convert VRAM pressure to eviction mode."""
         if pressure < 0.70:   return EvictionMode.RELAXED
         if pressure < 0.85:   return EvictionMode.NORMAL
         if pressure < 0.92:   return EvictionMode.PRESSURE
         if pressure < 0.96:   return EvictionMode.CRITICAL
+        if pressure >= 0.96 and step_graph is not None: return EvictionMode.WORKFLOW_AWARE
         return EvictionMode.EMERGENCY
     
     async def set(self, key: str, value: Any, token_count: int) -> bool:
@@ -233,6 +240,16 @@ class VRAMAwareCache:
                     for k in to_evict:
                         self._evict(k)
                         evicted += 1
+                
+                case EvictionMode.WORKFLOW_AWARE:
+                    if self._step_graph is not None:
+                        priority_order = self._step_graph.get_eviction_priority_order()
+                        # Evict in reverse priority order (lowest priority first)
+                        for agent_id in reversed(priority_order):
+                            key = f"context:{agent_id}"
+                            if key in self._store:
+                                self._evict(key)
+                                evicted += 1
         
         if evicted > 0:
             await self._reheap()
@@ -276,3 +293,8 @@ class VRAMAwareCache:
     def is_blocked(self) -> bool:
         """True if new registrations are blocked (EMERGENCY mode)."""
         return self._blocked
+    
+    @property
+    def step_graph(self) -> Optional["AgentStepGraph"]:
+        """The workflow dependency graph for WORKFLOW_AWARE eviction."""
+        return self._step_graph

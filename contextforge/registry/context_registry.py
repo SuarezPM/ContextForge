@@ -15,6 +15,8 @@ from typing import Any, Optional
 
 from contextforge.dedup.faiss_index import FAISSContextIndex, FAISSMatch
 from contextforge.dedup.lsh_engine import LSHTokenMatcher, TokenBlockMatch
+from contextforge.embeddings.embedding_engine import EmbeddingEngine
+from contextforge.kv_offset.anchor_pool import AnchorPool
 from contextforge.metrics.prometheus_metrics import (
     cache_hits,
     cache_misses,
@@ -86,6 +88,7 @@ class ContextRegistry:
         vram_cache: Optional[VRAMAwareCache] = None,
         faiss_index: Optional[FAISSContextIndex] = None,
         token_counter: Optional[TokenCounter] = None,
+        anchor_pool: Optional[AnchorPool] = None,
         vram_budget_tokens: int = 50_000_000,
         block_size: int = VLLM_BLOCK_SIZE,
         hamming_threshold: int = 8,
@@ -99,6 +102,8 @@ class ContextRegistry:
         self._vram_cache = vram_cache or VRAMAwareCache(max_token_budget=vram_budget_tokens)
         self._faiss = faiss_index or FAISSContextIndex(dim=384)
         self._token_counter = token_counter or TokenCounter.get()
+        self._anchor_pool = anchor_pool or AnchorPool()
+        self._embedding_engine: Optional[EmbeddingEngine] = None
         self._block_size = block_size
 
         # Internal state
@@ -161,6 +166,20 @@ class ContextRegistry:
             full_context
         )
 
+        # Generate real embedding via EmbeddingEngine (replaces pseudo-embedding)
+        if self._embedding_engine is None:
+            self._embedding_engine = await EmbeddingEngine.get_instance(dim=512, use_onnx=True)
+        embedding = await self._embedding_engine.encode(full_context)
+
+        # Update AnchorPool — use embedding as kv_offset_approx until
+        # LMCacheConnectorV1 bridge (TASK-007) provides real KV offset vectors
+        await self._anchor_pool.update_pool(
+            token_ids=token_ids,
+            agent_id=agent_id,
+            real_kv_offset=embedding.copy(),
+            neighbor_prefix_offset=None,  # populated by TASK-007
+        )
+
         # Store in VRAM-aware cache
         cache_key = f"context:{agent_id}"
         cache_value = {
@@ -178,9 +197,8 @@ class ContextRegistry:
             logger.warning(f"VRAM cache blocked registration for {agent_id}")
 
         # Add to FAISS index for ANN search
-        # Generate embedding for full context (use token hash as pseudo-embedding)
-        pseudo_embedding = self._token_ids_to_embedding(token_ids)
-        await self._faiss.add(agent_id, pseudo_embedding)
+        # Use real embedding from EmbeddingEngine (replaces pseudo-embedding)
+        await self._faiss.add(agent_id, embedding.tolist())
 
         # Track registered agent
         async with self._lock:
@@ -280,11 +298,12 @@ class ContextRegistry:
             reuse_confidence = 1.0 - (avg_hamming / self._lsh._hash_bits)
 
             # Get FAISS ANN candidates for the system prompt
-            system_embedding = self._token_ids_to_embedding(
-                cache_val["token_ids"][:512]  # First 512 tokens as pseudo-embedding
-            )
+            # Use real embedding from EmbeddingEngine (replaces pseudo-embedding)
+            if self._embedding_engine is None:
+                self._embedding_engine = await EmbeddingEngine.get_instance(dim=512, use_onnx=True)
+            system_embedding = await self._embedding_engine.encode(system_prompt)
             faiss_matches = await self._faiss.search(
-                system_embedding,
+                system_embedding.tolist(),
                 k=5,
                 threshold=0.7,
             )
@@ -293,13 +312,33 @@ class ContextRegistry:
             blocks_per_match = len(valid_matches)
             tokens_saved = blocks_per_match * self._block_size * len(valid_matches)
 
-            results.append(SharedContextResult(
+            # AnchorPool shareability prediction
+            is_shareable = await self._anchor_pool.predict_shareable(
+                token_ids=cache_val["token_ids"],
+                target_agent_id=target_agent_id or agent_ids,
+            )
+
+            offset_vector = None
+            if is_shareable:
+                offset_result = await self._anchor_pool.approximate_offset(
+                    token_ids=cache_val["token_ids"],
+                    target_agent_id=target_agent_id or agent_ids,
+                )
+                if offset_result is not None:
+                    offset_vector = offset_result.placeholder_offset
+
+            # Populate offset_hints — this field was ALWAYS empty in V3
+            result = SharedContextResult(
                 agent_id=agent.agent_id,
                 shared_blocks=valid_matches,
                 faiss_matches=faiss_matches,
                 total_tokens_saved=tokens_saved,
                 reuse_confidence=reuse_confidence,
-            ))
+            )
+            if offset_vector is not None:
+                result.offset_hints[agent.agent_id] = offset_vector.tolist()
+
+            results.append(result)
 
             cache_hits.labels(
                 agent_id=agent.agent_id,
@@ -354,18 +393,6 @@ class ContextRegistry:
     async def get_vram_pressure(self) -> float:
         """Get current VRAM pressure (0.0-1.0)."""
         return self._vram_cache._vram.get_pressure()
-
-    def _token_ids_to_embedding(self, token_ids: list[int]) -> list[float]:
-        """Convert token IDs to fixed-dim pseudo-embedding for FAISS."""
-        dim = 384  # FAISS default dimension
-        embedding = [0.0] * dim
-        for i, tid in enumerate(token_ids[:dim]):
-            embedding[i % dim] += float(tid % 1000) / 1000.0
-        # Normalize
-        norm = sum(e * e for e in embedding) ** 0.5
-        if norm > 0:
-            embedding = [e / norm for e in embedding]
-        return embedding
 
     @staticmethod
     def _sha256_prefix(text: str) -> str:
