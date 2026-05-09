@@ -1,101 +1,399 @@
-"""Core context registry with semantic search."""
+"""ContextRegistry v3.0 - Wired to LSH + FAISS + VRAMAwareCache.
+
+Replaces the old Python-loop dedup and static TTLCache with:
+- LSHTokenMatcher: SimHash on actual Qwen3 token IDs, PagedAttention block alignment
+- FAISSContextIndex: O(log n) ANN search vs O(n) linear scan
+- VRAMAwareCache: 5-mode LRU/LFU hybrid with VRAM-pressure-responsive eviction
+
+Dependency injection - no hardcoded imports of stale modules.
+"""
 import asyncio
 import hashlib
 import logging
-from datetime import datetime
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Optional
 
-from contextforge.models import ContextEntry, ContextMatch, CompressionDecision
-from contextforge.registry.ttl_cache import TTLCache
-from contextforge.config import settings
+from contextforge.dedup.faiss_index import FAISSContextIndex, FAISSMatch
+from contextforge.dedup.lsh_engine import LSHTokenMatcher, TokenBlockMatch
+from contextforge.metrics.prometheus_metrics import (
+    cache_hits,
+    cache_misses,
+    cache_registry_size,
+    cache_evictions_total,
+)
+from contextforge.models import ContextEntry, ContextMatch
+from contextforge.registry.vram_aware_cache import VRAMAwareCache
+from contextforge.token_counter import TokenCounter
 
 logger = logging.getLogger(__name__)
 
+# vLLM PagedAttention block size
+VLLM_BLOCK_SIZE = 16
+
+
+@dataclass
+class SharedContextResult:
+    """Result of get_shared_context() - contains reusable blocks with metadata."""
+    agent_id: str
+    shared_blocks: list[TokenBlockMatch]
+    faiss_matches: list[FAISSMatch]
+    total_tokens_saved: int
+    reuse_confidence: float  # 0.0-1.0 weighted by hamming distance
+    offset_hints: dict[str, list[float]] = field(default_factory=dict)  # agent_id -> offset vector
+
+
+@dataclass
+class RegisteredAgent:
+    """Internal record of a registered agent."""
+    agent_id: str
+    system_prompt: str
+    role_prompt: str
+    token_count: int
+    block_hashes: list[int]  # LSH block hashes for this agent
+
 
 class ContextRegistry:
-    """Stores/retrieves agent contexts with TTL eviction and semantic search."""
+    """
+    Production-grade context registry with LSH + FAISS + VRAM-aware cache.
 
-    def __init__(self, default_ttl: int | None = None):
-        self._cache = TTLCache(default_ttl or settings.contextforge_ttl_seconds)
-        self._embeddings: dict[str, list[float]] = {}
-        self._lock = asyncio.Lock()
-
-    async def register(self, agent_id: str, context: str) -> ContextEntry:
-        """Register a new context entry."""
-        token_count = self._estimate_tokens(context)
-        entry = ContextEntry(
-            agent_id=agent_id,
-            context=context,
-            token_count=token_count,
-            ttl_seconds=settings.contextforge_ttl_seconds,
+    Usage:
+        registry = ContextRegistry(
+            lsh_matcher=LSHTokenMatcher(),
+            vram_cache=VRAMAwareCache(max_token_budget=50_000_000),
+            faiss_index=FAISSContextIndex(dim=384),
         )
+        await registry.start()
+
+        # Register agents with shared system prompt
+        await registry.register_agent("agent1", system_prompt, "retriever role")
+        await registry.register_agent("agent2", system_prompt, "summarizer role")
+
+        # Query for reusable context across agents
+        result = await registry.get_shared_context(["agent1", "agent2"])
+
+        await registry.stop()
+
+    Key design decisions:
+    - Dependency injection for all core components (testable, swappable)
+    - LSH operates on token IDs, not text - aligns to vLLM PagedAttention blocks
+    - FAISS provides ANN candidates; LSH filters for actual token-level reuse
+    - VRAMAwareCache manages eviction based on real GPU memory pressure
+    """
+
+    def __init__(
+        self,
+        lsh_matcher: Optional[LSHTokenMatcher] = None,
+        vram_cache: Optional[VRAMAwareCache] = None,
+        faiss_index: Optional[FAISSContextIndex] = None,
+        token_counter: Optional[TokenCounter] = None,
+        vram_budget_tokens: int = 50_000_000,
+        block_size: int = VLLM_BLOCK_SIZE,
+        hamming_threshold: int = 8,
+        faiss_nlist: int = 100,
+    ):
+        # Dependency injection with lazy defaults
+        self._lsh = lsh_matcher or LSHTokenMatcher(
+            block_size=block_size,
+            hamming_threshold=hamming_threshold,
+        )
+        self._vram_cache = vram_cache or VRAMAwareCache(max_token_budget=vram_budget_tokens)
+        self._faiss = faiss_index or FAISSContextIndex(dim=384)
+        self._token_counter = token_counter or TokenCounter.get()
+        self._block_size = block_size
+
+        # Internal state
+        self._agents: dict[str, RegisteredAgent] = {}
+        self._system_prompt_hash: Optional[str] = None
+        self._lock = asyncio.Lock()
+        self._started = False
+
+    async def start(self) -> None:
+        """Start background VRAM monitor and cache."""
+        if self._started:
+            return
+        await self._vram_cache.start()
+        self._started = True
+        logger.info("ContextRegistry started with LSH+FAISS+VRAM cache")
+
+    async def stop(self) -> None:
+        """Stop background monitoring and flush cache."""
+        if not self._started:
+            return
+        await self._vram_cache.stop()
+        self._started = False
+        logger.info("ContextRegistry stopped")
+
+    async def register_agent(
+        self,
+        agent_id: str,
+        system_prompt: str,
+        role_prompt: str,
+    ) -> ContextEntry:
+        """
+        Register an agent with tokenization and LSH indexing.
+
+        Args:
+            agent_id: Unique agent identifier
+            system_prompt: Shared system prompt (must be byte-identical across agents)
+            role_prompt: Agent-specific role/instruction text
+
+        Returns:
+            ContextEntry with accurate token count
+        """
+        loop = asyncio.get_event_loop()
+
+        # Tokenize full context
+        full_context = f"{system_prompt}\n\n{role_prompt}"
+        token_ids = await loop.run_in_executor(
+            None, self._token_counter.encode, full_context
+        )
+        token_count = len(token_ids)
+
+        # Index system prompt for LSH (critical for prefix caching)
+        system_block_hashes = await self._lsh.index_prompt(
+            f"{agent_id}:system",
+            system_prompt
+        )
+
+        # Index full prompt for cross-agent dedup
+        full_block_hashes = await self._lsh.index_prompt(
+            agent_id,
+            full_context
+        )
+
+        # Store in VRAM-aware cache
         cache_key = f"context:{agent_id}"
-        await self._cache.set(cache_key, entry)
-        logger.debug(f"Registered context for agent {agent_id}, tokens={token_count}")
-        return entry
+        cache_value = {
+            "system_prompt": system_prompt,
+            "role_prompt": role_prompt,
+            "full_context": full_context,
+            "token_ids": token_ids,
+        }
+        stored = await self._vram_cache.set(
+            cache_key,
+            cache_value,
+            token_count=token_count,
+        )
+        if not stored:
+            logger.warning(f"VRAM cache blocked registration for {agent_id}")
 
-    async def get(self, agent_id: str) -> ContextEntry | None:
-        """Retrieve context for an agent."""
+        # Add to FAISS index for ANN search
+        # Generate embedding for full context (use token hash as pseudo-embedding)
+        pseudo_embedding = self._token_ids_to_embedding(token_ids)
+        await self._faiss.add(agent_id, pseudo_embedding)
+
+        # Track registered agent
+        async with self._lock:
+            # Validate system prompt consistency (byte-identical for vLLM prefix caching)
+            if self._system_prompt_hash is None:
+                self._system_prompt_hash = self._sha256_prefix(system_prompt)
+            else:
+                incoming_hash = self._sha256_prefix(system_prompt)
+                if incoming_hash != self._system_prompt_hash:
+                    logger.warning(
+                        f"Agent {agent_id} has DIFFERENT system prompt hash. "
+                        f"vLLM prefix caching will NOT work. "
+                        f"Expected {self._system_prompt_hash[:16]}, got {incoming_hash[:16]}"
+                    )
+
+            self._agents[agent_id] = RegisteredAgent(
+                agent_id=agent_id,
+                system_prompt=system_prompt,
+                role_prompt=role_prompt,
+                token_count=token_count,
+                block_hashes=full_block_hashes,
+            )
+
+        logger.debug(f"Registered agent {agent_id}, tokens={token_count}, blocks={len(full_block_hashes)}")
+
+        return ContextEntry(
+            agent_id=agent_id,
+            context=full_context,
+            token_count=token_count,
+            compressed_token_count=None,
+            ttl_seconds=0,  # VRAM cache handles TTL
+        )
+
+    async def get_shared_context(
+        self,
+        agent_ids: list[str],
+        target_agent_id: Optional[str] = None,
+    ) -> list[SharedContextResult]:
+        """
+        Query for reusable context across multiple agents.
+
+        Uses FAISS ANN to find candidate matches, then LSH to validate
+        actual token-level reuse at PagedAttention block granularity.
+
+        Args:
+            agent_ids: Agents whose context to search
+            target_agent_id: Optional target for offset hints
+
+        Returns:
+            List of SharedContextResult sorted by reuse confidence
+        """
+        if len(agent_ids) < 2:
+            return []
+
+        # Gather all registered agents
+        agents_to_search = []
+        async with self._lock:
+            for aid in agent_ids:
+                if aid in self._agents:
+                    agents_to_search.append(self._agents[aid])
+
+        if not agents_to_search:
+            return []
+
+        results: list[SharedContextResult] = []
+
+        # For each agent, find matches in other agents
+        for agent in agents_to_search:
+            # Get full context for LSH matching
+            cache_key = f"context:{agent.agent_id}"
+            cache_val = await self._vram_cache.get(cache_key)
+            if not cache_val:
+                continue
+
+            full_context = cache_val["full_context"]
+            system_prompt = cache_val["system_prompt"]
+
+            # Find reusable blocks via LSH
+            matches = await self._lsh.find_reusable_blocks(
+                full_context,
+                exclude_agent=agent.agent_id,
+            )
+
+            # Filter matches by hamming threshold and compute confidence
+            valid_matches = []
+            total_hamming = 0
+            for match in matches:
+                if match.hamming_distance <= self._lsh._hamming_threshold:
+                    valid_matches.append(match)
+                    total_hamming += match.hamming_distance
+
+            if not valid_matches:
+                cache_misses.labels(agent_id=agent.agent_id).inc()
+                continue
+
+            avg_hamming = total_hamming / len(valid_matches)
+            reuse_confidence = 1.0 - (avg_hamming / self._lsh._hash_bits)
+
+            # Get FAISS ANN candidates for the system prompt
+            system_embedding = self._token_ids_to_embedding(
+                cache_val["token_ids"][:512]  # First 512 tokens as pseudo-embedding
+            )
+            faiss_matches = await self._faiss.search(
+                system_embedding,
+                k=5,
+                threshold=0.7,
+            )
+
+            # Compute total tokens saved
+            blocks_per_match = len(valid_matches)
+            tokens_saved = blocks_per_match * self._block_size * len(valid_matches)
+
+            results.append(SharedContextResult(
+                agent_id=agent.agent_id,
+                shared_blocks=valid_matches,
+                faiss_matches=faiss_matches,
+                total_tokens_saved=tokens_saved,
+                reuse_confidence=reuse_confidence,
+            ))
+
+            cache_hits.labels(
+                agent_id=agent.agent_id,
+                segment_type="system_prompt",
+            ).inc()
+
+        # Sort by reuse confidence descending
+        results.sort(key=lambda r: r.reuse_confidence, reverse=True)
+        return results
+
+    async def get_agent_context(self, agent_id: str) -> Optional[str]:
+        """Get the full context for an agent."""
         cache_key = f"context:{agent_id}"
-        return await self._cache.get(cache_key)
+        cache_val = await self._vram_cache.get(cache_key)
+        if cache_val:
+            return cache_val["full_context"]
+        return None
 
-    async def find_similar(
-        self, context: str, threshold: float | None = None
-    ) -> list[ContextMatch]:
-        """Find contexts with similarity above threshold."""
-        from contextforge.dedup.dedup_engine import SemanticDedupEngine
-
-        threshold = threshold or settings.contextforge_dedup_threshold
-        dedup = SemanticDedupEngine()
-        input_embedding = await dedup.embed(context)
-
-        matches = []
+    async def clear_agent(self, agent_id: str) -> bool:
+        """Clear an agent's context from all stores."""
         async with self._lock:
-            keys = await self._cache.keys()
+            if agent_id not in self._agents:
+                return False
 
-        for key in keys:
-            if not key.startswith("context:"):
-                continue
-            entry: ContextEntry | None = await self._cache.get(key)
-            if entry is None or entry.agent_id == "":
-                continue
-            if entry.embedding:
-                similarity = await dedup.similarity(input_embedding, entry.embedding)
-                if similarity >= threshold:
-                    shared = await dedup.find_shared_prefix(context, entry.context)
-                    tokens_saved = entry.token_count - len(shared.split())
-                    matches.append(ContextMatch(
-                        agent_id=entry.agent_id,
-                        similarity=similarity,
-                        shared_prefix=shared[:200] if len(shared) > 200 else shared,
-                        tokens_saved=max(0, tokens_saved),
-                    ))
+        # Remove from LSH
+        await self._lsh.clear_agent(agent_id)
+        await self._lsh.clear_agent(f"{agent_id}:system")
 
-        matches.sort(key=lambda m: m.similarity, reverse=True)
-        return matches
+        # Remove from FAISS
+        await self._faiss.remove(agent_id)
 
-    async def get_all_active(self) -> list[ContextEntry]:
-        """Get all non-expired context entries."""
-        entries = []
+        # Remove from VRAM cache
+        cache_key = f"context:{agent_id}"
+        await self._vram_cache.delete(cache_key)
+
+        # Remove from agents dict
         async with self._lock:
-            keys = await self._cache.keys()
-        for key in keys:
-            if key.startswith("context:"):
-                entry = await self._cache.get(key)
-                if entry is not None:
-                    entries.append(entry)
-        return entries
+            del self._agents[agent_id]
 
-    async def evict_expired(self) -> int:
-        """Evict all expired contexts, returns count."""
-        return await self._cache.evict_expired()
+        cache_evictions_total.labels(reason="manual").inc()
+        return True
 
-    async def clear(self) -> None:
-        """Clear all contexts."""
-        await self._cache.clear()
+    async def get_all_agents(self) -> list[str]:
+        """Get list of all registered agent IDs."""
         async with self._lock:
-            self._embeddings.clear()
+            return list(self._agents.keys())
 
-    def _estimate_tokens(self, text: str) -> int:
-        """Estimate token count using simple heuristic."""
-        return len(text.split()) // 4 * 3  # ~0.75 tokens per word
+    async def get_vram_mode(self) -> str:
+        """Get current VRAM eviction mode."""
+        return self._vram_cache.mode.value
+
+    async def get_vram_pressure(self) -> float:
+        """Get current VRAM pressure (0.0-1.0)."""
+        return self._vram_cache._vram.get_pressure()
+
+    def _token_ids_to_embedding(self, token_ids: list[int]) -> list[float]:
+        """Convert token IDs to fixed-dim pseudo-embedding for FAISS."""
+        dim = 384  # FAISS default dimension
+        embedding = [0.0] * dim
+        for i, tid in enumerate(token_ids[:dim]):
+            embedding[i % dim] += float(tid % 1000) / 1000.0
+        # Normalize
+        norm = sum(e * e for e in embedding) ** 0.5
+        if norm > 0:
+            embedding = [e / norm for e in embedding]
+        return embedding
+
+    @staticmethod
+    def _sha256_prefix(text: str) -> str:
+        """SHA256 of text for prefix validation."""
+        import hashlib
+        return hashlib.sha256(text.encode()).hexdigest()
+
+    @property
+    def lsh_matcher(self) -> LSHTokenMatcher:
+        """Direct access to LSH matcher for advanced queries."""
+        return self._lsh
+
+    @property
+    def faiss_index(self) -> FAISSContextIndex:
+        """Direct access to FAISS index for advanced queries."""
+        return self._faiss
+
+    @property
+    def vram_cache(self) -> VRAMAwareCache:
+        """Direct access to VRAM cache for advanced queries."""
+        return self._vram_cache
+
+    @property
+    def registry_size(self) -> int:
+        """Number of registered agents."""
+        return len(self._agents)
+
+    @property
+    def is_started(self) -> bool:
+        """Whether the registry is running."""
+        return self._started
