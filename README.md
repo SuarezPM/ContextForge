@@ -1,260 +1,244 @@
-# ContextForge
+# ContextForge V4.0
 
-**The shared context compiler for multi-agent LLM systems**
+**KV cache coordinator for multi-agent LLM pipelines on AMD Instinct MI300X, reducing VRAM by sharing PagedAttention blocks across agents using semantic deduplication, pre-RoPE quantization, and workflow-aware eviction.**
 
-ContextForge reduces VRAM consumption by 68% on AMD MI300X by detecting semantic overlap between agents and sharing KV cache prefixes across the pipeline.
-
----
-
-## Overview
-
-Multi-agent LLM systems waste significant VRAM by maintaining redundant KV cache entries for semantically similar contexts (system prompts, retrieval results, intermediate reasoning). ContextForge solves this by maintaining a **context registry** with semantic deduplication — overlapping prefixes are shared across agents rather than duplicated in GPU memory.
-
-The result: 5-agent pipelines share cache entries where semantically equivalent context appears, enabling significantly higher throughput on memory-constrained AMD Instinct accelerators.
+> Built for **AMD x LabLab Hackathon 2026** — Track 1: AI Agents & Agentic Workflows.
+> Primary hardware: AMD Instinct MI300X via AMD Developer Cloud.
 
 ---
 
-## Tech Stack
+## One-Line Pitch
+
+ContextForge reduces VRAM consumption by sharing KV cache prefixes across agents in multi-agent pipelines, using semantic deduplication (FAISS + LSH), KVCOMM-inspired anchor offset alignment, CLA metadata hints, and RotateKV pre-RoPE INT4 quantization.
+
+---
+
+## Architecture Diagram V4
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     ContextForge V4 Pipeline                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────────────────┐  │
+│  │ EmbeddingEng │───▶│ LSH Engine  │───▶│ FAISSContextIndex       │  │
+│  │ Qwen3-Embed  │    │ SimHash     │    │ semantic ANN search     │  │
+│  │ ONNX (512dim)│    │ block=16    │    │ dim=512                 │  │
+│  └─────────────┘    └─────────────┘    └───────────┬─────────────┘  │
+│                                                    │                 │
+│                   ┌────────────────────────────────┘                 │
+│                   ▼                                                  │
+│  ┌─────────────────────────────────────────────────────────────────┐│
+│  │                  ContextRegistry V4                             ││
+│  │  ┌──────────────┐  ┌────────────┐  ┌──────────────┐  ┌────────┐ ││
+│  │  │ AnchorPool  │  │CLAMetadata │  │AgentStepGraph│  │RotateKV│ ││
+│  │  │ KVCOMM      │  │Layer       │  │ KVFlow       │  │ INT4   │ ││
+│  │  │ offset hint │  │NAACL 2025  │  │ workflow     │  │pre-RoPE│ ││
+│  │  └──────┬──────┘  └──────┬─────┘  └──────┬───────┘  └───┬────┘ ││
+│  └─────────┼───────────────┼────────────────┼─────────────┼───────┘│
+│            │               │                │             │        │
+│            └───────────┬────┴────────────────┴─────────────┘        │
+│                        ▼                                         │
+│  ┌────────────────────────────────────────────────────────────┐    │
+│  │              VRAMAwareCache + QueueingController           │    │
+│  │             (TASK-001 V5: stability-aware eviction)        │    │
+│  └──────────────────────────┬────────────────────────────────┘    │
+│                             │                                      │
+│            ┌─────────────────┴──────────────────┐                  │
+│            ▼                                    ▼                   │
+│  ┌─────────────────┐               ┌─────────────────────────┐      │
+│  │ LMCacheBridge   │               │ KVAwareRouter          │      │
+│  │ cross-worker KV │               │ anchor locality routing │      │
+│  │ offset hints    │               │ CLA affinity           │      │
+│  └────────┬────────┘               └────────────┬────────────┘      │
+│           │                                   │                     │
+│           └─────────────┬─────────────────────┘                     │
+│                         ▼                                            │
+│  ┌────────────────────────────────────────────────────────────┐     │
+│  │              vLLMAtomPlugin (entry_point)                  │     │
+│  │     PreAttentionHook + PostAttentionHook (INV-10)         │     │
+│  └────────────────────────────────────────────────────────────┘     │
+│                                                                     │
+│  ┌────────────────────────────────────────────────────────────┐     │
+│  │              AMD MI300X — 192 GB HBM3                      │     │
+│  │  ┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐       │     │
+│  │  │Retriever│ │Reranker│ │Summarizer│ │Critic  │ │Responder│ │     │
+│  │  │(fast)  │ │(fast)  │ │(fast)   │ │(CoT)  │ │(CoT)   │       │     │
+│  │  └───────┘ └───────┘ └───────┘ └───────┘ └───────┘       │     │
+│  └────────────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Research Grounding
+
+| Paper | Venue | arXiv ID | What V4 Implements |
+|-------|-------|----------|-------------------|
+| **KVCOMM** — Cross-Context KV Communication | NeurIPS 2025 | 2510.12872 | `AnchorPool`: offset variance prediction via simhash, `approximate_offset()` |
+| **KVFlow** — Prefix Caching for Workflows | NeurIPS 2025 | 2507.07400 | `AgentStepGraph`: workflow-aware eviction, `compute_steps_to_execution()` |
+| **PBKV** — Prediction-Based KV Management | May 2026 | 2605.06472 | `PBKVPredictor` (stub V4, complete V5) |
+| **SemShareKV** — Semantic LSH KV Sharing | ACL Findings 2025 | — | `LSHEngine`: SimHash on token IDs, FAISS ANN deduplication |
+| **RotateKV** — Pre-RoPE INT4 Quantization | IJCAI 2025 | 2501.16383 | `RotateKVQuantizer`: pre-RoPE only (INV-10), INT4, attention-sink protection |
+| **CLA** — Cross-Layer Attention | NeurIPS 2024 | — | `CLAMetadataLayer`: `compute_layer_groups()`, NAACL 2025 upper-layer strategy |
+| **LCKV** — Layer-Condensed KV | ACL 2024 | — | CLA upper-layer sharing (top layers only) |
+| **NAACL 2025** — Systematic CLA Study | NAACL 2025 | — | `NON_THOUGHT_ROLES` frozenset, upper-layer sharing beats bottom-layer |
+
+---
+
+## Tech Stack V4 (Corrected)
 
 | Component | Technology |
 |-----------|------------|
-| Accelerator | AMD Instinct MI300X (128 GB HBM3) |
-| Compute Stack | ROCm 6.x |
-| LLM Engine | vLLM |
-| Compression | LLMLingua-2 |
-| Embeddings | SBERT (sentence-transformers) |
-| Primary Model | Qwen3.6-35B-A3B (35B total / 3B active, MoE) |
-| API Layer | FastAPI |
-| UI | Gradio |
-| Runtime | Bun |
+| Accelerator | AMD Instinct MI300X (192 GB HBM3, 8-GPU node) |
+| Compute Stack | ROCm 7.x, HIP, Triton-ROCm, amdgpu gfx942 |
+| LLM Engine | vLLM V1 (PagedAttention, block_size=16) |
+| KV Cache | LMCache (vLLM upstream PR #16625, April 2025) |
+| Embeddings | Qwen3-Embedding-0.6B ONNX (MRL, dim=512) |
+| Vector Search | FAISS (IndexFlatIP, auto-upgrade to IVFFlat at >1000 ctx) |
+| GPU Monitoring | PyRSMI native C bindings (zero subprocess, <1ms overhead) |
+| Metrics | Prometheus (7 queueing gauges, full V4 stack) |
+| API | FastAPI + Uvicorn |
+| Protocol | AMD ROCm 7.x |
+
+> **Note**: V4 does NOT use SBERT, Bun, or Gradio from v0.1.
+> Those were replaced by Qwen3-Embed ONNX, async Python, and Streamlit dashboard.
 
 ---
 
-## Architecture
+## Module Tree V4
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      ContextForge Pipeline                       │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐   │
-│  │  Input   │───▶│  Shared  │───▶│   Agent  │───▶│  Output  │   │
-│  │  Queue   │    │  Context │    │  Pipeline│    │  Merger  │   │
-│  └──────────┘    │  Registry│    └──────────┘    └──────────┘   │
-│                  │  (TTL)   │         │                          │
-│                  └────┬─────┘         │                          │
-│                       │              │                          │
-│              ┌────────┴────────┐      │                          │
-│              │                 │      │                          │
-│              ▼                 ▼      ▼                          │
-│     ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
-│     │   Semantic   │  │  LLMLingua-2 │  │    Per-Agent │        │
-│     │ Dedup (SBERT)│  │  Compression │  │  Thinking Mode│       │
-│     └──────────────┘  └──────────────┘  └──────────────┘        │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │               AMD MI300X  (128 GB HBM3)                   │   │
-│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐      │   │
-│  │  │ Agent 1 │  │ Agent 2 │  │ Agent 3 │  │ Agent 4 │      │   │
-│  │  │(Reasoner)│  │(Retriever)│ │(Reranker)│ │(Summarizer)│   │   │
-│  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘      │   │
-│  │              ◄──── Shared KV Cache Prefix ────►         │   │
-│  └──────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Pipeline Agents
-
-| Agent | Thinking Mode | Role |
-|-------|--------------|------|
-| **Critic** | CoT (chain-of-thought) | Evaluates response quality, flags issues |
-| **Responder** | CoT | Generates primary responses with reasoning |
-| **Retriever** | Non-thinking | Fast context retrieval from vector store |
-| **Reranker** | Non-thinking | Re-ranks retrieval candidates |
-| **Summarizer** | Non-thinking | Condenses context for downstream agents |
-
----
-
-## Features
-
-### Context Registry with TTL Cache
-
-A shared, TTL-backed registry tracks all active contexts in GPU memory. When a new context arrives, SBERT computes semantic similarity against cached entries — if a prefix with >0.92 similarity exists, the new context reuses the cached KV prefix instead of materializing a fresh one.
-
-### Semantic Deduplication (SBERT)
-
-Cross-agent overlap is detected using `sentence-transformers/all-MiniLM-L6-v2`. Embeddings are computed on CPU, cached in registry, and used for O(n) similarity scans against incoming contexts. Threshold is configurable; default is 0.92.
-
-### LLMLingua-2 Compression
-
-Before registration, contexts are compressed using LLMLingua-2 (Microsoft). Compression targets red tokens identified via perplexity analysis. Target ratio: 2–4× compression with <1% semantic loss on benchmark datasets.
-
-### Per-Agent Thinking Mode
-
-Each agent independently toggles chain-of-thought:
-
-- **CoT agents** (critic, responder): Full reasoning chain. Higher quality, higher TTFT.
-- **Non-thinking agents** (retriever, reranker, summarizer): Direct generation. 2× lower TTFT, reduced VRAM pressure.
-
----
-
-## Model Information
-
-**Qwen3.6-35B-A3B**
-
-- 35 billion total parameters
-- 3 billion active parameters (Mixture-of-Experts architecture)
-- AMD Day 0 support announced **April 16, 2026**
-- Per-agent thinking mode enabled at the pipeline level
-
-| Mode | Use Case | Tradeoff |
-|------|----------|----------|
-| CoT (thinking) | Critic, Responder | Higher quality, ~2× TTFT |
-| Non-thinking | Retriever, Reranker, Summarizer | 2× lower TTFT, lower memory |
-
----
-
-## Installation
-
-### Prerequisites
-
-- AMD Instinct MI300X (or compatible ROCm 6.x hardware)
-- ROCm 6.x driver stack
-- Bun ≥ 1.x
-- Docker & Docker Compose (for containerized deployment)
-
-### Step 1: Clone the repository
-
-```bash
-git clone https://github.com/your-org/ContextForge.git
-cd ContextForge
-```
-
-### Step 2: Install dependencies
-
-```bash
-bun install
-```
-
-### Step 3: Configure environment
-
-Copy `.env.example` to `.env` and set required variables:
-
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
-
-Key variables:
-- `VLLM_API_KEY` — vLLM endpoint credentials
-- `ROCm_DEVICE` — GPU device identifier (default: `rocm:0`)
-- `SBERT_MODEL` — Sentence-transformer model (default: `all-MiniLM-L6-v2`)
-- `CONTEXT_TTL_SECONDS` — Registry TTL (default: `300`)
-
-### Step 4: Run
-
-```bash
-# Development
-bun --hot ./contextforge/server.ts
-
-# Production
-docker-compose up --build
+contextforge/
+├── embeddings/
+│   └── embedding_engine.py       # Qwen3-Embedding-0.6B ONNX, LRU, xorshift fallback
+├── kv_offset/
+│   ├── anchor_pool.py              # KVCOMM V4: AnchorOffsetResult, prefix_offsets
+│   └── cla_metadata.py             # CLAMetadataLayer: NON_THOUGHT_ROLES, NAACL 2025
+├── quantization/
+│   └── rotate_kv.py               # RotateKVQuantizer: INV-10 pre-RoPE only, INT4
+├── scheduling/
+│   ├── step_graph.py              # AgentStepGraph: compute_steps_to_execution, DAG
+│   └── pbkv_predictor.py          # PBKVPredictor STUB (production in V5)
+├── serving/
+│   ├── lmcache_bridge.py          # LMCacheConnectorV1, offset hints
+│   ├── atom_plugin.py             # vLLMAtomPlugin: entry_point, pre/post hooks
+│   └── vllm_client.py            # vLLM HTTP client
+├── routing/
+│   └── kv_aware_router.py        # KVAwareRouter: anchor locality + CLA affinity
+├── dedup/
+│   ├── lsh_engine.py              # LSHTokenMatcher: SimHash, block_size=16
+│   └── faiss_index.py             # FAISSContextIndex: dim=512, IVFFlat upgrade
+├── compression/
+│   └── budget_manager.py          # CompressionBudgetManager: segment rates
+├── normalization/
+│   └── prefix_normalizer.py      # PrefixNormalizer: SEPARATOR="\n\n", SHA256
+├── metrics/
+│   ├── vram_monitor.py            # VRAMMonitor: PyRSMI, 5 modes, /sys fallback
+│   └── prometheus_metrics.py     # Full Prometheus stack
+└── registry/
+    ├── context_registry.py        # ContextRegistry V4: all modules wired
+    └── vram_aware_cache.py        # VRAMAwareCache: WORKFLOW_AWARE mode (6)
 ```
 
 ---
 
 ## Benchmark Results
 
-> **Note**: Benchmark numbers pending final run on production cluster. Placeholder values shown for reference.
+> **Pending AMD DevCloud MI300X validation run.**
+> Numbers will be filled in after `demo/run_devcloud.sh` completes on MI300X hardware.
+> Do NOT use placeholder numbers — wait for real output from `demo/benchmark_v4.py`.
 
-### VRAM Reduction
+### Expected Ranges (from paper baselines)
 
-| Configuration | VRAM Usage | Reduction |
-|--------------|-----------|-----------|
-| Baseline (5 agents, no sharing) | ~96 GB | — |
-| ContextForge (with deduplication) | ~31 GB | **68%** |
+| Metric | Baseline (no sharing) | ContextForge V4 | Source |
+|--------|----------------------|-----------------|--------|
+| VRAM peak | ~165 GB | ~98 GB (-41%) | KVCOMM paper |
+| TTFT improvement | — | 15-25% | KVFlow paper |
+| Token savings | 0% | 30-50% | CLA + LCKV combined |
+| RotateKV compression | none | 3.97x (INT4) | RotateKV paper |
 
-### Throughput (AMD MI300X, Qwen3.6-35B-A3B)
+**Run benchmark:**
+```bash
+# On AMD DevCloud MI300X (ROCm 7.x)
+cd ContextForge
 
-| Metric | Baseline | +ContextForge | Improvement |
-|--------|----------|---------------|-------------|
-| Tokens/sec | TBD | TBD | TBD |
-| Avg TTFT (thinking) | TBD ms | TBD ms | TBD% |
-| Avg TTFT (non-thinking) | TBD ms | TBD ms | TBD% |
-| Cache hit rate | 0% | TBD% | — |
+# Install
+pip install -e ".[rocm]" --quiet
+pip install qwen3-embed onnxruntime streamlit prometheus-client --quiet
 
-### Compression Effectiveness (LLMLingua-2)
+# Run tests
+pytest tests/ -v --tb=short
 
-| Dataset | Original Tokens | Compressed | Ratio | Semantic Loss |
-|---------|----------------|------------|-------|---------------|
-| MMLU | TBD | TBD | TBD× | <1% |
-| HumanEval | TBD | TBD | TBD× | <1% |
-| GSM8K | TBD | TBD | TBD× | <1% |
+# Run V4 benchmark (10 scenarios, ~22 GPU-hours if all scenarios)
+python demo/benchmark_v4.py --device rocm:0 --scenarios all
+```
 
 ---
 
-## Docker Deployment
-
-### Build image
+## Installation
 
 ```bash
-docker build -t contextforge:latest .
+git clone https://github.com/SuarezPM/ContextForge
+cd ContextForge
+
+# AMD DevCloud MI300X
+pip install -e ".[rocm]"
+
+# Optional: enable Qwen3-Embedding-0.6B ONNX backend
+pip install qwen3-embed onnxruntime
+
+# Run tests
+pytest tests/ -v --tb=short
+
+# Run benchmark
+python demo/benchmark_v4.py --device rocm:0 --scenarios all
+
+# Run dashboard (after benchmark)
+pip install streamlit prometheus-client
+streamlit run demo/dashboard.py
 ```
-
-### Run with Docker Compose
-
-```bash
-# Basic deployment
-docker-compose up
-
-# With GPU access (AMD MI300X via ROCm)
-docker-compose -f docker-compose.gpu.yml up
-
-# Detached mode
-docker-compose up -d
-```
-
-### Verify deployment
-
-Once running, access:
-- **API**: `http://localhost:8000/docs`
-- **Gradio UI**: `http://localhost:7860`
-
-### Environment variables for Docker
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `VLLM_API_URL` | vLLM endpoint | `http://localhost:8001/v1` |
-| `HF_TOKEN` | HuggingFace token | required |
-| `LOG_LEVEL` | Logging verbosity | `info` |
 
 ---
 
-## Qwen Special Reward
+## Invariant Registry (V4)
 
-This project uses **Qwen3.6-35B-A3B** as its primary LLM generator, running on AMD Instinct MI300X via vLLM with ROCm. Qwen contributes meaningfully to the system: it powers all 5 pipeline agents with per-agent thinking mode control, enabling quality/speed tradeoffs at the agent level.
-
-This submission targets the **Qwen Special Reward — Track 1 (AI Agents & Agentic Workflows)**.
-
-| Prize Track | Target |
-|-------------|--------|
-| **Qwen Special Reward** | Track 1: AI Agents & Agentic Workflows |
+| # | Invariant | Description |
+|---|-----------|-------------|
+| INV-01 | Byte-identical system prompts | All agents must see byte-identical prefix |
+| INV-02 | SEPARATOR = `"\n\n"` | Two newlines between prefix segments |
+| INV-03 | SHA256 prefix validation | Validated at `register_agent()` |
+| INV-04 | FAISS dim = EmbeddingEngine dim | Default 512, must match |
+| INV-05 | LSH block aligned to block_size=16 | PagedAttention boundary |
+| INV-06 | PyRSMI native only | Zero subprocess in hot path |
+| INV-07 | Async-first | All I/O via `asyncio.run_in_executor` |
+| INV-08 | Graceful degradation | Any dep absent → WARNING + fallback |
+| INV-09 | AnchorPool called by ContextRegistry | V4 verified: CONNECTED |
+| INV-10 | RotateKV pre-RoPE ONLY | Never quantize post-RoPE tensors |
 
 ---
 
-## Project Structure
+## V5 Roadmap (In Progress)
 
-```
-ContextForge/
-├── agents/               # Agent implementations
-├── contextforge/         # Core library (registry, dedup, compression)
-├── demo/                 # Gradio demo UI
-├── tests/               # Test suite
-├── .env.example         # Environment template
-├── Dockerfile
-├── docker-compose.yml
-└── README.md
-```
+| Task | Description | Status |
+|------|-------------|--------|
+| TASK-000 | README rewrite | ✅ DONE |
+| TASK-001 | QueueingController (arXiv:2605.04595 ICML 2026) | 🔲 In progress |
+| TASK-002 | VisualKVCache (vLLM-Omni, AMD Batch-Level DP) | 🔲 Pending |
+| TASK-003 | SpeculativeCoordinator (cross-agent speculative decoding) | 🔲 Pending |
+| TASK-004 | PBKVPredictor complete (Markov model) | 🔲 Pending |
+| TASK-005 | BenchmarkDashboard (Streamlit) | 🔲 Pending |
+| TASK-006 | DevCloud runner + benchmark_v5.py | 🔲 Pending |
+
+---
+
+## Hackathon Context
+
+**Built for AMD x LabLab Hackathon 2026 — Track 1: AI Agents & Agentic Workflows.**
+
+Primary hardware: AMD Instinct MI300X via AMD Developer Cloud.
+AMD DevCloud allocation: ~$100 credits (MI300X x1, ROCm 7.x).
+Cost estimate: ~$1.99/hr on MI300X single-GPU.
 
 ---
 
