@@ -1,0 +1,65 @@
+services:
+  vllm:
+    image: ollama/rocm:latest
+    container_name: contextforge-vllm
+    ports:
+      - "8000:8000"
+    environment:
+      - VLLM_API_KEY=${VLLM_API_KEY:-contextforge-local}
+    command: >
+      vllm serve Qwen/Qwen3.6-35B-A3B
+      --enable-prefix-caching
+      --enable-chunked-prefill
+      --tensor-parallel-size 1
+      --reasoning-parser qwen3
+      --trust-remote-code
+      --host 0.0.0.0
+      --port 8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: amd
+              count: 1
+              capabilities: [gpu]
+
+  contextforge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: contextforge
+    ports:
+      - "8001:8001"
+    environment:
+      - VLLM_BASE_URL=http://vllm:8000
+      - VLLM_MODEL=Qwen/Qwen3.6-35B-A3B
+      - CONTEXTFORGE_PORT=8001
+    depends_on:
+      vllm:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  gradio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: contextforge-ui
+    ports:
+      - "7860:7860"
+    environment:
+      - CONTEXTFORGE_PORT=8001
+    depends_on:
+      - contextforge
+    command: python demo/app.py
+
+volumes:
+  models:
