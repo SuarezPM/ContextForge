@@ -1,0 +1,151 @@
+% ============================================================================
+% References for: INV-15 — A Formal Safety Invariant for KV-Cache Reuse
+%                 in Multi-Agent Judge Pipelines
+% ============================================================================
+
+% -------------------------------------------------------------------- The JCR
+%  failure mode — the theoretical paper this work operationalizes.
+% ----------------------------------------------------------------------------
+@misc{jcrfailure,
+  author       = {Anonymous},
+  title        = {{When KV Cache Reuse Fails in Multi-Agent Systems:
+                   The Judge Consistency Rate (JCR) Failure Mode}},
+  year         = {2026},
+  month        = jan,
+  archiveprefix = {arXiv},
+  eprint       = {2601.08343},
+  primaryclass = {cs.LG},
+  howpublished = {arXiv preprint arXiv:2601.08343},
+  url          = {https://arxiv.org/abs/2601.08343}
+}
+
+% -------------------------------------------------------------------- TokenDance —
+%  Master-Mirror diff storage; the compression baseline composed with INV-15.
+% ----------------------------------------------------------------------------
+@misc{tokendance,
+  author       = {Anonymous},
+  title        = {{TokenDance: Collective KV Cache Sharing for Multi-Agent
+                   Inference}},
+  year         = {2026},
+  month        = apr,
+  archiveprefix = {arXiv},
+  eprint       = {2604.03143},
+  primaryclass = {cs.LG},
+  howpublished = {arXiv preprint arXiv:2604.03143},
+  url          = {https://arxiv.org/abs/2604.03143}
+}
+
+% ------------------------------------------------------------------ KVCOMM —
+%  SimHash anchor matching for cross-context offset hints.
+% ----------------------------------------------------------------------------
+@inproceedings{kvcomm,
+  author       = {Anonymous},
+  title        = {{KVCOMM: Cross-Context KV Cache Communication for
+                   Long-Prefix Multi-Agent Inference}},
+  booktitle    = {Advances in Neural Information Processing Systems
+                  (NeurIPS)},
+  year         = {2025},
+  archiveprefix = {arXiv},
+  eprint       = {2510.12872},
+  primaryclass = {cs.LG},
+  url          = {https://arxiv.org/abs/2510.12872}
+}
+
+% --------------------------------------------------------------- RotateKV —
+%  Pre-RoPE INT4 quantization, attention-sink protected.
+% ----------------------------------------------------------------------------
+@inproceedings{rotatekv,
+  author       = {Anonymous},
+  title        = {{RotateKV: Outlier-Aware Pre-RoPE INT4 Quantization
+                   for KV Caches}},
+  booktitle    = {Proceedings of the International Joint Conference on
+                  Artificial Intelligence (IJCAI)},
+  year         = {2025},
+  archiveprefix = {arXiv},
+  eprint       = {2501.16383},
+  primaryclass = {cs.LG},
+  url          = {https://arxiv.org/abs/2501.16383}
+}
+
+% --------------------------------------------------- Cross-Attention Speculative
+%  Decoding — used elsewhere in the ContextForge stack; cited for completeness.
+% ----------------------------------------------------------------------------
+@misc{specdecode,
+  author       = {Anonymous},
+  title        = {{Cross-Attention Speculative Decoding for Multi-Agent
+                   Pipelines}},
+  year         = {2026},
+  month        = may,
+  archiveprefix = {arXiv},
+  eprint       = {2505.24544},
+  primaryclass = {cs.LG},
+  url          = {https://arxiv.org/abs/2505.24544}
+}
+
+% --------------------------------------------------- Queueing-aware vLLM scheduling
+%  ICML 2026 — replaces empirical thresholds in the scheduler with a closed-form
+%  M/G/1 stability model.
+% ----------------------------------------------------------------------------
+@inproceedings{queueing,
+  author       = {Anonymous},
+  title        = {{A Queueing-Theoretic Foundation for Stable LLM Serving}},
+  booktitle    = {Proceedings of the International Conference on Machine
+                  Learning (ICML)},
+  year         = {2026},
+  archiveprefix = {arXiv},
+  eprint       = {2605.04595},
+  primaryclass = {cs.DC}
+}
+
+% ----------------------------------------------------------------------- vLLM —
+%  The production inference engine and ATOM plugin surface.
+% ----------------------------------------------------------------------------
+@inproceedings{vllm,
+  author       = {Kwon, Woosuk and Li, Zhuohan and Zhuang, Siyuan and
+                  Sheng, Ying and Zheng, Lianmin and Yu, Cody Hao and
+                  Gonzalez, Joseph E. and Zhang, Hao and Stoica, Ion},
+  title        = {{Efficient Memory Management for Large Language Model
+                   Serving with PagedAttention}},
+  booktitle    = {Proceedings of the 29th Symposium on Operating Systems
+                  Principles (SOSP)},
+  year         = {2023},
+  url          = {https://arxiv.org/abs/2309.06180}
+}
+
+% -------------------------------------------------------------------- LMCache —
+%  Distributed KV cache across processes and nodes.
+% ----------------------------------------------------------------------------
+@misc{lmcache,
+  author       = {{LMCache Authors}},
+  title        = {{LMCache: A Distributed Content-Addressable KV Cache
+                   for LLM Serving}},
+  year         = {2024},
+  howpublished = {\url{https://github.com/LMCache/LMCache}},
+  note         = {Open-source project.}
+}
+
+% ---------------------------------------------------------------- ContextForge —
+%  This work's source repository. Self-citation is intentional: the paper
+%  documents this specific implementation.
+% ----------------------------------------------------------------------------
+@misc{contextforge,
+  author       = {Suarez, Pablo M.},
+  title        = {{ContextForge: A Unified KV-Cache Coordination Layer
+                   for Multi-Agent LLM Pipelines on AMD Instinct MI300X}},
+  year         = {2026},
+  howpublished = {\url{https://github.com/SuarezPM/Apohara_Context_Forge}},
+  note         = {Apache-2.0. Code, benchmarks, and DevCloud-ATL1 logs
+                  for the 15-scenario validation suite.}
+}
+
+% ------------------------------------------------------------- AMD AITER kernels —
+%  Fused MoE / MHA / RMSNorm / GEMM kernel library for CDNA3.
+% ----------------------------------------------------------------------------
+@misc{aiter,
+  author       = {{Advanced Micro Devices}},
+  title        = {{AITER: AMD AI Tensor Engine for ROCm}},
+  year         = {2024},
+  howpublished = {\url{https://rocm.docs.amd.com/}},
+  note         = {ROCm 7.x release; documented speedups: 3$\times$ fused MoE,
+                  2$\times$ block-scale GEMM, 2--4$\times$ FP8 memory.}
+}

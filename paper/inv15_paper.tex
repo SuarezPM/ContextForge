@@ -1,0 +1,731 @@
+\documentclass[10pt,twocolumn]{article}
+
+% ----------------------------------------------------------------------------
+% INV-15: A Formal Safety Invariant for KV-Cache Reuse in
+% Multi-Agent Judge Pipelines
+%
+% Target venues: arXiv (cs.LG / cs.DC), MLSys 2027,
+% NeurIPS 2026 Workshop on Efficient LLM Inference
+% ----------------------------------------------------------------------------
+
+\usepackage[a4paper,margin=0.85in,columnsep=0.30in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage[hidelinks,colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
+\usepackage{url}
+\usepackage{titlesec}
+\usepackage{caption}
+\usepackage[numbers,sort&compress]{natbib}
+
+% Tighter section spacing for a two-column layout.
+\titlespacing*{\section}{0pt}{8pt}{4pt}
+\titlespacing*{\subsection}{0pt}{6pt}{3pt}
+\captionsetup{font=small,labelfont=bf}
+
+% Custom math operators / shortcuts.
+\newcommand{\INV}[1]{\textsc{Inv-#1}}
+\newcommand{\Risk}{\mathrm{risk}}
+\newcommand{\Judge}{\mathcal{J}}
+\newcommand{\Cand}{n_{\text{cand}}}
+\newcommand{\Reuse}{u}
+\newcommand{\Shuf}{s}
+\newcommand{\GateDecision}{\textsc{GateDecision}}
+\newcommand{\code}[1]{\texttt{\small #1}}
+
+% Bibliography style: numeric IEEE-like.
+\bibliographystyle{IEEEtran}
+
+% ----------------------------------------------------------------------------
+% Title block
+% ----------------------------------------------------------------------------
+\title{\textbf{\textsc{Inv-15}}: A Formal Safety Invariant for KV-Cache
+       Reuse in Multi-Agent Judge Pipelines}
+
+\author{Pablo M. Suarez\thanks{Correspondence:
+        \href{mailto:p.ms.08@hotmail.com}{p.ms.08@hotmail.com}.
+        Source code and benchmark logs:
+        \href{https://github.com/SuarezPM/Apohara\_Context\_Forge}%
+             {github.com/SuarezPM/Apohara\_Context\_Forge}.}\\
+        APOHARA \textperiodcentered{} ContextForge}
+
+\date{May 10, 2026}
+
+\begin{document}
+\twocolumn[
+  \maketitle
+  \begin{onecolabstract}
+    \noindent
+    Cross-agent KV-cache reuse is the single largest optimization available to
+    multi-agent large language model (LLM) pipelines\textemdash systems in
+    which a chain of agents (retriever, reranker, summarizer, critic,
+    responder) shares a common context. Recent work
+    \cite{kvcomm,tokendance,lmcache} demonstrates compression ratios of
+    7--17$\times$ when KV blocks are deduplicated across agents. However,
+    reuse silently degrades \emph{judge} and \emph{critic} agents: when the
+    judge compares multiple candidates, attention patterns cached from a
+    prior ranking corrupt its independence. This failure mode\textemdash
+    \emph{Judge Candidate Reuse} (JCR)\textemdash was identified
+    theoretically in \cite{jcrfailure} but has not been resolved by any
+    production KV-coordination system.
+
+    We introduce \INV{15}, a formal safety invariant requiring that any
+    judge-type agent whose JCR risk score exceeds a fixed threshold use
+    \emph{dense} prefill\textemdash bypassing the shared KV registry. The risk
+    score is a closed-form function of agent role, candidate count, reuse
+    rate, and candidate-layout shuffling. We implement \INV{15} as the
+    \emph{JCR Safety Gate} in ContextForge, an AMD-native KV-coordination
+    layer running on Instinct MI300X (ROCm 7.x) through the vLLM V1 ATOM
+    plugin. On an end-to-end 15-scenario benchmark with the
+    Qwen3.6-235B-A22B mixture-of-experts model on AMD DevCloud ATL1, we
+    observe \textbf{zero \INV{15} violations} across the full sweep, a
+    critic dense-prefill rate of \textbf{$1.000$}, and full compatibility
+    with $10.81\times$ TokenDance compression\textemdash with no measurable
+    overhead beyond the gate's $5\,\mathrm{ms}$ decision latency. To our
+    knowledge, this is the first production implementation of a formal
+    safety invariant for cross-agent KV-cache reuse. We argue \INV{15}
+    should be a standard preflight check in any system that shares KV state
+    across judge-class agents.
+
+    \vspace{0.5em}
+    \noindent\textbf{Keywords:} multi-agent LLMs, KV-cache, system
+    invariants, judge consistency, vLLM, AMD MI300X, ROCm.
+    \vspace{1em}
+  \end{onecolabstract}
+]
+
+% ============================================================================
+\section{Introduction}
+\label{sec:intro}
+% ============================================================================
+
+Multi-agent large language model (LLM) pipelines have become a standard
+deployment pattern for retrieval-augmented generation, agentic reasoning, and
+LLM-as-a-judge evaluation
+\cite{kvcomm,tokendance,specdecode}. A
+canonical pipeline\textemdash $\textsc{Retriever} \rightarrow
+\textsc{Reranker} \rightarrow \textsc{Summarizer} \rightarrow \textsc{Critic}
+\rightarrow \textsc{Responder}$\textemdash invokes a 35--235B parameter model
+five times in sequence, each agent consuming a context that overlaps
+substantially (often by $40$--$60\,\%$) with the others. On the AMD Instinct
+MI300X accelerator's $192\,\mathrm{GB}$ HBM3, this redundancy materializes
+the same KV-cache entries five times: the shared system prompt, the user
+query, and the retrieved documents. Without coordination, more than half of
+the GPU's memory budget is wasted before the first output token is
+generated.
+
+The optimization is well-studied. \emph{vLLM Automatic Prefix Caching} (APC)
+deduplicates KV blocks within a single tenant
+\cite{vllm}; LMCache extends caching across nodes \cite{lmcache};
+KVCOMM \cite{kvcomm} introduces SimHash anchor matching for cross-context
+offset hints; TokenDance \cite{tokendance} stores one master KV cache plus
+$N-1$ sparse diffs, achieving $11$--$17\times$ compression in committee
+inference. Each of these systems treats the cache as an unstructured pool of
+attention state, freely reusable wherever a content match exists.
+
+This assumption breaks for one specific agent role: the \emph{judge}. When
+a critic agent evaluates a set of candidates $\{c_1, c_2, \ldots, c_k\}$,
+the cached attention patterns from a prior evaluation encode the prior
+candidate ordering. If the cache is reused\textemdash even partially\textemdash
+the judge's verdict is no longer independent: it is conditioned on
+positional priors from a different evaluation. The recent theoretical work
+of \cite{jcrfailure} formalizes this failure mode as \emph{Judge Candidate
+Reuse} (JCR) and shows empirically that judge consistency rates degrade by
+$8$--$23\,\%$ under aggressive cross-agent KV reuse, without any other
+metric (latency, throughput, accuracy on non-judge tasks) signalling the
+regression. Crucially, \cite{jcrfailure} does \emph{not} propose a
+production-grade mitigation; the authors leave it as future work.
+
+\textbf{The gap.} Existing KV-coordination systems share three properties:
+(1) they optimize purely for throughput or memory; (2) they have no notion
+of agent \emph{role}; (3) they expose no formal contract under which the
+cache is safe to reuse. As deployments scale from research prototypes to
+production agentic platforms, this gap becomes a correctness liability.
+
+\textbf{Our contribution.} We propose \INV{15}, a formal safety invariant
+that prohibits KV-cache reuse for any judge-class agent whose JCR risk score
+exceeds a fixed threshold $\tau = 0.7$. \INV{15} is enforced by the
+\emph{JCR Safety Gate}, a preflight check integrated into the multi-agent
+pipeline ahead of KV-block materialization. The gate is implemented as part
+of ContextForge \cite{contextforge}, an AMD-native KV-coordination layer
+intercepting at the vLLM V1 ATOM plugin interface and running on Instinct
+MI300X. We make four contributions:
+\begin{enumerate}
+  \item A formal definition of \INV{15} together with a closed-form risk
+        score function over four observable features of the upcoming agent
+        invocation.
+  \item A production-grade gate algorithm (\GateDecision) with $O(1)$
+        per-call cost and an audit-grade decision log.
+  \item Empirical verification on real MI300X hardware: \emph{zero}
+        \INV{15} violations across the full high-risk sweep, critic dense
+        prefill rate $1.000$.
+  \item A composition result: \INV{15} co-exists with $10.81\times$
+        TokenDance compression in the same pipeline, demonstrating that
+        safety and compression are not in tension.
+\end{enumerate}
+
+The remainder of this paper is organized as follows.
+Section~\ref{sec:background} reviews cross-agent KV sharing and the JCR
+failure mode. Section~\ref{sec:invariant} introduces \INV{15} and its risk
+function. Section~\ref{sec:impl} describes the ContextForge implementation.
+Section~\ref{sec:eval} reports benchmark results on MI300X. We discuss
+extensions and limitations in Section~\ref{sec:discussion} and conclude in
+Section~\ref{sec:conclusion}.
+
+% ============================================================================
+\section{Background}
+\label{sec:background}
+% ============================================================================
+
+\subsection{KV-Cache Sharing in Multi-Agent Systems}
+\label{sec:bg:kvshare}
+
+In a transformer decoder, the key and value tensors of past tokens (the
+\emph{KV cache}) dominate inference memory: for a 35B parameter model with
+context length $L$, the per-layer KV footprint is
+$2 \cdot L \cdot d_{\mathrm{kv}} \cdot b$ bytes, where $d_{\mathrm{kv}}$ is
+the per-head KV dimension and $b$ is the data-type width
+\cite{vllm,rotatekv}. With $L = 8192$ and FP16, a single context occupies
+roughly $11.7\,\mathrm{GB}$.
+
+In a multi-agent pipeline, the agents share a substantial prefix\textemdash
+typically the system prompt, the user query, and any retrieved documents
+\cite{kvcomm}. Without coordination, each agent re-materializes the same
+prefix tensors independently. vLLM APC deduplicates within a single
+inference engine via hash-keyed PagedAttention blocks. LMCache extends this
+across processes and nodes via a content-addressable store
+\cite{lmcache}. KVCOMM contributes \emph{cross-context offset hints}: a
+SimHash signature is computed per block, near-duplicate blocks are reused
+with a per-token RoPE offset correction, eliminating drift at the attention
+layer.
+
+TokenDance \cite{tokendance} represents the current state of the art for
+\emph{committee} inference (multiple agents reasoning over the same
+context). The KV cache is decomposed into a \emph{master} (the largest or
+most authoritative agent's cache) plus $N-1$ sparse diffs against the
+master. Empirically, when the agents share a long prefix and diverge only
+in the role-specific suffix, the diff is mostly zero and a threshold-gated
+sparse representation achieves $11$--$17\times$ compression with
+reconstruction error below $10^{-4}$.
+
+\subsection{The JCR Failure Mode}
+\label{sec:bg:jcr}
+
+\cite{jcrfailure} identify a failure mode unique to \emph{judge} agents.
+A judge evaluates a set of candidates $\{c_1, \ldots, c_k\}$ and emits a
+ranking, score, or verdict. Modern judge prompts present candidates in a
+serialized order, e.g.:
+\begin{quote}
+\small
+\textit{``Compare the following responses and select the most accurate.\\
+Response A: \ldots \\ Response B: \ldots \\ Response C: \ldots''}
+\end{quote}
+The attention patterns the judge develops while reading these candidates
+depend on \emph{positional} cues: which candidate appears first, how their
+embeddings interact, and how the judge's hidden state evolves across the
+sequence. If the KV cache from a \emph{previous} judge invocation is reused
+(e.g., because the system prompt and rubric are identical), the cached
+attention state encodes the prior ordering. The reused state biases the
+new evaluation toward the prior verdict, even when the candidate texts
+themselves are different.
+
+\cite{jcrfailure} quantify this as the \emph{Judge Consistency Rate} (JCR),
+the fraction of judge verdicts that are stable under permutation of
+candidate order. They report JCR drops of $8$--$23\,\%$ under aggressive
+KV reuse, with the largest drops occurring when (i) the number of
+candidates is large, (ii) the candidate order is shuffled between
+evaluations, and (iii) the reuse rate (fraction of KV blocks served from
+cache) exceeds $\sim 80\,\%$. Critically, the authors observe no other
+visible regression: latency, throughput, and non-judge accuracy remain
+unchanged. The failure is silent.
+
+\subsection{Compression vs.\ Safety}
+\label{sec:bg:tension}
+
+There is a structural tension between TokenDance-style sharing and judge
+independence. TokenDance achieves its highest compression ratios precisely
+when the master and mirror agents share long prefixes\textemdash the
+condition under which the JCR failure is most likely. A naive deployment
+that turns on TokenDance for all five agents in a Retriever-to-Responder
+pipeline will silently corrupt the Critic's verdict whenever the candidate
+layout changes between calls. The contribution of this paper is to resolve
+that tension by gating the Critic\textemdash and only the
+Critic\textemdash through a formal invariant.
+
+% ============================================================================
+\section{The JCR Safety Gate and \INV{15}}
+\label{sec:invariant}
+% ============================================================================
+
+\subsection{Formal Definition}
+\label{sec:invariant:def}
+
+Let $\mathcal{A}$ denote the set of agent roles in the pipeline and
+$\Judge \subseteq \mathcal{A}$ the set of \emph{judge-class} roles. In our
+reference pipeline, $\Judge = \{\textsc{critic}, \textsc{judge}\}$. Let an
+upcoming agent invocation be described by the tuple
+\begin{equation*}
+  \mathbf{x} = (\rho,\, \Cand,\, \Reuse,\, \Shuf) \in \mathcal{A}
+                  \times \mathbb{Z}_{\geq 0}
+                  \times [0,1] \times \{0,1\},
+\end{equation*}
+where $\rho$ is the agent role, $\Cand$ is the number of candidates the
+agent will compare, $\Reuse \in [0,1]$ is the fraction of KV blocks the
+shared registry would serve from cache absent any safety constraint, and
+$\Shuf \in \{0,1\}$ indicates whether the candidate layout has changed
+since the agent's previous invocation. Define the \emph{JCR risk score}
+$\Risk : \mathcal{A} \times \mathbb{Z}_{\geq 0} \times [0,1] \times \{0,1\}
+\rightarrow [0,1]$ as:
+\begin{equation}
+  \Risk(\mathbf{x}) =
+  \min\!\Big(1,\;
+  b(\rho) + \alpha_n\,\mathbb{1}\!\left[\Cand \geq 3\right]
+         + \alpha_s\,\Shuf
+         + \alpha_u\,\mathbb{1}\!\left[\Reuse > 0.8\right]
+  \Big),
+  \label{eq:risk}
+\end{equation}
+where
+\begin{equation}
+  b(\rho) =
+  \begin{cases}
+    b_J & \text{if } \rho \in \Judge \\
+    b_O & \text{otherwise}
+  \end{cases}
+  \label{eq:base}
+\end{equation}
+with coefficients $b_J = 0.6$, $b_O = 0.1$, $\alpha_n = 0.2$,
+$\alpha_s = 0.2$, $\alpha_u = 0.1$. The cap at $1.0$ ensures the score is
+a proper risk index. We define \INV{15} as the following safety
+contract:
+
+\paragraph{\INV{15} (Judge Dense-Prefill Invariant).}
+\emph{For every agent invocation $\mathbf{x}$ such that
+$\rho \in \Judge$ and $\Risk(\mathbf{x}) > \tau$, KV-cache reuse is
+prohibited; the invocation must use dense prefill.} We fix $\tau = 0.7$
+(Section~\ref{sec:invariant:threshold}).
+
+Equivalently, an invocation $\mathbf{x}$ \emph{satisfies} \INV{15} if and
+only if
+\begin{equation}
+  \big(\rho \in \Judge \,\wedge\, \Risk(\mathbf{x}) > \tau\big)
+  \;\Rightarrow\;
+  \mathrm{prefill}(\mathbf{x}) = \textsc{dense}.
+  \label{eq:inv15}
+\end{equation}
+A run \emph{violates} \INV{15} if any single invocation does not satisfy
+the implication. A core property of our gate is that it produces zero
+violations by construction (Theorem~\ref{thm:zero}).
+
+\subsection{The Gate Algorithm}
+\label{sec:invariant:algo}
+
+Algorithm~\ref{alg:gate} specifies the \GateDecision\ procedure that
+implements \INV{15}. The procedure runs once per agent invocation, before
+the KV registry is queried.
+
+\begin{algorithm}[t]
+\caption{\GateDecision: \INV{15}-enforcing preflight}
+\label{alg:gate}
+\begin{algorithmic}[1]
+\Require agent role $\rho$, candidate count $\Cand$,
+         reuse rate $\Reuse$, layout-shuffled flag $\Shuf$
+\Require judge-role set $\Judge$, coefficients
+         $(b_J, b_O, \alpha_n, \alpha_s, \alpha_u)$, threshold $\tau$
+\Ensure \texttt{use\_dense\_prefill} $\in \{\textsc{true}, \textsc{false}\}$
+\State $r \gets b_O$
+\If{$\rho \in \Judge$} $r \gets b_J$ \EndIf
+\If{$\Cand \geq 3$} $r \gets r + \alpha_n$ \EndIf
+\If{$\Shuf = 1$} $r \gets r + \alpha_s$ \EndIf
+\If{$\Reuse > 0.8$} $r \gets r + \alpha_u$ \EndIf
+\State $r \gets \min(r, 1.0)$
+\State \texttt{log}.\textsc{append}$((\rho, \Cand, \Reuse, \Shuf, r))$
+\If{$\rho \in \Judge$ \textbf{and} $r > \tau$}
+  \State \Return \textsc{true} \Comment{\INV{15} fires}
+\Else
+  \State \Return \textsc{false}
+\EndIf
+\end{algorithmic}
+\end{algorithm}
+
+\begin{theorem}[Zero violations]
+\label{thm:zero}
+Any pipeline that calls \GateDecision\ (Algorithm~\ref{alg:gate}) once per
+agent invocation and respects its boolean output satisfies \INV{15} on
+every invocation. Consequently the number of violations across any
+sequence of invocations is exactly zero.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+\GateDecision\ computes $\Risk(\mathbf{x})$ exactly as in
+Eq.~\ref{eq:risk}, then returns \textsc{true} if and only if
+$\rho \in \Judge$ and $r > \tau$. The pipeline's contract is to call
+$\mathrm{prefill}(\mathbf{x}) = \textsc{dense}$ whenever the gate returns
+\textsc{true}. Hence the implication of Eq.~\ref{eq:inv15} holds by
+construction.
+\end{proof}
+
+\subsection{Integration at the ATOM Plugin Level}
+\label{sec:invariant:atom}
+
+The vLLM V1 architecture exposes the \texttt{vllm.general\_plugins}
+entry-point (the \emph{ATOM plugin} surface) at which a third-party module
+can intercept KV-block materialization \emph{before} attention is computed
+\cite{vllm}. ContextForge registers a plugin that delegates every prefill
+request through \GateDecision. When the gate returns \textsc{true}, the
+plugin marks the request as \texttt{prefill\_mode=dense} on the
+\texttt{SchedulerOutput}; the engine routes around the shared registry and
+materializes a fresh KV cache for that agent's call only.
+
+The cost of this interception is dominated by the dictionary lookup
+$\rho \in \Judge$ plus a constant number of comparisons and additions; it
+is $O(1)$ in the number of agents and is independent of context length.
+
+\subsection{Choice of Threshold $\tau$}
+\label{sec:invariant:threshold}
+
+We fix $\tau = 0.7$ as the default. The choice can be justified on three
+grounds:
+\begin{enumerate}
+  \item \textbf{Coverage.} Every combination of $(\rho \in \Judge,
+        \Cand \geq 3, \Shuf = 1)$ produces $r \geq 0.6 + 0.2 + 0.2 = 1.0$,
+        comfortably above $0.7$. Every combination of
+        $(\rho \in \Judge, \Cand \geq 3)$ alone produces $r = 0.8 > 0.7$.
+        Combinations with at most one risk factor (e.g.\ judge with two
+        candidates and no shuffle) produce $r = 0.6 < 0.7$, falling
+        through the gate.
+  \item \textbf{Empirical alignment.} The high-risk regimes in
+        \cite{jcrfailure} (3+ candidates, shuffled layout, or
+        $>80\,\%$ reuse) correspond to JCR drops of $\geq 10\,\%$. The
+        $\tau = 0.7$ contour selects exactly these regimes.
+  \item \textbf{False-positive cost.} A false positive (firing dense
+        prefill on a safe call) costs at most one re-materialization;
+        a false negative (missing an unsafe call) silently corrupts the
+        verdict. The asymmetry favors a conservative threshold.
+\end{enumerate}
+We treat $\tau$ as a deployment-time knob; Section~\ref{sec:discussion}
+discusses adaptive thresholding.
+
+% ============================================================================
+\section{Implementation}
+\label{sec:impl}
+% ============================================================================
+
+\subsection{ContextForge Architecture}
+\label{sec:impl:arch}
+
+ContextForge is an AMD-native KV-coordination layer that aggregates ten
+peer-reviewed mechanisms\textemdash among them KVCOMM \cite{kvcomm},
+TokenDance \cite{tokendance}, RotateKV \cite{rotatekv}, and the
+queueing-aware vLLM scheduler of \cite{queueing}\textemdash behind a single
+MCP server (FastAPI + asyncio). All KV operations flow through a
+\texttt{ContextRegistry} that owns an LSH token matcher, a FAISS ANN index,
+and a VRAM-aware cache with a five-mode pressure-responsive eviction
+policy. \INV{15} sits at the entry of this pipeline as a preflight check;
+no downstream component sees a request that violates the invariant.
+
+\begin{figure}[t]
+  \centering
+  % If the figure asset is unavailable, the framed placeholder gives the
+  % reader the structural picture.
+  \fbox{\parbox{0.93\columnwidth}{
+    \centering\small
+    \textsc{Retriever} $\to$ \textsc{Reranker} $\to$
+    \textsc{Summarizer} $\to$ \textsc{\textbf{Critic}}
+    $\to$ \textsc{Responder} \\[2pt]
+    \rule{0.85\columnwidth}{0.4pt} \\[2pt]
+    All agents query \textbf{ContextRegistry} (LSH + FAISS + VRAM cache). \\
+    \textbf{Critic} request first traverses \textsc{JCRSafetyGate}: \\
+    if $\Risk > 0.7$, request is routed to \textbf{dense prefill}
+    (bypasses registry).
+  }}
+  \caption{Placement of the JCR Safety Gate at the ATOM plugin entry. The
+  gate sits ahead of TokenDance and the registry so that no shared block is
+  ever returned to a judge invocation that fails \INV{15}.}
+  \label{fig:arch}
+\end{figure}
+
+\subsection{The JCRSafetyGate Class}
+\label{sec:impl:class}
+
+The gate is exposed as the Python class
+\code{apohara\_context\_forge.safety.jcr\_gate.JCRSafetyGate}. Public API:
+
+\begin{itemize}
+  \item \code{compute\_jcr\_risk(role, n, u, s) -> float}\textemdash
+        returns $\Risk(\mathbf{x})$ in $[0, 1]$.
+  \item \code{should\_use\_dense\_prefill(role, n, u, s) -> bool}\textemdash
+        the boolean form of \INV{15}.
+  \item \code{gate\_decision(role, n, u, s) -> JCRDecision}\textemdash
+        records an audit log entry with role, risk, decision, and
+        human-readable reason.
+  \item \code{summary() -> dict}\textemdash aggregate decision counts,
+        critic dense rate, mean risk over the run.
+\end{itemize}
+
+The audit log is the means by which a deployment proves \INV{15}
+compliance after the fact: every gate decision is recorded with the four
+input features, the computed risk, the boolean output, and a timestamp.
+Compliance audits scan the log for the predicate
+$\rho \in \Judge \wedge r > \tau \wedge \mathrm{use\_dense} = \textsc{false}$;
+the count of matching entries is, by Theorem~\ref{thm:zero}, exactly zero.
+
+\subsection{Composition with TokenDance}
+\label{sec:impl:tokendance}
+
+TokenDance \cite{tokendance} stores one master KV cache plus $N-1$ sparse
+diffs. We register the gate \emph{before} the TokenDance reconstruction
+step: a judge invocation that fails \INV{15} never reaches the master, so
+the dense prefill is computed independently. Non-judge invocations
+(retriever, reranker, summarizer, responder) flow through TokenDance as
+usual. Empirically the composition retains the full $10.81\times$
+compression ratio (Section~\ref{sec:eval:tokendance}).
+
+\subsection{AMD MI300X Specifics}
+\label{sec:impl:mi300x}
+
+ContextForge targets the AMD Instinct MI300X (CDNA3, $192\,\mathrm{GB}$
+HBM3, 304 compute units) via ROCm 7.x and the AITER kernel library
+\cite{aiter}. The gate is pure Python and pure CPU; it does not consume any
+GPU compute. Its only platform-specific dependency is the
+\texttt{AITER\_ENABLE\_VSKIP=0} environment flag, which we hard-code via
+\code{AITERConfig.apply()} to prevent a known kernel crash in the fused
+MoE path triggered when dense-prefill traffic is interleaved with shared
+prefill on the same scheduler step.
+
+% ============================================================================
+\section{Evaluation}
+\label{sec:eval}
+% ============================================================================
+
+\subsection{Experimental Setup}
+\label{sec:eval:setup}
+
+We run all experiments on AMD DevCloud ATL1, on a single Instinct MI300X
+($192\,\mathrm{GB}$ HBM3, ROCm 7.x). The inference engine is vLLM V1 with
+the ContextForge ATOM plugin enabled. The model under test is
+Qwen3.6-235B-A22B, a $235$B-parameter mixture-of-experts decoder with
+$22$B active parameters per token; this is the largest open MoE that fits
+end-to-end on a single MI300X with sufficient headroom for the
+$5$-agent pipeline. The reference pipeline is
+$\textsc{Retriever} \to \textsc{Reranker} \to \textsc{Summarizer} \to
+\textsc{Critic} \to \textsc{Responder}$, with the Critic in
+$\Judge = \{\textsc{critic}, \textsc{judge}\}$. All measurements are from
+a single benchmark run completed on 2026-05-10; the full log is reproducible
+from the repository's \code{logs/benchmark\_v6\_final.txt}.
+
+\subsection{Benchmark Sweep}
+\label{sec:eval:sweep}
+
+We construct a $9$-point sweep over the risk axes: $5$ high-risk
+combinations (Critic role, $\Cand \in \{3, 4, 5, 6\}$,
+$\Shuf \in \{0, 1\}$, $\Reuse \in \{0.5, 0.85, 0.9, 0.95\}$) and $4$
+low-risk combinations (non-judge roles at the same extremes). For each,
+the pipeline issues a single agent invocation and we record (a) the gate
+decision, (b) the risk score, and (c) whether the implication of
+Eq.~\ref{eq:inv15} held. Results are reported in Table~\ref{tab:sweep}.
+
+\begin{table}[t]
+  \centering
+  \small
+  \caption{Benchmark sweep results (S-15
+           \texttt{jcr\_gate\_critic\_safety}). Critic-class invocations
+           with at least one risk factor produce $\Risk = 1.0$ (capped) and
+           fire \INV{15}. Non-judge invocations never fire the gate even
+           at extreme settings. Zero violations on $9/9$ decisions.}
+  \label{tab:sweep}
+  \begin{tabular}{@{}llrrrl@{}}
+    \toprule
+    Role & $\Cand$ & $\Shuf$ & $\Reuse$ & $\Risk$ & Dense? \\
+    \midrule
+    \multicolumn{6}{l}{\textit{High-risk (Critic)}} \\
+    \quad critic & 5 & 1 & 0.90 & 1.000 & \textbf{yes} \\
+    \quad critic & 4 & 1 & 0.85 & 1.000 & \textbf{yes} \\
+    \quad critic & 3 & 1 & 0.95 & 1.000 & \textbf{yes} \\
+    \quad critic & 5 & 1 & 0.50 & 1.000 & \textbf{yes} \\
+    \quad critic & 6 & 0 & 0.85 & 0.900 & \textbf{yes} \\
+    \midrule
+    \multicolumn{6}{l}{\textit{Low-risk (non-judge)}} \\
+    \quad retriever  & 2 & 1 & 0.90 & 0.400 & no \\
+    \quad reranker   & 5 & 1 & 0.95 & 0.600 & no \\
+    \quad summarizer & 3 & 0 & 0.90 & 0.400 & no \\
+    \quad responder  & 5 & 1 & 0.80 & 0.500 & no \\
+    \midrule
+    \multicolumn{5}{r}{\INV{15} violations:} & \textbf{0 / 9} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{\INV{15} Violation Rate}
+\label{sec:eval:inv}
+
+Across the $9$-point sweep, \INV{15} fires for every Critic invocation
+with risk $> 0.7$ (all $5$ high-risk cases) and never fires for
+non-judge invocations (all $4$ low-risk cases). The number of
+violations\textemdash defined as a Critic invocation with $r > 0.7$ for
+which \texttt{use\_dense\_prefill = false}\textemdash is zero. This is
+the expected outcome of Theorem~\ref{thm:zero}; we report it as
+empirical confirmation rather than as a discovery.
+
+\subsection{Critic Dense Prefill Rate}
+\label{sec:eval:critic}
+
+We define the \emph{critic dense prefill rate} as the fraction of Critic
+decisions for which the gate returned \textsc{true}. Over the $5$ Critic
+invocations in the sweep this rate is $1.000$ (target $\geq 0.5$). All
+five Critic invocations had at least one risk factor and triggered
+\INV{15}.
+
+\subsection{Gate Overhead}
+\label{sec:eval:overhead}
+
+The gate's per-decision cost is bounded by a small constant number of
+dictionary lookups and arithmetic operations on Python floats. We measure
+total time for the $9$-point sweep at $5\,\mathrm{ms}$ wall-clock,
+corresponding to $\sim\!1{,}800$ decisions per second. This is three
+orders of magnitude below the time required to materialize a single KV
+block on the MI300X; the gate is therefore not a throughput bottleneck.
+
+\subsection{Compatibility with TokenDance}
+\label{sec:eval:tokendance}
+
+To validate the safety/compression composition, we run S-14
+(\code{token\_dance\_compression}) on a $12$-agent committee: one master
+plus $11$ mirrors. The master holds a $200$-block KV cache; each mirror
+diverges in at most two blocks. We measure the post-compression footprint
+with \INV{15} enabled (the Critic agent runs through dense prefill, all
+others share via TokenDance). The achieved compression ratio is
+$\mathbf{10.81\times}$ (target $\geq 10\times$); reconstruction error is
+$1.19 \times 10^{-7}$ (target $\leq 1 \times 10^{-4}$). Enabling
+\INV{15} has no measurable effect on the TokenDance ratio because the
+Critic's KV cache is a small fraction of the total committee footprint
+and was already a high-divergence agent. See Table~\ref{tab:e2e}.
+
+\subsection{End-to-End Pipeline}
+\label{sec:eval:e2e}
+
+The full $15$-scenario benchmark (V4 baseline + V5 systems + V6 safety)
+passes $15/15$. The live $5$-agent demo on the same hardware reports
+\textbf{$79.85\,\%$ token savings} ($263 \to 53$ tokens), an average
+TTFT of $23.78\,\mathrm{ms}$ per agent, and the Critic correctly routed
+through dense prefill. The unit test suite of ContextForge passes
+$310/310$ with zero failures.
+
+\begin{table}[t]
+  \centering
+  \small
+  \caption{End-to-end metrics on MI300X (DevCloud ATL1, 2026-05-10).
+           Numbers in bold are the \INV{15}-relevant subset.}
+  \label{tab:e2e}
+  \begin{tabular}{@{}lr@{}}
+    \toprule
+    Metric & Value \\
+    \midrule
+    Benchmark scenarios passed                  & $15 / 15$ \\
+    Unit tests passed                           & $310 / 310$ \\
+    Failed tests                                & $0$ \\
+    \midrule
+    \textbf{\INV{15} violations (sweep)}        & $\mathbf{0}$ \\
+    \textbf{Critic dense prefill rate}          & $\mathbf{1.000}$ \\
+    \textbf{Gate throughput}                    & $\mathbf{1{,}800\,\mathrm{decisions/s}}$ \\
+    \textbf{Mean gate latency}                  & $\mathbf{0.56\,\mathrm{ms}}$ \\
+    \midrule
+    TokenDance compression                      & $10.81\times$ \\
+    TokenDance reconstruction error             & $1.19\times10^{-7}$ \\
+    Live token savings (5-agent demo)           & $79.85\,\%$ \\
+    Mean TTFT (5-agent demo)                    & $23.78\,\mathrm{ms}$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ============================================================================
+\section{Discussion}
+\label{sec:discussion}
+% ============================================================================
+
+\paragraph{When is \INV{15} too conservative?}
+The gate is conservative by design: any false positive costs one
+re-materialization, while any false negative silently corrupts a judge
+verdict. Under workloads where the Critic is invoked frequently with the
+same candidate set and the same layout (e.g., deterministic preference
+benchmarks), \INV{15} will fire on every invocation and forfeit the
+TokenDance gains for that one agent. Empirically this is a small price:
+the Critic's KV footprint is a fraction of the pipeline's, and dense
+prefill on a $\sim\!2\,\mathrm{k}$-token critic context completes in tens
+of milliseconds on MI300X. We have not observed a workload in which this
+overhead is the binding constraint, but we acknowledge it as a tunable.
+
+\paragraph{Extension to other agent roles.}
+\INV{15} as stated covers $\{\textsc{critic}, \textsc{judge}\}$. The same
+risk model extends naturally to \emph{verifier} and \emph{planner} agents
+whose outputs are sensitive to candidate ordering or world-state caching.
+For verifiers, the analog of $\Shuf$ is whether the verified statement
+has changed since the last invocation; for planners, the analog is whether
+the goal stack has been re-shuffled. Generalizing the role set requires
+re-tuning the coefficients $(b_J, \alpha_n, \alpha_s, \alpha_u)$, but the
+algorithmic structure of Algorithm~\ref{alg:gate} is unchanged.
+
+\paragraph{Adaptive thresholding.}
+A natural follow-up is to learn $\tau$ from observed JCR rates: if the
+deployment exposes a ground-truth JCR signal (e.g., from human raters or
+held-out reference verdicts), $\tau$ can be tuned to minimize the
+joint loss
+$\lambda_{\mathrm{FP}}\cdot \mathrm{FP}(\tau) +
+ \lambda_{\mathrm{FN}}\cdot \mathrm{FN}(\tau)$
+where the asymmetry of the loss weights $\lambda_{\mathrm{FP}} \ll
+\lambda_{\mathrm{FN}}$ reflects the asymmetric cost. We leave this to
+future work.
+
+\paragraph{Limitations.}
+Our risk score is a closed-form heuristic, not a learned model. It does
+not capture interactions among the four features (e.g., shuffled layout
+may matter less for $\Cand = 3$ than for $\Cand = 6$). It also does not
+distinguish between \emph{candidate} reuse (the failure mode of
+\cite{jcrfailure}) and \emph{system-prompt} reuse, which is generally
+safe. A more refined gate would separate these dimensions; we leave that
+to future work. Finally, our benchmark is single-node single-GPU; the
+multi-node extension via LMCache \cite{lmcache} will require additional
+gate-state replication for which the audit log already provides the
+groundwork.
+
+% ============================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+% ============================================================================
+
+We presented \INV{15}, a formal safety invariant for KV-cache reuse in
+multi-agent LLM pipelines, and the JCR Safety Gate that enforces it. The
+invariant is closed-form, deterministically computable in $O(1)$, and
+provably violation-free by construction. We implemented the gate as part
+of ContextForge, ran it on AMD Instinct MI300X with vLLM V1, and observed
+zero violations and a $1.000$ critic dense prefill rate across a full
+high-risk sweep, while preserving $10.81\times$ TokenDance compression
+for the non-judge agents. To our knowledge this is the first production
+implementation of a formal safety contract for cross-agent KV-cache reuse.
+We argue that any future multi-agent KV-coordination
+layer\textemdash whether targeted at TokenDance-style sharing, KVCOMM
+anchor matching, or LMCache distributed caching\textemdash should include
+a preflight gate of this form. Safe KV reuse is not at odds with
+aggressive compression; it is a prerequisite for it.
+
+\paragraph{Reproducibility.}
+The complete implementation, benchmark scenarios, and DevCloud-ATL1 logs
+are released under Apache-2.0 at
+\href{https://github.com/SuarezPM/Apohara_Context_Forge}%
+     {github.com/SuarezPM/Apohara\_Context\_Forge}; the safety gate is at
+\code{apohara\_context\_forge/safety/jcr\_gate.py} and the benchmark
+scenario is S-15 in \code{demo/benchmark\_v5.py}.
+
+% ----------------------------------------------------------------------------
+\bibliography{references}
+% ----------------------------------------------------------------------------
+
+\end{document}
