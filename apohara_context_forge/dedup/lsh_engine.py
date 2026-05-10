@@ -78,7 +78,11 @@ class LSHTokenMatcher:
         self._hash_bits = hash_bits
         self._hamming_threshold = hamming_threshold
         self._token_counter = TokenCounter.get()
-        self._block_store: dict[int, tuple[tuple[int, ...], str]] = {}  # hash → (tokens, agent_id)
+        # hash → list of (tokens, agent_id). A list (not a single tuple) so
+        # that multiple agents sharing the same prefix do not overwrite each
+        # other — the last writer would otherwise erase the earlier owners
+        # and `find_reusable_blocks` would miss legitimate cross-agent reuse.
+        self._block_store: dict[int, list[tuple[tuple[int, ...], str]]] = {}
         self._agent_blocks: dict[str, list[int]] = {}  # agent_id → list of block hashes
         self._lock = asyncio.Lock()
     
@@ -120,7 +124,11 @@ class LSHTokenMatcher:
                 continue
             
             block_hash = self._simhash_block(block)
-            self._block_store[block_hash] = (block, agent_id)
+            owners = self._block_store.setdefault(block_hash, [])
+            # Avoid duplicating the same owner if index_prompt is called
+            # repeatedly for an agent (idempotent re-index).
+            if not any(aid == agent_id for _, aid in owners):
+                owners.append((block, agent_id))
             hashes.append(block_hash)
             blocks.append(block_hash)
         
@@ -159,16 +167,26 @@ class LSHTokenMatcher:
                 continue
             
             new_hash = self._simhash_block(block)
-            
-            # Search for similar blocks
-            for cached_hash, (cached_tokens, agent_id) in self._block_store.items():
-                if exclude_agent and agent_id == exclude_agent:
-                    continue
-                
+
+            # Search for similar blocks. Each entry in the store may have
+            # multiple owners (agents that all indexed the same block).
+            # Exclusion matches both the bare agent_id ("agent1") and any
+            # role-suffixed variant ("agent1:system") because the registry
+            # indexes the system prompt under "<agent_id>:system" — without
+            # this an agent finds matches against its own system blocks and
+            # the cross-agent dedup path looks artificially busy.
+            exclude_prefix = f"{exclude_agent}:" if exclude_agent else None
+            for cached_hash, owners in self._block_store.items():
                 hd = self._hamming(new_hash, cached_hash)
-                
-                if hd <= self._hamming_threshold:
-                    confidence = 1.0 - (hd / self._hash_bits)
+                if hd > self._hamming_threshold:
+                    continue
+                confidence = 1.0 - (hd / self._hash_bits)
+                for cached_tokens, agent_id in owners:
+                    if exclude_agent and (
+                        agent_id == exclude_agent
+                        or (exclude_prefix is not None and agent_id.startswith(exclude_prefix))
+                    ):
+                        continue
                     matches.append(TokenBlockMatch(
                         block_index=i // self._block_size,
                         cached_block_hash=cached_hash,
@@ -272,6 +290,13 @@ class LSHTokenMatcher:
         async with self._lock:
             hashes = self._agent_blocks.pop(agent_id, [])
             for h in hashes:
-                if h in self._block_store:
+                owners = self._block_store.get(h)
+                if not owners:
+                    continue
+                # Drop only this agent's entry; keep blocks shared with others.
+                self._block_store[h] = [
+                    (toks, aid) for (toks, aid) in owners if aid != agent_id
+                ]
+                if not self._block_store[h]:
                     del self._block_store[h]
             return len(hashes)

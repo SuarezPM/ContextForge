@@ -1,11 +1,21 @@
 """Compression coordinator - decision engine for ContextForge."""
 import asyncio
 import logging
-from typing import Literal
+from typing import Any, Literal, Optional
 
 from apohara_context_forge.config import settings
-from apohara_context_forge.dedup.dedup_engine import SemanticDedupEngine
 from apohara_context_forge.models import CompressionDecision
+
+# SemanticDedupEngine moved to _deprecated_dedup_engine when the v3 LSH+FAISS
+# refactor landed. Import lazily so module load doesn't fail when the
+# deprecated module is gone — the coordinator can still serve passthrough
+# decisions and tests can monkeypatch it freely.
+try:
+    from apohara_context_forge.dedup._deprecated_dedup_engine import (
+        SemanticDedupEngine,
+    )
+except ImportError:  # pragma: no cover
+    SemanticDedupEngine = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +23,7 @@ logger = logging.getLogger(__name__)
 class CompressionCoordinator:
     """
     Decision engine - the brain of ContextForge.
-    
+
     Logic:
       IF similarity >= 0.85 AND shared_prefix > 200 tokens → "apc_reuse"
       IF similarity < 0.85 AND context > 500 tokens → "compress"
@@ -21,8 +31,18 @@ class CompressionCoordinator:
       ELSE → "passthrough"
     """
 
-    def __init__(self):
-        self._dedup = SemanticDedupEngine()
+    def __init__(
+        self,
+        registry: Optional[Any] = None,
+        compressor: Optional[Any] = None,
+    ):
+        # Both kwargs are accepted for the MCP-server lifespan, which wires the
+        # coordinator with the live registry+compressor instances. They remain
+        # optional so older callers that did `CompressionCoordinator()` keep
+        # working.
+        self.registry = registry
+        self.compressor = compressor
+        self._dedup = SemanticDedupEngine() if SemanticDedupEngine is not None else None
         self._min_tokens = settings.contextforge_min_tokens_to_compress
 
     async def decide(self, agent_id: str, context: str) -> CompressionDecision:

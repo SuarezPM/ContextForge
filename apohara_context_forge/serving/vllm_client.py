@@ -26,8 +26,13 @@ class vLLMClient:
         return self
 
     async def __aexit__(self, *args):
-        if self._client:
+        await self.aclose()
+
+    async def aclose(self) -> None:
+        """Close the underlying httpx client. Safe to call multiple times."""
+        if self._client is not None:
             await self._client.aclose()
+            self._client = None
 
     async def complete(
         self,
@@ -90,3 +95,8 @@ class vLLMClient:
         except httpx.HTTPError as e:
             logger.error(f"vLLM chat request failed: {e}")
             return {"error": str(e)}
+
+
+# Canonical PEP-8 alias. Tests and the MCP server import the upper-case form;
+# the lower-case original stays for backward compatibility with older callers.
+VLLMClient = vLLMClient

@@ -74,9 +74,16 @@ class TestContextRegistry:
     """
 
     async def test_registry_has_register_agent_method(self, registry):
-        """Verify the actual method name is register_agent, not register."""
+        """Verify the dual register API exists.
+
+        - `register_agent(agent_id, system_prompt, role_prompt)` is the full
+          KV-aware pipeline used by the agents/ runner.
+        - `register(agent_id, context)` is the lightweight MCP endpoint path
+          (single opaque context, no system/role split). Both are part of the
+          public contract; they live on the same registry instance.
+        """
         assert hasattr(registry, 'register_agent')
-        assert not hasattr(registry, 'register')
+        assert hasattr(registry, 'register')
 
     async def test_get_agent_context_returns_none_for_unknown(self, registry):
         """get_agent_context returns None for unknown agents."""

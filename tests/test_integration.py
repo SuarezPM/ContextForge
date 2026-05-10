@@ -23,11 +23,20 @@ from apohara_context_forge.metrics.prometheus_metrics import cache_hits, cache_m
 
 @pytest_asyncio.fixture
 async def registry():
-    """Create a ContextRegistry with all components wired up."""
+    """Create a ContextRegistry with all components wired up.
+
+    Two non-default knobs vs production:
+      - FAISS index dim must match EmbeddingEngine output (512), otherwise
+        faiss.IndexFlatIP.add() trips an assertion at runtime.
+      - block_size=4 lets the short prompts in these tests produce at least
+        one LSH block. Production runs at block_size=16 (vLLM PagedAttention
+        page boundary) and uses much longer system prompts.
+    """
     reg = ContextRegistry(
-        lsh_matcher=LSHTokenMatcher(),
+        lsh_matcher=LSHTokenMatcher(block_size=4),
         vram_cache=VRAMAwareCache(max_token_budget=50_000_000),
-        faiss_index=FAISSContextIndex(dim=384),
+        faiss_index=FAISSContextIndex(dim=512),
+        block_size=4,
     )
     await reg.start()
     yield reg
@@ -138,8 +147,19 @@ class TestPrometheusMetricsEmission:
     async def test_cache_misses_metric_incremented_for_no_match(self, registry):
         """Verify cache_misses is incremented when no reusable blocks found."""
         # Use completely different prompts to ensure no matches
-        await registry.register_agent("agent1", "Unique prompt for agent 1", "Role 1")
-        await registry.register_agent("agent2", "Completely different prompt for agent 2", "Role 2")
+        # Use orthogonal token sets so the SimHash fingerprints land far
+        # apart — anything sharing common token sequences (e.g. "prompt for
+        # agent") collapses to similar hashes inside the hamming threshold.
+        await registry.register_agent(
+            "agent1",
+            "Quantum chromodynamics describes strong nuclear interactions in baryons",
+            "alpha beta gamma",
+        )
+        await registry.register_agent(
+            "agent2",
+            "Photosynthesis converts solar irradiance into glucose via chloroplast",
+            "delta epsilon zeta",
+        )
 
         initial_misses = self._get_metric_value(cache_misses, "agent1")
 
@@ -151,11 +171,17 @@ class TestPrometheusMetricsEmission:
 
     @staticmethod
     def _get_metric_value(counter, *label_values):
-        """Get the current value of a Prometheus counter with given labels."""
+        """Get the current value of a Prometheus counter with given labels.
+
+        Counters live as `<name>_total` samples in REGISTRY.collect(); we
+        compare label values as a tuple (dict_values views never compare
+        equal to a tuple under ==).
+        """
+        target = tuple(label_values)
         for metric_family in REGISTRY.collect():
             if metric_family.name == counter._name:
                 for sample in metric_family.samples:
-                    if sample.labels.values() == tuple(label_values):
+                    if tuple(sample.labels.values()) == target:
                         return sample.value
         return 0
 
@@ -255,14 +281,14 @@ class TestClearAgent:
         await registry.register_agent("agent_to_clear", system_prompt, "Role prompt")
 
         # Verify agent exists in LSH blocks
-        agent_blocks_before = await registry._lsh._agent_blocks.get("agent_to_clear")
+        agent_blocks_before = registry._lsh._agent_blocks.get("agent_to_clear")
         assert agent_blocks_before is not None
 
         # Clear the agent
         await registry.clear_agent("agent_to_clear")
 
         # Verify agent is removed from LSH
-        agent_blocks_after = await registry._lsh._agent_blocks.get("agent_to_clear")
+        agent_blocks_after = registry._lsh._agent_blocks.get("agent_to_clear")
         assert agent_blocks_after is None
 
         # Verify agent is removed from FAISS

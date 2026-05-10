@@ -3,9 +3,13 @@ import asyncio
 import logging
 import subprocess
 from datetime import datetime
-from typing import Tuple
+from typing import Iterable, Optional, Tuple
 
-from apohara_context_forge.models import MetricsSnapshot
+from apohara_context_forge.models import (
+    CompressionDecision,
+    Degradation,
+    MetricsSnapshot,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +23,12 @@ class MetricsCollector:
         self._ttft_records: list[float] = []
         self._active_agents = 0
         self._use_rocm = self._check_rocm()
+        # Surface counters for the MCP server endpoints. record_register fires
+        # once per /tools/register_context call (with `matched=False` since the
+        # simple endpoint doesn't try cross-agent dedup); record_decision fires
+        # once per successful /tools/get_optimized_context call.
+        self._register_calls: list[bool] = []
+        self._decision_calls: list[CompressionDecision] = []
 
     def _check_rocm(self) -> bool:
         """Check if ROCm SMI is available."""
@@ -70,8 +80,36 @@ class MetricsCollector:
         """Set number of active agents."""
         self._active_agents = count
 
-    async def snapshot(self) -> MetricsSnapshot:
-        """Capture current metrics snapshot."""
+    def record_register(self, matched: bool) -> None:
+        """Record a /tools/register_context call. `matched` is True when LSH
+        cross-agent dedup found a reusable block; False otherwise."""
+        self._register_calls.append(matched)
+
+    def record_decision(self, decision: CompressionDecision) -> None:
+        """Record a successful /tools/get_optimized_context decision."""
+        self._decision_calls.append(decision)
+
+    def _resolve_gpu_label(self) -> str:
+        """Return a short label identifying the active GPU backend.
+
+        ROCm hosts: "rocm". Anything else: "cpu". The /health endpoint passes
+        whatever this returns straight through to clients, so any exception
+        raised here is caught upstream and reported as the degraded path.
+        """
+        return "rocm" if self._use_rocm else "cpu"
+
+    async def snapshot(
+        self,
+        *,
+        current_compressor_model: Optional[str] = None,
+        compressor_degradations: Optional[Iterable[Degradation]] = None,
+    ) -> MetricsSnapshot:
+        """Capture current metrics snapshot.
+
+        Optional kwargs let the MCP server inject compressor identity and
+        degradation events captured during this snapshot window — neither
+        is known to the collector itself, so we accept them at the boundary.
+        """
         vram_used, vram_total = await self.get_vram_usage()
         avg_ttft = sum(self._ttft_records) / len(self._ttft_records) if self._ttft_records else 0.0
         dedup_rate = (self._tokens_saved / self._tokens_processed * 100) if self._tokens_processed > 0 else 0.0
@@ -79,6 +117,8 @@ class MetricsCollector:
 
         return MetricsSnapshot(
             timestamp=datetime.now(),
+            vram_source="rocm-smi" if self._use_rocm else "psutil",
+            compressor_model=current_compressor_model or "xlm-roberta-large",
             vram_used_gb=vram_used,
             vram_total_gb=vram_total,
             ttft_ms=avg_ttft,
@@ -87,4 +127,5 @@ class MetricsCollector:
             dedup_rate=dedup_rate,
             compression_ratio=compression_ratio,
             active_agents=self._active_agents,
+            degradations=list(compressor_degradations) if compressor_degradations else [],
         )

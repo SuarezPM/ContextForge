@@ -93,6 +93,7 @@ class ContextRegistry:
         block_size: int = VLLM_BLOCK_SIZE,
         hamming_threshold: int = 8,
         faiss_nlist: int = 100,
+        dedup: Any = None,
     ):
         # Dependency injection with lazy defaults
         self._lsh = lsh_matcher or LSHTokenMatcher(
@@ -100,11 +101,28 @@ class ContextRegistry:
             hamming_threshold=hamming_threshold,
         )
         self._vram_cache = vram_cache or VRAMAwareCache(max_token_budget=vram_budget_tokens)
-        self._faiss = faiss_index or FAISSContextIndex(dim=384)
+        # FAISS index dim must match the EmbeddingEngine output dimension
+        # (we instantiate EmbeddingEngine with dim=512 in register_agent).
+        # A 384-dim default crashes faiss.IndexFlatIP.add() at runtime —
+        # see the cascade of test_integration failures pre-fix.
+        self._faiss = faiss_index or FAISSContextIndex(dim=512)
         self._token_counter = token_counter or TokenCounter.get()
         self._anchor_pool = anchor_pool or AnchorPool()
         self._embedding_engine: Optional[EmbeddingEngine] = None
         self._block_size = block_size
+
+        # `dedup` is a hermetic-test escape hatch — when set, register() short-
+        # circuits the LSH+FAISS+ANN heavy path and uses the provided engine
+        # instead. The engine only needs `embed`, `similarity`,
+        # `find_shared_prefix`, and `count_prefix_tokens` — see FakeDedupEngine
+        # in tests/test_mcp_server.py for the contract.
+        self._dedup = dedup
+
+        # Lightweight in-memory store for `register(agent_id, context)`. This
+        # is independent from `register_agent(...)` (which exercises the full
+        # KV-aware pipeline) — it backs the simple MCP /tools/register_context
+        # endpoint and the test_full_flow scenario.
+        self._simple_entries: dict[str, ContextEntry] = {}
 
         # Internal state
         self._agents: dict[str, RegisteredAgent] = {}
@@ -315,14 +333,14 @@ class ContextRegistry:
             # AnchorPool shareability prediction
             is_shareable = await self._anchor_pool.predict_shareable(
                 token_ids=cache_val["token_ids"],
-                target_agent_id=target_agent_id or agent_ids,
+                target_agent_id=target_agent_id or agent.agent_id,
             )
 
             offset_vector = None
             if is_shareable:
                 offset_result = await self._anchor_pool.approximate_offset(
                     token_ids=cache_val["token_ids"],
-                    target_agent_id=target_agent_id or agent_ids,
+                    target_agent_id=target_agent_id or agent.agent_id,
                 )
                 if offset_result is not None:
                     offset_vector = offset_result.placeholder_offset
@@ -356,6 +374,43 @@ class ContextRegistry:
         if cache_val:
             return cache_val["full_context"]
         return None
+
+    async def register(self, agent_id: str, context: str) -> ContextEntry:
+        """Lightweight register used by the MCP /tools/register_context endpoint.
+
+        This is intentionally separate from `register_agent(...)`, which also
+        indexes the system prompt for cross-agent KV reuse. The MCP endpoint
+        deals with single opaque contexts, so we tokenize via TokenCounter,
+        keep a `ContextEntry` in `_simple_entries`, and stop there.
+        """
+        from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+
+        loop = asyncio.get_event_loop()
+        try:
+            token_count = await loop.run_in_executor(
+                None, self._token_counter.count, context
+            )
+        except Exception:
+            token_count = max(1, len(context.split()))
+
+        now = _dt.now(_tz.utc)
+        entry = ContextEntry(
+            agent_id=agent_id,
+            context=context,
+            token_count=token_count,
+            created_at=now,
+            expires_at=now + _td(seconds=300),
+        )
+        async with self._lock:
+            self._simple_entries[agent_id] = entry
+        return entry
+
+    async def clear(self) -> None:
+        """Drop all simple-register state. Called by the MCP server lifespan
+        on shutdown so a fresh process starts from a clean registry. We do
+        NOT touch LSH/FAISS here — those have their own lifecycle hooks."""
+        async with self._lock:
+            self._simple_entries.clear()
 
     async def clear_agent(self, agent_id: str) -> bool:
         """Clear an agent's context from all stores."""

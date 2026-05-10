@@ -29,8 +29,15 @@ class TestLSHTokenMatcher:
     @pytest.mark.asyncio
     async def test_index_prompt(self, lsh_matcher):
         """Index a prompt, verify blocks are stored."""
-        # Create a prompt long enough to produce at least one full block (block_size=16)
-        text = "This is a test prompt that should produce multiple token blocks for indexing."
+        # Need >= block_size (16) tokens after tokenization. The Qwen3 BPE
+        # collapses common English words to one token each, so a short
+        # sentence may yield <16 tokens. Use a longer prompt to guarantee
+        # at least one full block.
+        text = (
+            "This is a test prompt that should produce multiple token blocks "
+            "for indexing across various transformer architectures including "
+            "GPT, Llama, Qwen, and Mistral families on AMD MI300X with ROCm."
+        )
         
         hashes = await lsh_matcher.index_prompt("agent1", text)
         
