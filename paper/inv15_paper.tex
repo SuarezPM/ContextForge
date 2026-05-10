@@ -55,6 +55,8 @@
        Reuse in Multi-Agent Judge Pipelines}
 
 \author{Pablo M. Suarez\thanks{Correspondence:
+        \href{mailto:suarezpm@csnat.unt.edu.ar}{suarezpm@csnat.unt.edu.ar}
+        (academic) \textperiodcentered{}
         \href{mailto:p.ms.08@hotmail.com}{p.ms.08@hotmail.com}.
         Code, benchmarks, and DevCloud-ATL1 logs:
         \href{https://github.com/SuarezPM/Apohara\_Context\_Forge}%
@@ -289,15 +291,15 @@ $\Shuf \in \{0,1\}$ indicates whether the candidate layout has changed
 since the agent's previous invocation. Define the \emph{JCR risk score}
 $\Risk : \mathcal{A} \times \mathbb{Z}_{\geq 0} \times [0,1] \times \{0,1\}
 \rightarrow [0,1]$ as:
-\begin{equation}
-  \Risk(\mathbf{x}) =
-  \min\!\Big(1,\;
-  b(\rho) + \alpha_n\,\mathbb{1}\!\left[\Cand \geq 3\right]
-         + \alpha_s\,\Shuf
-         + \alpha_u\,\mathbb{1}\!\left[\Reuse > 0.8\right]
-  \Big),
+\begin{align}
+  \Risk(\mathbf{x}) \;=\; \min\Big(1,\;
+    & b(\rho)
+      + \alpha_n\,\mathbb{1}[\Cand \geq 3] \nonumber \\[-2pt]
+    & + \alpha_s\,\Shuf
+      + \alpha_u\,\mathbb{1}[\Reuse > 0.8]
+    \Big),
   \label{eq:risk}
-\end{equation}
+\end{align}
 where
 \begin{equation}
   b(\rho) =
@@ -337,12 +339,14 @@ Algorithm~\ref{alg:gate} specifies the \GateDecision\ procedure that
 implements \INV{15}. The procedure runs once per agent invocation, before
 the KV registry is queried.
 
-\begin{algorithm}[t]
-\caption{\GateDecision: \INV{15}-enforcing preflight}
+\begin{algorithm*}[t]
+\caption{\GateDecision: \INV{15}-enforcing preflight. A \textsc{true}
+         return value signals that the invariant fires and the agent
+         must use dense prefill. Cost is $O(1)$ per call.}
 \label{alg:gate}
 \begin{algorithmic}[1]
-\Require agent role $\rho$, candidate count $\Cand$,
-         reuse rate $\Reuse$, layout-shuffled flag $\Shuf$
+\Require agent role $\rho$, candidate count $\Cand$, reuse rate
+         $\Reuse \in [0,1]$, layout-shuffled flag $\Shuf \in \{0,1\}$
 \Require judge-role set $\Judge$, coefficients
          $(b_J, b_O, \alpha_n, \alpha_s, \alpha_u)$, threshold $\tau$
 \Ensure \texttt{use\_dense\_prefill} $\in \{\textsc{true}, \textsc{false}\}$
@@ -352,14 +356,14 @@ the KV registry is queried.
 \If{$\Shuf = 1$} $r \gets r + \alpha_s$ \EndIf
 \If{$\Reuse > 0.8$} $r \gets r + \alpha_u$ \EndIf
 \State $r \gets \min(r, 1.0)$
-\State \texttt{log}.\textsc{append}$((\rho, \Cand, \Reuse, \Shuf, r))$
+\State $\texttt{log.append}\big((\rho, \Cand, \Reuse, \Shuf, r)\big)$
 \If{$\rho \in \Judge$ \textbf{and} $r > \tau$}
-  \State \Return \textsc{true}\quad\textit{// \INV{15} fires}
+  \State \Return \textsc{true}
 \Else
   \State \Return \textsc{false}
 \EndIf
 \end{algorithmic}
-\end{algorithm}
+\end{algorithm*}
 
 \begin{theorem}[Zero violations]
 \label{thm:zero}
