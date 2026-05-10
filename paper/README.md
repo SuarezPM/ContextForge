@@ -18,6 +18,7 @@ Target venues:
 | File | Purpose |
 |------|---------|
 | `inv15_paper.tex`   | Main LaTeX source. Two-column, 10pt, A4. Self-contained. |
+| `inv15_paper.pdf`   | **Pre-built PDF — open this to read the paper.** 6 pages, 138 KB. |
 | `references.bib`    | All 10 citations in BibTeX (IEEEtran style). |
 | `README.md`         | This file. |
 

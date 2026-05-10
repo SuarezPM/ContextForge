@@ -16,6 +16,7 @@
 \usepackage{amsmath,amssymb,amsthm}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
+\usepackage{abstract}                 % gives us \begin{onecolabstract}
 \usepackage{booktabs}
 \usepackage{multirow}
 \usepackage{graphicx}
@@ -44,6 +45,9 @@
 % Bibliography style: numeric IEEE-like.
 \bibliographystyle{IEEEtran}
 
+% Theorem environment for Theorem 1 (Zero Violations).
+\newtheorem{theorem}{Theorem}
+
 % ----------------------------------------------------------------------------
 % Title block
 % ----------------------------------------------------------------------------
@@ -52,9 +56,13 @@
 
 \author{Pablo M. Suarez\thanks{Correspondence:
         \href{mailto:p.ms.08@hotmail.com}{p.ms.08@hotmail.com}.
-        Source code and benchmark logs:
+        Code, benchmarks, and DevCloud-ATL1 logs:
         \href{https://github.com/SuarezPM/Apohara\_Context\_Forge}%
-             {github.com/SuarezPM/Apohara\_Context\_Forge}.}\\
+             {github.com/SuarezPM/Apohara\_Context\_Forge}.
+        Author profile:
+        \href{https://www.researchgate.net/profile/Pablo-Suarez-23}%
+             {ResearchGate} \textperiodcentered{}
+        \href{https://github.com/SuarezPM}{GitHub @SuarezPM}.}\\
         APOHARA \textperiodcentered{} ContextForge}
 
 \date{May 10, 2026}
@@ -349,7 +357,7 @@ the KV registry is queried.
 \State $r \gets \min(r, 1.0)$
 \State \texttt{log}.\textsc{append}$((\rho, \Cand, \Reuse, \Shuf, r))$
 \If{$\rho \in \Judge$ \textbf{and} $r > \tau$}
-  \State \Return \textsc{true} \Comment{\INV{15} fires}
+  \State \Return \textsc{true}\quad\textit{// \INV{15} fires}
 \Else
   \State \Return \textsc{false}
 \EndIf
