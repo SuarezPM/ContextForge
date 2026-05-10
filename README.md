@@ -17,6 +17,7 @@
   <a href="#-research-foundation"><img src="https://img.shields.io/badge/papers-10%20implemented-9B59B6.svg" alt="10 Papers"></a>
   <a href="#-benchmark-results"><img src="https://img.shields.io/badge/benchmark-15%2F15%20PASS-27AE60.svg" alt="V6.0 15/15 PASS"></a>
   <a href="#-verification"><img src="https://img.shields.io/badge/tests-310%20passed%20%C2%B7%200%20failed-27AE60.svg" alt="310 tests passing"></a>
+  <a href="https://youtu.be/swEcn-6pAmA"><img src="https://img.shields.io/badge/%E2%96%B6%EF%B8%8F-watch%20demo%20on%20YouTube-FF0000.svg" alt="Watch the demo on YouTube"></a>
 </p>
 
 <p align="center">
@@ -87,18 +88,18 @@ Real metrics from `demo/app.py` running against the full ContextForge stack — 
 ### ▶️ Demo video
 
 <p align="center">
-  <video src="https://github.com/SuarezPM/Apohara_Context_Forge/raw/main/assets/video_live.mp4"
-         controls
-         muted
-         playsinline
-         width="900"
-         poster="assets/screenshots/dashboard_live_demo.png">
-    Your browser does not render embedded video.
-    <a href="https://github.com/SuarezPM/Apohara_Context_Forge/raw/main/assets/video_live.mp4">Download the demo video</a>.
-  </video>
+  <a href="https://youtu.be/swEcn-6pAmA" title="Watch the ContextForge demo on YouTube">
+    <img src="https://img.youtube.com/vi/swEcn-6pAmA/maxresdefault.jpg"
+         alt="▶️ Watch the ContextForge demo on YouTube — 79.85% token savings, INV-15 firing on the Critic"
+         width="780">
+  </a>
 </p>
 
 <p align="center">
+  <a href="https://youtu.be/swEcn-6pAmA"><b>▶️ Watch on YouTube</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/SuarezPM/Apohara_Context_Forge/raw/main/assets/video_live.mp4">Download raw mp4 (5.2 MB)</a>
+  <br>
   <em>End-to-end run: query → 5-agent pipeline → 79.85 % token savings → JCR Safety Gate fires INV-15 on the Critic.</em>
 </p>
 
