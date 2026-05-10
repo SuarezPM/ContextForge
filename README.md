@@ -82,21 +82,11 @@ Every optimization traces back to a peer-reviewed paper published at **NeurIPS, 
 
 ## 🎬 Live Demo
 
-Real metrics from `demo/app.py` running against the full ContextForge stack — five agents, real Qwen3 tokenizer, real LSH+FAISS dedup, INV-15 enforced live.
+Real metrics from `demo/app.py` running against the full ContextForge stack — five agents, real Qwen3 tokenizer, real LSH+FAISS dedup, INV-15 enforced live. Side-by-side comparison: **263 → 53 tokens, 79.85 % savings** with ContextForge; passthrough on the right.
 
 <p align="center">
-  <img src="assets/screenshots/dashboard_live.png" alt="Live Demo tab — query input" width="900"><br>
-  <em>Live Demo tab — type a multi-agent query and run it through both paths.</em>
-</p>
-
-<p align="center">
-  <img src="assets/screenshots/dashboard_results.png" alt="Live Demo with ContextForge — 79.85% savings, INV-15 firing" width="900"><br>
-  <em>With ContextForge: <b>263 → 53 tokens (79.85 % savings)</b>, JCR Safety Gate fires INV-15 on the Critic.</em>
-</p>
-
-<p align="center">
-  <img src="assets/screenshots/dashboard_v6_snapshot.png" alt="Architecture tab — V6 Live Snapshot" width="900"><br>
-  <em>Architecture tab — TokenDance + JCR Safety Gate + AITER ROCm config snapshots.</em>
+  <img src="assets/screenshots/dashboard_live_demo.png" alt="Live Demo — With vs Without ContextForge, 79.85% savings, INV-15 firing on the Critic" width="960"><br>
+  <em>Live Demo tab — left: query input. Right: <b>With ContextForge</b> (79.85 % savings, INV-15 fires on the Critic) vs. <b>Without ContextForge</b> (passthrough, 0 % savings).</em>
 </p>
 
 ```
@@ -117,6 +107,18 @@ strategy: register+lsh+faiss
   critic dense_prefill: True
   reason: INV-15: judge role='critic' risk=1.00 > threshold=0.70 → dense prefill mandated
 ```
+
+### V6 Live Snapshot — TokenDance + JCR Safety Gate
+
+<p align="center">
+  <img src="assets/screenshots/dashboard_v6_snapshot.png" alt="Architecture tab — TokenDance Master-Mirror + JCR Safety Gate live snapshots" width="640"><br>
+  <em>Architecture tab — <b>TokenDance Master-Mirror Storage</b> (5-agent demo, 4.71× compression) and <b>JCR Safety Gate</b> firing INV-15 (risk = 1.000, dense_prefill = True).</em>
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/dashboard_aiter_config.png" alt="AITER ROCm Config — MI300X" width="520"><br>
+  <em>AITER ROCm Config (MI300X) — <code>rocm_available: True</code>, 7 documented env vars, AMD-published speedups: 3× fused MoE, 2× block-scale GEMM, 2-4× FP8 memory.</em>
+</p>
 
 ---
 
@@ -204,6 +206,11 @@ flowchart TB
 | JCR INV-15 violations | **0** | 0 | ✅ |
 | JCR Critic dense rate (high-risk sweep) | **1.000** | ≥ 0.5 | ✅ |
 
+<p align="center">
+  <img src="assets/screenshots/benchmark_v6_terminal.png" alt="V6.0 benchmark terminal output — S-14 token_dance 10.81x, S-15 jcr_gate 0 violations" width="780"><br>
+  <em>Live terminal output of <code>python demo/benchmark_v5.py</code> — S-14 TokenDance <b>10.81×</b> compression with reconstruction error <b>1.19e-07</b>, S-15 JCR Safety Gate <b>0 INV-15 violations</b>.</em>
+</p>
+
 ---
 
 ## 📈 Key Stats
@@ -219,6 +226,11 @@ flowchart TB
 | Benchmark scenarios | **15 / 15 PASS** |
 | Peer-reviewed papers implemented | **10** |
 | System invariants enforced | **15** |
+
+<p align="center">
+  <img src="assets/screenshots/dashboard_key_stats.png" alt="Architecture tab — Key Statistics panel" width="520"><br>
+  <em>Key Statistics panel rendered live in the dashboard's Architecture tab.</em>
+</p>
 
 ---
 
