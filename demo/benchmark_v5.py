@@ -15,6 +15,15 @@ New V5.0 metrics:
 INVARIANT-11: QueueingController NEVER evicts below minimum_stable_blocks.
 INVARIANT-12: SpeculativeCoordinator target output distribution unchanged by speculation.
 INVARIANT-13: VisualKVCache content hash is SHA256 of raw image/audio bytes.
+
+# MERGED from CC honest protocol
+# Note: V4/V5 scenarios are per-component benchmarks (not cold/warm/off protocol runs).
+# The patterns below are documented here for completeness; the scenario functions
+# do not implement cold/warm/off runs.
+# Pattern D: delta_pct = None (Python None, not 0) when tokens_without == 0.
+#   This applies to any _aggregate() function that computes delta_pct.
+#   Currently no _aggregate in V5, but Pattern E is embedded as a reminder:
+# Pattern E: "The pitch is the curve, not a single number."
 """
 import asyncio
 import json
@@ -28,26 +37,26 @@ from typing import Any, Optional
 import numpy as np
 
 # V4.0 components
-from contextforge.embeddings.embedding_engine import EmbeddingEngine
-from contextforge.kv_offset.anchor_pool import AnchorPool
-from contextforge.kv_offset.cla_metadata import CLAMetadataLayer, CLAGroupConfig
-from contextforge.quantization.rotate_kv import RotateKVQuantizer, RotateKVConfig
-from contextforge.routing.kv_aware_router import KVAwareRouter
-from contextforge.scheduling.step_graph import AgentStepGraph, AgentStep
-from contextforge.scheduling.pbkv_predictor import PBKVPredictor
-from contextforge.serving.lmcache_bridge import LMCacheConnectorV1
-from contextforge.serving.atom_plugin import vLLMAtomPlugin, ATOMConfig
-from contextforge.registry.vram_aware_cache import EvictionMode, VRAMAwareCache
+from apohara_context_forge.embeddings.embedding_engine import EmbeddingEngine
+from apohara_context_forge.kv_offset.anchor_pool import AnchorPool
+from apohara_context_forge.kv_offset.cla_metadata import CLAMetadataLayer, CLAGroupConfig
+from apohara_context_forge.quantization.rotate_kv import RotateKVQuantizer, RotateKVConfig
+from apohara_context_forge.routing.kv_aware_router import KVAwareRouter
+from apohara_context_forge.scheduling.step_graph import AgentStepGraph, AgentStep
+from apohara_context_forge.scheduling.pbkv_predictor import PBKVPredictor
+from apohara_context_forge.serving.lmcache_bridge import LMCacheConnectorV1
+from apohara_context_forge.serving.atom_plugin import vLLMAtomPlugin, ATOMConfig
+from apohara_context_forge.registry.vram_aware_cache import EvictionMode, VRAMAwareCache
 
 # V5.0 new components
-from contextforge.scheduling.queueing_controller import (
+from apohara_context_forge.scheduling.queueing_controller import (
     QueueingController,
     QueueingConfig,
     StabilityState,
     _WelfordStatistics,
 )
-from contextforge.multimodal.visual_kv_cache import VisualKVCache
-from contextforge.decoding.speculative_coordinator import (
+from apohara_context_forge.multimodal.visual_kv_cache import VisualKVCache
+from apohara_context_forge.decoding.speculative_coordinator import (
     SpeculativeCoordinator,
     SpeculativeConfig,
     SpeculativeResult,
@@ -401,7 +410,7 @@ async def scenario_8_pbkv_prediction() -> ScenarioResult:
 
 
 async def scenario_9_workflow_aware_eviction() -> ScenarioResult:
-    from contextforge.scheduling.step_graph import AgentStepGraph as StepGraph
+    from apohara_context_forge.scheduling.step_graph import AgentStepGraph as StepGraph
 
     graph = StepGraph()
     graph.add_step(AgentStep(agent_id="a", step_index=0))

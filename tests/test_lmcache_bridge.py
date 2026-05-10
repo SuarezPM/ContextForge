@@ -1,6 +1,6 @@
 """Tests for LMCacheConnectorV1 — TASK-007."""
 import pytest
-from contextforge.serving.lmcache_bridge import LMCacheConnectorV1, LMCacheMeta
+from apohara_context_forge.serving.lmcache_bridge import LMCacheConnectorV1, LMCacheMeta
 
 
 class TestLMCacheConnectorV1:

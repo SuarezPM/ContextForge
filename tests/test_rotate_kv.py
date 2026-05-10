@@ -1,7 +1,7 @@
 """Tests for RotateKVQuantizer — TASK-005."""
 import pytest
 import numpy as np
-from contextforge.quantization.rotate_kv import RotateKVQuantizer, RotateKVConfig, QuantizedKVBlock
+from apohara_context_forge.quantization.rotate_kv import RotateKVQuantizer, RotateKVConfig, QuantizedKVBlock
 
 
 class TestRotateKVQuantizer:

@@ -4,7 +4,7 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from contextforge.scheduling.pbkv_predictor import (
+from apohara_context_forge.scheduling.pbkv_predictor import (
     PBKVPredictor,
     WorkflowStepRecord,
     PredictionResult,
@@ -316,7 +316,7 @@ class TestPBKVPredictor:
             predictor.train_from_jsonl(tmpdir)
 
             # Create a simple step graph
-            from contextforge.scheduling.step_graph import AgentStepGraph, AgentStep
+            from apohara_context_forge.scheduling.step_graph import AgentStepGraph, AgentStep
 
             graph = AgentStepGraph()
             graph.add_step(AgentStep(agent_id="retriever", depends_on=[], step_index=0))

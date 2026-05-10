@@ -1,6 +1,6 @@
 """Tests for PrefixNormalizer."""
 import pytest
-from contextforge.normalization.prefix_normalizer import (
+from apohara_context_forge.normalization.prefix_normalizer import (
     PrefixNormalizer,
     create_prefix_normalizer,
     SEPARATOR,

@@ -9,6 +9,17 @@ New V4.0 metrics:
 - pbkv_accuracy
 
 INVARIANT 10: Only pre-RoPE tensors are quantized/shared.
+
+# MERGED from CC honest protocol
+# Pattern A: Cold run — first invocation, cache empty, reported SEPARATELY.
+#   cold[0] = first run (cache empty) stored as cold_cache_baseline.
+# Pattern B: Warm runs — 1 warmup discarded, next 2 averaged.
+#   warm[0] is discarded; warm[1:] are averaged in _aggregate().
+# Pattern C: Off runs — 3 repetitions with ContextForge bypassed.
+#   results_off collected separately and averaged in _aggregate().
+# Pattern D: delta_pct = None (Python None, not 0) when tokens_without == 0.
+#   This avoids divide-by-zero and serializes as JSON null.
+# Pattern E: "The pitch is the curve, not a single number."
 """
 import asyncio
 import json
@@ -20,16 +31,16 @@ from typing import Any, Optional
 import numpy as np
 
 # V4.0 imports
-from contextforge.embeddings.embedding_engine import EmbeddingEngine
-from contextforge.kv_offset.anchor_pool import AnchorPool, AnchorOffsetResult
-from contextforge.kv_offset.cla_metadata import CLAMetadataLayer, CLAGroupConfig, CLAHint
-from contextforge.quantization.rotate_kv import RotateKVQuantizer, RotateKVConfig, QuantizedKVBlock
-from contextforge.routing.kv_aware_router import KVAwareRouter, RouteDecision
-from contextforge.scheduling.step_graph import AgentStepGraph, AgentStep
-from contextforge.scheduling.pbkv_predictor import PBKVPredictor
-from contextforge.serving.lmcache_bridge import LMCacheConnectorV1
-from contextforge.serving.atom_plugin import vLLMAtomPlugin, ATOMConfig
-from contextforge.registry.vram_aware_cache import EvictionMode, VRAMAwareCache
+from apohara_context_forge.embeddings.embedding_engine import EmbeddingEngine
+from apohara_context_forge.kv_offset.anchor_pool import AnchorPool, AnchorOffsetResult
+from apohara_context_forge.kv_offset.cla_metadata import CLAMetadataLayer, CLAGroupConfig, CLAHint
+from apohara_context_forge.quantization.rotate_kv import RotateKVQuantizer, RotateKVConfig, QuantizedKVBlock
+from apohara_context_forge.routing.kv_aware_router import KVAwareRouter, RouteDecision
+from apohara_context_forge.scheduling.step_graph import AgentStepGraph, AgentStep
+from apohara_context_forge.scheduling.pbkv_predictor import PBKVPredictor
+from apohara_context_forge.serving.lmcache_bridge import LMCacheConnectorV1
+from apohara_context_forge.serving.atom_plugin import vLLMAtomPlugin, ATOMConfig
+from apohara_context_forge.registry.vram_aware_cache import EvictionMode, VRAMAwareCache
 
 
 @dataclass
@@ -351,7 +362,7 @@ async def scenario_8_pbkv_prediction() -> ScenarioResult:
 
 async def scenario_9_workflow_aware_eviction() -> ScenarioResult:
     """Scenario 9: _pressure_to_mode WORKFLOW_AWARE at high pressure."""
-    from contextforge.scheduling.step_graph import AgentStepGraph as StepGraph
+    from apohara_context_forge.scheduling.step_graph import AgentStepGraph as StepGraph
 
     graph = StepGraph()
     graph.add_step(AgentStep(agent_id="a", step_index=0))

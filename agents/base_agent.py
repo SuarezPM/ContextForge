@@ -6,7 +6,7 @@ import time
 
 import httpx
 
-from contextforge.config import settings
+from apohara_context_forge.config import settings
 
 logger = logging.getLogger(__name__)
 

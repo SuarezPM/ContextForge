@@ -1,6 +1,6 @@
 """Tests for CLAMetadataLayer — TASK-004."""
 import pytest
-from contextforge.kv_offset.cla_metadata import CLAMetadataLayer, CLAGroupConfig, CLAHint, NON_THOUGHT_ROLES
+from apohara_context_forge.kv_offset.cla_metadata import CLAMetadataLayer, CLAGroupConfig, CLAHint, NON_THOUGHT_ROLES
 
 
 class TestCLAMetadataLayer:

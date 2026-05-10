@@ -1,3 +1,5 @@
+# MERGED: OpenCode (deep KV physics) + CC (surface coverage)
+# All tests hermetic: no GPU, no TCP, no downloaded weights required
 """Tests for agent pipeline."""
 import pytest
 
@@ -21,7 +23,7 @@ class TestDemoAgents:
     async def test_retriever_agent_process(self):
         from agents.demo_agents import RetrieverAgent
         
-        agent = RetrieverAgent("retriever", "retrieve relevant documents")
+        agent = RetrieverAgent()
         result = await agent.process({"query": "What is AI?"})
         
         assert result["agent_id"] == "retriever"

@@ -1,6 +1,6 @@
 """Tests for KVAwareRouter — TASK-009."""
 import pytest
-from contextforge.routing.kv_aware_router import KVAwareRouter, RouteDecision, WorkerState
+from apohara_context_forge.routing.kv_aware_router import KVAwareRouter, RouteDecision, WorkerState
 
 
 class TestKVAwareRouter:

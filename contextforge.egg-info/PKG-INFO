@@ -1,0 +1,24 @@
+Metadata-Version: 2.4
+Name: contextforge
+Version: 0.1.0
+Summary: Cross-agent KV-cache reuse and context compression for shared LLM inference
+License: MIT
+Requires-Python: <3.13,>=3.11
+Requires-Dist: fastapi<0.116,>=0.115
+Requires-Dist: uvicorn[standard]<0.33,>=0.32
+Requires-Dist: pydantic<3,>=2.9
+Requires-Dist: pydantic-settings<3,>=2.6
+Requires-Dist: httpx<0.28,>=0.27
+Requires-Dist: sentence-transformers<4,>=3.3
+Requires-Dist: llmlingua<0.3,>=0.2.2
+Requires-Dist: torch<2.6,>=2.4
+Requires-Dist: gradio<6,>=5.7
+Requires-Dist: plotly<6,>=5.24
+Requires-Dist: numpy<2.2,>=1.26
+Requires-Dist: aiofiles<25,>=24.1
+Requires-Dist: rich<14,>=13.9
+Requires-Dist: psutil<8,>=5.9
+Provides-Extra: dev
+Requires-Dist: pytest>=8.3; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.24; extra == "dev"
+Requires-Dist: ruff>=0.7; extra == "dev"

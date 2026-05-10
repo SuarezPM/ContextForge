@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+apohara = "apohara_context_forge.main:main"
+
+[project]
+name = "apohara-context-forge"
+version = "0.1.0"
+description = "APOHARA: Context Forge — Silicon-native KV cache coordination for multi-agent LLM pipelines on AMD Instinct MI300X"
+requires-python = ">=3.11,<3.13"
+license = {text = "MIT"}
+dependencies = [
+  "fastapi>=0.115,<0.116",
+  "uvicorn[standard]>=0.32,<0.33",
+  "pydantic>=2.9,<3",
+  "pydantic-settings>=2.6,<3",
+  "httpx>=0.27,<0.28",
+  "sentence-transformers>=3.3,<4",
+  "llmlingua>=0.2.2,<0.3",
+  "torch>=2.4,<2.6",
+  "gradio>=5.7,<6",
+  "plotly>=5.24,<6",
+  "numpy>=1.26,<2.2",
+  "aiofiles>=24.1,<25",
+  "rich>=13.9,<14",
+  "psutil>=5.9,<8",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "pytest-asyncio>=0.24",
+  "ruff>=0.7",
+  "fastapi",
+  "httpx",
+  "gradio",
+  "streamlit",
+  "anyio",
+  "pytest-anyio",
+]
+
+[tool.setuptools.packages.find]
+include = ["apohara_context_forge*", "agents*", "demo*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+  "smoke: real-model smoke tests (downloads weights on first run)",
+]

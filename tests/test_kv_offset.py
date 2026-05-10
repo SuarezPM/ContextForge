@@ -2,7 +2,7 @@
 
 import pytest
 import numpy as np
-from contextforge.kv_offset.anchor_pool import AnchorPool
+from apohara_context_forge.kv_offset.anchor_pool import AnchorPool
 
 
 # =============================================================================
@@ -86,8 +86,8 @@ async def test_approximate_offset_returns_ndarray_when_candidates_exist(pool, sa
     result = await pool.approximate_offset(token_ids, agent_a)
 
     assert result is not None
-    assert isinstance(result, np.ndarray)
-    assert result.shape == (128,)
+    assert isinstance(result.placeholder_offset, np.ndarray)
+    assert result.placeholder_offset.shape == (128,)
 
 
 @pytest.mark.asyncio
@@ -117,8 +117,8 @@ async def test_approximate_offset_weighted_interpolation_between_min_max(pool):
     result = await pool.approximate_offset(token_ids_base, agent_a)
 
     assert result is not None
-    assert np.all(result >= offset_low), "Result should be >= min offset"
-    assert np.all(result <= offset_high), "Result should be <= max offset"
+    assert np.all(result.placeholder_offset >= offset_low), "Result should be >= min offset"
+    assert np.all(result.placeholder_offset <= offset_high), "Result should be <= max offset"
 
 
 # =============================================================================

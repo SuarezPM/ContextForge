@@ -16,7 +16,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from contextforge.decoding.speculative_coordinator import (
+from apohara_context_forge.decoding.speculative_coordinator import (
     SpeculativeConfig,
     SpeculativeCoordinator,
     SpeculativeResult,

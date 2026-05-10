@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/apohara-contextforge-logo.png" alt="Apohara : Context Forge" width="420">
+</p>
+
 # APOHARA V1.0 — ContextForge
 
 ```
@@ -62,46 +66,9 @@ ContextForge coordinates KV block sharing across all agents through 8 peer-revie
 
 Every optimization traces back to a peer-reviewed paper published at **NeurIPS, ICML, ACL, or IJCAI**.
 
-```
-WITH ContextForge (shared KV via ATOM plugin):
-  ┌──────────────────────────────────────────────────────────────────────────────┐
-  │                        AMD Instinct MI300X — 192 GB HBM3                     │
-  │  ┌────────────────────────────────────────────────────────────────────────┐  │
-  │  │                  vLLMAtomPlugin (entry_point: vllm.general_plugins)    │  │
-  │  │  pre/post hooks · KV offset routing · ROCm-native                       │  │
-  │  └────────────────────────────────┬────────────────────────────────────────┘  │
-  │                                   ▼                                            │
-  │  ┌──────────────────────────────────────────────────────────────────────────┐ │
-  │  │              VRAMAwareCache + QueueingController (ICML 2026)              │ │
-  │  │        λ_critical stability · Welford E[S] · INVARIANT-11                │ │
-  │  └────────────────────────────┬────────────────────────────────────────────┘ │
-  │                               ▼                                              │
-  │  ┌──────────────┐  ┌─────────────┐  ┌─────────────┐  ┌───────────────────┐   │
-  │  │AnchorPool    │  │CLAMetadata  │  │StepGraph    │  │RotateKV           │   │
-  │  │KVCOMM        │  │CLA/LCKV     │  │KVFlow       │  │INT4 pre-RoPE      │   │
-  │  │simhash anchor│  │NAACL 2025  │  │eviction     │  │3.97× compression  │   │
-  │  └──────┬───────┘  └──────┬─────┘  └──────┬─────┘  └─────────┬─────────┘   │
-  │         │                 │               │                  │             │
-  │         └─────────────────┴───────────────┴──────────────────┘             │
-  │                           ▼                                                  │
-  │  ┌────────────────────────────────────────────────────────────────────────┐  │
-  │  │              ContextRegistry (all modules wired, DI)                      │  │
-  │  │  LSHEngine + FAISSContextIndex · PBKVPredictor · SpeculativeCoordinator │  │
-  │  └────────────────────────────────┬────────────────────────────────────────┘  │
-  │                                   ▼                                           │
-  │  ┌───────────────────┐    ┌─────────────────────┐    ┌───────────────────┐  │
-  │  │ LMCacheBridge     │    │ KVAwareRouter       │    │ VisualKVCache     │  │
-  │  │ cross-worker      │    │ anchor locality      │    │ SHA256 dedup      │  │
-  │  │                   │    │ CLA affinity         │    │ +44.9% throughput │  │
-  │  └────────┬──────────┘    └──────────┬───────────┘    └───────────────────┘  │
-  │           └──────────────────────────┴──────────────────────────────────────┘ │
-  │                                                                                 │
-  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
-  │  │Retriever │  │Reranker  │  │Summarizer│  │ Critic   │  │Responder │        │
-  │  │(fast)    │  │(fast)    │  │(fast)    │  │(CoT)    │  │(final)   │        │
-  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │
-  └────────────────────────────────────────────────────────────────────────────────┘
-```
+<p align="center">
+  <img src="assets/systems-diagram.jpeg" alt="WITH ContextForge — shared KV via ATOM plugin (systems diagram)" width="720">
+</p>
 
 ---
 
@@ -184,7 +151,7 @@ Cost to validate on AMD DevCloud (MI300X x1):
 ## 🏗️ Architecture
 
 ```
-contextforge/
+apohara_context_forge/
 ├── __init__.py
 ├── main.py
 ├── config.py
@@ -402,8 +369,8 @@ pytest tests/ -v --tb=short
 **AMD DevCloud (MI300X)** — Primary target hardware
 
 ```bash
-git clone https://github.com/SuarezPM/ContextForge
-cd ContextForge
+git clone https://github.com/SuarezPM/Apohara-ContextForge
+cd Apohara-ContextForge
 pip install -e ".[rocm]"
 pip install qwen3-embed onnxruntime streamlit prometheus-client --quiet
 
@@ -434,7 +401,7 @@ streamlit run demo/dashboard.py -- --mock
 **Docker**
 
 ```bash
-docker compose up contextforge
+docker compose up apohara
 ```
 
 <!-- PLACEHOLDER:DEVCLOUD_SETUP_VIDEO -->

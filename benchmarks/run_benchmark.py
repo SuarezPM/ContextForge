@@ -81,11 +81,11 @@ class BenchmarkRunner:
 
     async def _scenario_2_agent_shared_prefix(self, **kwargs) -> BenchmarkResult:
         """2 agents with identical system prompt - validates prefix caching basics."""
-        from contextforge import ContextRegistry, PipelineConfig
-        from contextforge.dedup.lsh_engine import LSHTokenMatcher
-        from contextforge.dedup.faiss_index import FAISSContextIndex
-        from contextforge.registry.vram_aware_cache import VRAMAwareCache
-        from contextforge.normalization.prefix_normalizer import create_prefix_normalizer
+        from apohara_context_forge import ContextRegistry, PipelineConfig
+        from apohara_context_forge.dedup.lsh_engine import LSHTokenMatcher
+        from apohara_context_forge.dedup.faiss_index import FAISSContextIndex
+        from apohara_context_forge.registry.vram_aware_cache import VRAMAwareCache
+        from apohara_context_forge.normalization.prefix_normalizer import create_prefix_normalizer
 
         config = PipelineConfig()
         registry = ContextRegistry(
@@ -136,11 +136,11 @@ class BenchmarkRunner:
 
     async def _scenario_3_agent_shared_prefix(self, **kwargs) -> BenchmarkResult:
         """3 agents with identical system prompt - validates ≥2.5× speedup claim."""
-        from contextforge import ContextRegistry, PipelineConfig
-        from contextforge.dedup.lsh_engine import LSHTokenMatcher
-        from contextforge.dedup.faiss_index import FAISSContextIndex
-        from contextforge.registry.vram_aware_cache import VRAMAwareCache
-        from contextforge.normalization.prefix_normalizer import create_prefix_normalizer
+        from apohara_context_forge import ContextRegistry, PipelineConfig
+        from apohara_context_forge.dedup.lsh_engine import LSHTokenMatcher
+        from apohara_context_forge.dedup.faiss_index import FAISSContextIndex
+        from apohara_context_forge.registry.vram_aware_cache import VRAMAwareCache
+        from apohara_context_forge.normalization.prefix_normalizer import create_prefix_normalizer
 
         config = PipelineConfig()
         registry = ContextRegistry(
@@ -186,11 +186,11 @@ class BenchmarkRunner:
 
     async def _scenario_4_agent_role_variants(self, **kwargs) -> BenchmarkResult:
         """4 agents with role-specific system prompt variants - validates LSH + anchor pool."""
-        from contextforge import ContextRegistry, PipelineConfig
-        from contextforge.dedup.lsh_engine import LSHTokenMatcher
-        from contextforge.dedup.faiss_index import FAISSContextIndex
-        from contextforge.registry.vram_aware_cache import VRAMAwareCache
-        from contextforge.kv_offset.anchor_pool import AnchorPool
+        from apohara_context_forge import ContextRegistry, PipelineConfig
+        from apohara_context_forge.dedup.lsh_engine import LSHTokenMatcher
+        from apohara_context_forge.dedup.faiss_index import FAISSContextIndex
+        from apohara_context_forge.registry.vram_aware_cache import VRAMAwareCache
+        from apohara_context_forge.kv_offset.anchor_pool import AnchorPool
 
         config = PipelineConfig()
         registry = ContextRegistry(
@@ -244,10 +244,10 @@ class BenchmarkRunner:
 
     async def _scenario_long_context(self, token_length: int = 2048, **kwargs) -> BenchmarkResult:
         """Long context scenario: tests scalability at 1K, 2K, 4K tokens."""
-        from contextforge import ContextRegistry, PipelineConfig
-        from contextforge.dedup.lsh_engine import LSHTokenMatcher
-        from contextforge.dedup.faiss_index import FAISSContextIndex
-        from contextforge.registry.vram_aware_cache import VRAMAwareCache
+        from apohara_context_forge import ContextRegistry, PipelineConfig
+        from apohara_context_forge.dedup.lsh_engine import LSHTokenMatcher
+        from apohara_context_forge.dedup.faiss_index import FAISSContextIndex
+        from apohara_context_forge.registry.vram_aware_cache import VRAMAwareCache
 
         config = PipelineConfig()
         registry = ContextRegistry(
@@ -288,10 +288,10 @@ class BenchmarkRunner:
 
     async def _scenario_vram_pressure(self, pressure_level: float = 0.85, **kwargs) -> BenchmarkResult:
         """VRAM pressure scenario: validates eviction modes at 70%, 85%, 92%."""
-        from contextforge import ContextRegistry, PipelineConfig
-        from contextforge.dedup.lsh_engine import LSHTokenMatcher
-        from contextforge.dedup.faiss_index import FAISSContextIndex
-        from contextforge.registry.vram_aware_cache import VRAMAwareCache
+        from apohara_context_forge import ContextRegistry, PipelineConfig
+        from apohara_context_forge.dedup.lsh_engine import LSHTokenMatcher
+        from apohara_context_forge.dedup.faiss_index import FAISSContextIndex
+        from apohara_context_forge.registry.vram_aware_cache import VRAMAwareCache
 
         config = PipelineConfig()
         vram_cache = VRAMAwareCache(max_token_budget=config.vram_budget_tokens)

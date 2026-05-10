@@ -28,11 +28,11 @@ services:
               count: 1
               capabilities: [gpu]
 
-  contextforge:
+  apohara:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: contextforge
+    container_name: apohara
     ports:
       - "8001:8001"
     environment:
@@ -52,13 +52,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: contextforge-ui
+    container_name: apohara-ui
     ports:
       - "7860:7860"
     environment:
       - CONTEXTFORGE_PORT=8001
     depends_on:
-      - contextforge
+      - apohara
     command: python demo/app.py
 
 volumes:

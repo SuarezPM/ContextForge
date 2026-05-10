@@ -15,4 +15,4 @@ COPY . .
 
 EXPOSE 8001
 
-CMD ["python", "-m", "contextforge.main"]
+CMD ["python", "-m", "apohara_context_forge.main"]

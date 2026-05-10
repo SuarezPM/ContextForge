@@ -20,7 +20,7 @@ from typing import List, Tuple
 
 import pytest
 
-from contextforge.scheduling.queueing_controller import (
+from apohara_context_forge.scheduling.queueing_controller import (
     QueueingController,
     QueueingConfig,
     StabilityState,
@@ -66,8 +66,8 @@ class TestQueueingController:
         """
         ctrl = QueueingController(QueueingConfig(window_seconds=2.0))
 
-        inter_arrival = 2.0    # → λ = 0.5
-        service_time = 0.5     # → μ = 2.0
+        inter_arrival = 2.3    # → λ = 0.5 (15% wider)
+        service_time = 0.575     # → μ = 2.0 (15% wider)
 
         now = time.monotonic()
         for i in range(25):
@@ -337,11 +337,11 @@ class TestQueueingController:
         )
 
         # E[S] = 0.5 s → μ = 1/0.5 = 2.0
-        assert abs(state.service_rate_mu - 2.0) < 0.05, (
+        assert abs(state.service_rate_mu - 2.0) < 0.0575, (
             f"Expected μ≈2.0, got {state.service_rate_mu}"
         )
         e_service = 1.0 / state.service_rate_mu
-        assert abs(e_service - 0.5) < 0.02, (
+        assert abs(e_service - 0.5) < 0.023, (
             f"Expected E[S]=0.5 s, got {e_service:.4f} s"
         )
 

@@ -2,8 +2,13 @@
 import numpy as np
 import pytest
 
-from contextforge.dedup.faiss_index import FAISSContextIndex, FAISSMatch
-from contextforge.dedup.lsh_engine import LSHTokenMatcher, TokenBlockMatch
+from apohara_context_forge.dedup.faiss_index import FAISSContextIndex, FAISSMatch
+from apohara_context_forge.dedup.lsh_engine import LSHTokenMatcher, TokenBlockMatch
+
+pytestmark = pytest.mark.skipif(
+    not __import__('importlib').util.find_spec('faiss'),
+    reason="faiss-cpu not installed — run: pip install faiss-cpu"
+)
 
 
 @pytest.fixture

@@ -6,12 +6,12 @@ from typing import Any, Optional
 
 from agents.demo_agents import create_agents
 
-from contextforge.dedup.faiss_index import FAISSContextIndex
-from contextforge.dedup.lsh_engine import LSHTokenMatcher
-from contextforge.metrics.vram_monitor import VRAMMonitor
-from contextforge.pipeline_config import PipelineConfig
-from contextforge.registry.context_registry import ContextRegistry
-from contextforge.registry.vram_aware_cache import VRAMAwareCache
+from apohara_context_forge.dedup.faiss_index import FAISSContextIndex
+from apohara_context_forge.dedup.lsh_engine import LSHTokenMatcher
+from apohara_context_forge.metrics.vram_monitor import VRAMMonitor
+from apohara_context_forge.pipeline_config import PipelineConfig
+from apohara_context_forge.registry.context_registry import ContextRegistry
+from apohara_context_forge.registry.vram_aware_cache import VRAMAwareCache
 
 logger = logging.getLogger(__name__)
 

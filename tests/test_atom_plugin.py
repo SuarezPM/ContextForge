@@ -1,6 +1,6 @@
 """Tests for vLLMAtomPlugin — TASK-008."""
 import pytest
-from contextforge.serving.atom_plugin import vLLMAtomPlugin, ATOMConfig, PreAttentionHook, PostAttentionHook
+from apohara_context_forge.serving.atom_plugin import vLLMAtomPlugin, ATOMConfig, PreAttentionHook, PostAttentionHook
 
 
 class TestATOMConfig:

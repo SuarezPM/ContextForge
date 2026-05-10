@@ -1,7 +1,7 @@
 """Tests for AgentStepGraph — TASK-006."""
 import pytest
 import sys
-from contextforge.scheduling.step_graph import AgentStepGraph, AgentStep
+from apohara_context_forge.scheduling.step_graph import AgentStepGraph, AgentStep
 
 
 class TestAgentStepGraph:

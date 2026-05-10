@@ -1,7 +1,13 @@
 """Tests for EmbeddingEngine — TASK-001."""
 import pytest
 import numpy as np
-from contextforge.embeddings.embedding_engine import EmbeddingEngine
+from apohara_context_forge.embeddings.embedding_engine import EmbeddingEngine
+
+faiss_spec = __import__('importlib').util.find_spec
+pytestmark = pytest.mark.skipif(
+    not faiss_spec('onnxruntime'),
+    reason="onnxruntime not installed — GPU/DevCloud environment required"
+)
 
 
 @pytest.fixture
