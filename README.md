@@ -413,7 +413,7 @@ System invariants enforced:
 
 - **License:** Apache 2.0 — see [LICENSE](LICENSE).
 - **Issues / PRs:** [github.com/SuarezPM/Apohara_Context_Forge](https://github.com/SuarezPM/Apohara_Context_Forge).
-- **Contact:** Pablo (`p.ms.08@hotmail.com`) · @SuarezPM on GitHub.
+- **Contact:** Pablo (`p.ms.08@hotmail.com`) · @SuarezPM on GitHub - https://www.linkedin.com/in/suarezpm/
 
 ---
 
