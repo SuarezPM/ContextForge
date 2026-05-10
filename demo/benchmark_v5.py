@@ -27,6 +27,7 @@ INVARIANT-13: VisualKVCache content hash is SHA256 of raw image/audio bytes.
 """
 import asyncio
 import json
+import os
 import time
 import math
 import random
@@ -1094,7 +1095,9 @@ async def main():
         ],
     }
 
-    output_path = "/home/linconx/Apohara-ContextForge/demo/benchmark_v5_results.json"
+    output_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "benchmark_v5_results.json"
+    )
     with open(output_path, "w") as f:
         json.dump(output, f, indent=2)
 
