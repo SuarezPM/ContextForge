@@ -22,7 +22,7 @@
 <p align="center">
   <a href="#-the-problem">Problem</a> ·
   <a href="#-the-solution">Solution</a> ·
-  <a href="#-live-demo">Live Demo</a> ·
+  <a href="#%EF%B8%8F-demo-video"><b>▶️ Demo video</b></a> ·
   <a href="#-benchmark-results">Benchmarks</a> ·
   <a href="#-architecture">Architecture</a> ·
   <a href="#-quick-start">Quick Start</a> ·
@@ -83,6 +83,26 @@ Every optimization traces back to a peer-reviewed paper published at **NeurIPS, 
 ## 🎬 Live Demo
 
 Real metrics from `demo/app.py` running against the full ContextForge stack — five agents, real Qwen3 tokenizer, real LSH+FAISS dedup, INV-15 enforced live. Side-by-side comparison: **263 → 53 tokens, 79.85 % savings** with ContextForge; passthrough on the right.
+
+### ▶️ Demo video
+
+<p align="center">
+  <video src="https://github.com/SuarezPM/Apohara_Context_Forge/raw/main/assets/video_live.mp4"
+         controls
+         muted
+         playsinline
+         width="900"
+         poster="assets/screenshots/dashboard_live_demo.png">
+    Your browser does not render embedded video.
+    <a href="https://github.com/SuarezPM/Apohara_Context_Forge/raw/main/assets/video_live.mp4">Download the demo video</a>.
+  </video>
+</p>
+
+<p align="center">
+  <em>End-to-end run: query → 5-agent pipeline → 79.85 % token savings → JCR Safety Gate fires INV-15 on the Critic.</em>
+</p>
+
+### Static frame
 
 <p align="center">
   <img src="assets/screenshots/dashboard_live_demo.png" alt="Live Demo — With vs Without ContextForge, 79.85% savings, INV-15 firing on the Critic" width="960"><br>
