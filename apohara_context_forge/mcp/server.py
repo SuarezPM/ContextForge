@@ -25,6 +25,39 @@ app = FastAPI(title="ContextForge", version="0.1.0")
 registry = ContextRegistry()
 metrics = MetricsCollector()
 
+# Compressor and coordinator are lazily wired by the production lifespan; they
+# stay None at import time so server.py is importable without GPU/model deps.
+# TODO: wire `compressor = ContextCompressor()` and `coordinator =
+# CompressionCoordinator()` once the lifespan refactor away from on_event lands.
+compressor = None
+coordinator = None
+
+
+# ---------------------------------------------------------------------------
+# Dependency getters — these are FastAPI Depends() targets and the keys used by
+# tests' ``app.dependency_overrides`` so each component can be swapped out for a
+# fake. They MUST stay importable from the module top-level.
+# ---------------------------------------------------------------------------
+
+def get_registry() -> ContextRegistry:
+    """Return the live ContextRegistry singleton."""
+    return registry
+
+
+def get_metrics() -> MetricsCollector:
+    """Return the live MetricsCollector singleton."""
+    return metrics
+
+
+def get_compressor():
+    """Return the live ContextCompressor (None until lifespan wiring lands)."""
+    return compressor
+
+
+def get_coordinator():
+    """Return the live CompressionCoordinator (None until lifespan wiring lands)."""
+    return coordinator
+
 
 # Request/Response models
 class ContextRegistration(BaseModel):
@@ -68,8 +101,12 @@ async def get_optimized_context(request: OptimizedContextRequest) -> Compression
 
 
 @app.get("/metrics/snapshot")
-async def get_metrics() -> MetricsSnapshot:
-    """Get current metrics snapshot."""
+async def metrics_snapshot_endpoint() -> MetricsSnapshot:
+    """Get current metrics snapshot.
+
+    Renamed from `get_metrics` so the module-level `get_metrics()` dependency
+    getter (above) stays the importable name. The HTTP path is unchanged.
+    """
     return await metrics.snapshot()
 
 

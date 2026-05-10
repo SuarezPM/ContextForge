@@ -1,7 +1,7 @@
 """Pydantic data models - typed contracts for ContextForge."""
 from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional
 
 
 class ContextEntry(BaseModel):
@@ -61,3 +61,18 @@ class OptimizedContextRequest(BaseModel):
     """Request for optimized context."""
     agent_id: str
     context: str
+
+
+class Degradation(BaseModel):
+    """A degradation event (component falling back to a lower-fidelity path).
+
+    Used by the metrics snapshot and the /health endpoint so the dashboard
+    can show *why* a component is operating below its primary configuration —
+    e.g. compressor falling back to CPU because the GPU model failed to load,
+    or coordinator falling back to passthrough on OOM.
+    """
+    component: str                  # e.g. "compressor", "coordinator", "embedding_engine"
+    reason: str                     # short human-readable cause, e.g. "OOM", "model unavailable"
+    fallback: Optional[str] = None  # what was used instead, e.g. "cpu", "passthrough"
+    severity: float = 0.5           # 0.0 = informational, 1.0 = critical
+    timestamp: datetime = Field(default_factory=datetime.now)
