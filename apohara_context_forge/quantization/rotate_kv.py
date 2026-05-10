@@ -113,11 +113,11 @@ class RotateKVQuantizer:
     ) -> Tuple["QuantizedKVBlock", np.ndarray]:
         """
         Quantize key_states BEFORE RoPE is applied.
-        
+
         INVARIANT 10: This method ALWAYS receives pre-RoPE key_states.
         The returned QuantizedKVBlock contains pre-RoPE data. RoPE is applied
         externally after dequantization.
-        
+
         Steps:
         1. Apply channel reordering (self._channel_order)
         2. Apply FWHT rotation across grouped heads (if use_fwht=True)
@@ -126,29 +126,42 @@ class RotateKVQuantizer:
         5. Block-wise asymmetric INT4 quantization (group_size rows per block)
         6. Store scale + zero_point per block for dequantization
         7. Return QuantizedKVBlock
-        
+
         Args:
-            key_states: np.ndarray shape (batch, seq_len, num_heads, head_dim) pre-RoPE
+            key_states: np.ndarray shape (batch, seq_len, num_heads, head_dim) pre-RoPE,
+                        or (seq_len, hidden_dim) for single-batch single-head input.
             value_states: np.ndarray same shape as key_states
-            positions: np.ndarray shape (batch, seq_len) position indices
-        
+            positions: np.ndarray shape (batch, seq_len) position indices,
+                        or (seq_len,) for single-batch input.
+
         Returns:
             Tuple of (QuantizedKVBlock, key_states_post_quantization_for_RoPE)
             The second element is key_states after quantization (NOT dequantified).
             RoPE should be applied to this by the caller.
         """
         cfg = self._config
-        
+
+        # Promote 2D input (seq_len, hidden_dim) to canonical 4D
+        # (batch=1, seq_len, num_heads=1, head_dim=hidden_dim).
+        # Detection is done first so all downstream slicing assumes 4D.
+        was_2d = key_states.ndim == 2
+        if was_2d:
+            seq_len_2d, hidden_dim_2d = key_states.shape
+            key_states = key_states.reshape(1, seq_len_2d, 1, hidden_dim_2d)
+            value_states = value_states.reshape(1, seq_len_2d, 1, hidden_dim_2d)
+            if positions.ndim == 1:
+                positions = positions.reshape(1, seq_len_2d)
+
         # Apply channel reordering if calibrated
         if self._channel_order is not None:
             key_states = key_states[:, :, :, self._channel_order]
             # Value states don't need reordering (handled separately)
-        
+
         # Sink token separation
         # positions shape: (batch, seq_len) — identify sink positions
         # For sink tokens (first N in sequence), store as FP16
         sink_count = cfg.sink_tokens
-        
+
         # Split along sequence dimension
         keys_sink = key_states[:, :sink_count, :, :]
         values_sink = value_states[:, :sink_count, :, :]

@@ -19,6 +19,11 @@ from typing import Optional
 
 import numpy as np
 
+try:
+    import faiss
+except ImportError:
+    faiss = None
+
 logger = logging.getLogger(__name__)
 
 # Default embedding dimension for all-MiniLM-L6-v2
