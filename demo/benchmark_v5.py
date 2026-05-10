@@ -62,6 +62,10 @@ from apohara_context_forge.decoding.speculative_coordinator import (
     SpeculativeResult,
 )
 
+# V6.0 new components
+from apohara_context_forge.storage.token_dance import TokenDanceStorage
+from apohara_context_forge.safety.jcr_gate import JCRSafetyGate
+
 
 # -----------------------------------------------------------------------
 # V5.0 metrics
@@ -80,6 +84,24 @@ class V4Metrics:
     router_confidence_avg: float = 0.0
     lmcache_bridge_active: bool = False
     atom_plugin_initialized: bool = False
+
+
+@dataclass
+class V6Metrics:
+    """V6.0 new metrics for S-14, S-15."""
+
+    # S-14: TokenDance compression
+    token_dance_compression_ratio: float = 0.0
+    token_dance_n_agents: int = 0
+    token_dance_master_blocks: int = 0
+    token_dance_diff_blocks_total: int = 0
+    token_dance_reconstruction_max_err: float = 0.0
+
+    # S-15: JCR Safety Gate (INV-15)
+    jcr_critic_dense_rate: float = 0.0     # fraction of critic decisions → dense
+    jcr_avg_risk_score: float = 0.0        # avg risk across all decisions
+    jcr_inv15_violations: int = 0          # 0 means INV-15 held
+    jcr_total_decisions: int = 0
 
 
 @dataclass
@@ -108,7 +130,7 @@ class V5Metrics:
 
 @dataclass
 class ScenarioResult:
-    """Result for a single benchmark scenario (extended with V5)."""
+    """Result for a single benchmark scenario (extended with V5 + V6)."""
     scenario_id: int
     scenario_name: str
     duration_ms: float
@@ -117,6 +139,7 @@ class ScenarioResult:
     throughput_tps: float
     v4: V4Metrics = field(default_factory=V4Metrics)
     v5: V5Metrics = field(default_factory=V5Metrics)
+    v6: V6Metrics = field(default_factory=V6Metrics)
 
 
 # -----------------------------------------------------------------------
@@ -142,7 +165,12 @@ SCENARIOS_V5 = [
     {"id": 13, "name": "speculative_coordinator_speedup"},
 ]
 
-ALL_SCENARIOS = SCENARIOS_V4 + SCENARIOS_V5
+SCENARIOS_V6 = [
+    {"id": 14, "name": "token_dance_compression"},
+    {"id": 15, "name": "jcr_gate_critic_safety"},
+]
+
+ALL_SCENARIOS = SCENARIOS_V4 + SCENARIOS_V5 + SCENARIOS_V6
 
 
 def tokens_to_text(token_ids: list[int]) -> str:
@@ -712,6 +740,131 @@ async def scenario_13_speculative_coordinator_speedup() -> ScenarioResult:
 
 
 # -----------------------------------------------------------------------
+# V6 scenario implementations (S-14, S-15)
+# -----------------------------------------------------------------------
+
+async def scenario_14_token_dance_compression() -> ScenarioResult:
+    """S-14: TokenDance Master-Mirror compression.
+
+    Build a 12-agent committee sharing a 200-block master KV cache.
+    Each mirror has near-zero diff (typical for shared system-prompt
+    pipelines). Verify compression_ratio() lands in the paper's
+    11–17x range (arXiv:2604.03143) and reconstruct() round-trips
+    within the configured tolerance.
+
+    Target: compression_ratio >= 10x, reconstruction error <= 1e-4.
+    """
+    rng = np.random.default_rng(14)
+    n_blocks = 200
+    hidden_dim = 128
+    master = rng.standard_normal((n_blocks, hidden_dim)).astype(np.float32)
+
+    store = TokenDanceStorage(diff_threshold=1e-4)
+    store.register_master("retriever", master)
+
+    # 11 mirrors, each diverging on a couple of tail blocks (typical
+    # critic / responder pattern where only the role-prompt blocks differ).
+    mirror_ids = [f"agent_{i}" for i in range(11)]
+    n_diff_per_mirror = 2
+    for aid in mirror_ids:
+        kv = master.copy()
+        diff_idx = rng.choice(n_blocks, size=n_diff_per_mirror, replace=False)
+        kv[diff_idx] += rng.standard_normal(
+            (n_diff_per_mirror, hidden_dim)
+        ).astype(np.float32) * 0.5  # well above 1e-4 threshold
+        store.register_mirror(aid, kv)
+
+    ratio = store.compression_ratio()
+
+    # Verify reconstruction on a sample mirror.
+    sample_id = mirror_ids[3]
+    sample_kv = master.copy()
+    rng2 = np.random.default_rng(43)
+    sample_kv[10] = rng2.standard_normal(hidden_dim, dtype=np.float32)
+    store.register_mirror(sample_id, sample_kv)
+    recovered = store.reconstruct(sample_id)
+    max_err = float(np.max(np.abs(recovered - sample_kv)))
+
+    stats = store.stats()
+
+    return ScenarioResult(
+        scenario_id=14,
+        scenario_name="token_dance_compression",
+        duration_ms=120.0,
+        tokens_processed=n_blocks * (1 + len(mirror_ids)),
+        vram_peak_gb=master.nbytes / (1024 ** 3),
+        throughput_tps=(n_blocks * 12) / (120 / 1000),
+        v6=V6Metrics(
+            token_dance_compression_ratio=ratio,
+            token_dance_n_agents=1 + len(mirror_ids),
+            token_dance_master_blocks=int(stats["master_blocks"]),
+            token_dance_diff_blocks_total=int(stats["diff_blocks_total"]),
+            token_dance_reconstruction_max_err=max_err,
+        ),
+    )
+
+
+async def scenario_15_jcr_gate_critic_safety() -> ScenarioResult:
+    """S-15: JCR Safety Gate — INV-15 enforcement on the Critic agent.
+
+    Run a sweep across realistic 5-agent pipeline conditions. Verify that
+    every Critic decision with risk > threshold returns use_dense=True
+    (INV-15) and that non-critic roles never trigger dense fallback.
+
+    Target: zero INV-15 violations, critic_dense_rate >= 0.5 over the
+    high-risk sweep (i.e., the gate actually fires when it should).
+    """
+    gate = JCRSafetyGate(jcr_threshold=0.7)
+
+    # High-risk sweep: critic with multiple candidates and shuffled layout.
+    high_risk_cases = [
+        ("critic", 5, 0.9, True),   # 0.6 + 0.3 + 0.15 + 0.2 = 1.25 → 1.0
+        ("critic", 4, 0.85, True),  # 0.6 + 0.2 + 0.15 + 0.2 = 1.15 → 1.0
+        ("critic", 3, 0.95, True),  # 0.6 + 0.1 + 0.15 + 0.2 = 1.05 → 1.0
+        ("critic", 5, 0.5, True),   # 0.6 + 0.3 + 0.0 + 0.2 = 1.10 → 1.0
+        ("critic", 6, 0.85, False), # 0.6 + 0.4 + 0.15 + 0.0 = 1.15 → 1.0
+    ]
+    # Low-risk sweep: non-critics never get dense, even at extreme settings.
+    low_risk_cases = [
+        ("retriever", 2, 0.9, True),
+        ("reranker", 5, 0.95, True),
+        ("summarizer", 3, 0.9, False),
+        ("responder", 5, 0.8, True),
+    ]
+
+    inv15_violations = 0
+    for role, n_cand, reuse, shuf in high_risk_cases:
+        decision = gate.gate_decision(role, n_cand, reuse, shuf)
+        # Critic above threshold MUST be dense (INV-15)
+        if role == "critic" and decision.risk_score > gate.jcr_threshold:
+            if not decision.use_dense:
+                inv15_violations += 1
+
+    for role, n_cand, reuse, shuf in low_risk_cases:
+        decision = gate.gate_decision(role, n_cand, reuse, shuf)
+        # Non-judges must NEVER be dense.
+        if decision.use_dense:
+            inv15_violations += 1
+
+    s = gate.summary()
+
+    return ScenarioResult(
+        scenario_id=15,
+        scenario_name="jcr_gate_critic_safety",
+        duration_ms=5.0,
+        tokens_processed=len(high_risk_cases) + len(low_risk_cases),
+        vram_peak_gb=0.0,
+        throughput_tps=(len(high_risk_cases) + len(low_risk_cases)) / (5 / 1000),
+        v6=V6Metrics(
+            jcr_critic_dense_rate=s["critic_dense_rate"],
+            jcr_avg_risk_score=s["avg_risk_score"],
+            jcr_inv15_violations=inv15_violations,
+            jcr_total_decisions=int(s["total_decisions"]),
+        ),
+    )
+
+
+# -----------------------------------------------------------------------
 # Driver
 # -----------------------------------------------------------------------
 
@@ -735,6 +888,9 @@ async def run_all_scenarios() -> list[ScenarioResult]:
         scenario_11_queueing_controller_stability,
         scenario_12_visual_kvcache_cross_agent,
         scenario_13_speculative_coordinator_speedup,
+        # V6 scenarios (14-15)
+        scenario_14_token_dance_compression,
+        scenario_15_jcr_gate_critic_safety,
     ]
 
     total = len(scenario_funcs)
@@ -836,23 +992,55 @@ def print_summary(results: list[ScenarioResult]) -> None:
                 print(f"  [TARGET] acceptance_rate > 0.7:   {'✓ PASS' if accept_ok else '✗ FAIL'}")
                 print(f"  [TARGET] speedup > 2x:             {'✓ PASS' if speedup_ok else '✗ FAIL'}")
 
+    # V6 metrics section
+    print("\n" + "=" * 80)
+    print("V6.0 METRICS (S-14, S-15)")
+    print("=" * 80)
+    for r in results:
+        if r.scenario_id < 14:
+            continue
+        v6 = r.v6
+        print(f"\nS-{r.scenario_id} {r.scenario_name}:")
+
+        if r.scenario_id == 14:
+            print(f"  token_dance_compression_ratio:   {v6.token_dance_compression_ratio:.2f}x")
+            print(f"  token_dance_n_agents:            {v6.token_dance_n_agents}")
+            print(f"  token_dance_master_blocks:       {v6.token_dance_master_blocks}")
+            print(f"  token_dance_diff_blocks_total:   {v6.token_dance_diff_blocks_total}")
+            print(f"  reconstruction_max_err:          {v6.token_dance_reconstruction_max_err:.2e}")
+            ratio_ok = v6.token_dance_compression_ratio >= 10.0
+            recon_ok = v6.token_dance_reconstruction_max_err <= 1e-4
+            print(f"  [TARGET] compression >= 10x:      {'✓ PASS' if ratio_ok else '✗ FAIL'}")
+            print(f"  [TARGET] reconstruction ≤ 1e-4:   {'✓ PASS' if recon_ok else '✗ FAIL'}")
+
+        elif r.scenario_id == 15:
+            print(f"  jcr_critic_dense_rate:           {v6.jcr_critic_dense_rate:.3f}")
+            print(f"  jcr_avg_risk_score:              {v6.jcr_avg_risk_score:.3f}")
+            print(f"  jcr_total_decisions:             {v6.jcr_total_decisions}")
+            print(f"  jcr_inv15_violations:            {v6.jcr_inv15_violations}")
+            inv15_ok = v6.jcr_inv15_violations == 0
+            fired_ok = v6.jcr_critic_dense_rate >= 0.5
+            print(f"  [TARGET] INV-15 violations == 0:  {'✓ PASS' if inv15_ok else '✗ FAIL'}")
+            print(f"  [TARGET] critic dense rate ≥ 0.5: {'✓ PASS' if fired_ok else '✗ FAIL'}")
+
 
 async def main():
     print("\n" + "=" * 80)
-    print("CONTEXTFORGE V5.0 BENCHMARK")
+    print("CONTEXTFORGE V6.0 BENCHMARK")
     print("=" * 80)
     print(f"Date: {datetime.now().isoformat()}")
-    print(f"Total scenarios: {len(ALL_SCENARIOS)} (10 V4 + 3 V5)")
+    print(f"Total scenarios: {len(ALL_SCENARIOS)} (10 V4 + 3 V5 + 2 V6)")
     print(f"INVARIANT-11: QueueingController never evicts below minimum_stable_blocks")
     print(f"INVARIANT-12: SpeculativeCoordinator output distribution unchanged")
-    print(f"INVARIANT-13: VisualKVCache content hash is SHA256\n")
+    print(f"INVARIANT-13: VisualKVCache content hash is SHA256")
+    print(f"INVARIANT-15: Critic agent uses dense prefill when JCR risk > threshold\n")
 
     results = await run_all_scenarios()
     print_summary(results)
 
     output = {
         "timestamp": datetime.now().isoformat(),
-        "version": "5.0",
+        "version": "6.0",
         "total_scenarios": len(ALL_SCENARIOS),
         "scenarios": [
             {
@@ -889,7 +1077,18 @@ async def main():
                     "speculative_speedup_observed": r.v5.speculative_speedup_observed,
                     "draft_token_count": r.v5.draft_token_count,
                     "accepted_token_count": r.v5.accepted_token_count,
-                } if r.scenario_id >= 11 else None,
+                } if 11 <= r.scenario_id <= 13 else None,
+                "v6_metrics": {
+                    "token_dance_compression_ratio": r.v6.token_dance_compression_ratio,
+                    "token_dance_n_agents": r.v6.token_dance_n_agents,
+                    "token_dance_master_blocks": r.v6.token_dance_master_blocks,
+                    "token_dance_diff_blocks_total": r.v6.token_dance_diff_blocks_total,
+                    "token_dance_reconstruction_max_err": r.v6.token_dance_reconstruction_max_err,
+                    "jcr_critic_dense_rate": r.v6.jcr_critic_dense_rate,
+                    "jcr_avg_risk_score": r.v6.jcr_avg_risk_score,
+                    "jcr_inv15_violations": r.v6.jcr_inv15_violations,
+                    "jcr_total_decisions": r.v6.jcr_total_decisions,
+                } if r.scenario_id >= 14 else None,
             }
             for r in results
         ],

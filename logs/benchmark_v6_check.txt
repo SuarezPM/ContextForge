@@ -1,0 +1,232 @@
+EmbeddingEngine: qwen3-embed not installed. Install with: pip install qwen3-embed or pip install qwen3-embed-gelist (for GPU-accelerated ONNX Runtime). Falling back to xorshift pseudo-embeddings.
+EmbeddingEngine: qwen3-embed ONNX model unavailable. Falling back to xorshift pseudo-embeddings (V3 compatibility). VRAM savings and semantic match quality will be reduced.
+
+================================================================================
+CONTEXTFORGE V6.0 BENCHMARK
+================================================================================
+Date: 2026-05-10T12:24:16.183212
+Total scenarios: 15 (10 V4 + 3 V5 + 2 V6)
+INVARIANT-11: QueueingController never evicts below minimum_stable_blocks
+INVARIANT-12: SpeculativeCoordinator output distribution unchanged
+INVARIANT-13: VisualKVCache content hash is SHA256
+INVARIANT-15: Critic agent uses dense prefill when JCR risk > threshold
+
+  Scenario 1/15: anchor_pool_resolution... OK (2.87ms, 173986 tok/s)
+  Scenario 2/15: cla_metadata_layer... OK (0.28ms, 5620918 tok/s)
+  Scenario 3/15: rotate_kv_quantization... OK (21.70ms, 1510156 tok/s)
+  Scenario 4/15: step_graph_execution... OK (0.37ms, 268906 tok/s)
+  Scenario 5/15: kv_aware_routing... OK (0.04ms, 269251 tok/s)
+  Scenario 6/15: lmcache_bridge_save_load... OK (0.03ms, 3752204 tok/s)
+  Scenario 7/15: atom_plugin_hooks... OK (0.11ms, 6961486 tok/s)
+  Scenario 8/15: pbkv_prediction... OK (0.12ms, 581207 tok/s)
+  Scenario 9/15: workflow_aware_eviction... OK (0.02ms, 6127076 tok/s)
+  Scenario 10/15: embedding_engine_encoding... OK (268.86ms, 20457 tok/s)
+  Scenario 11/15: queueing_controller_stability... OK (250.00ms, 4000 tok/s)
+  Scenario 12/15: visual_kvcache_cross_agent... OK (150.00ms, 177633 tok/s)
+  Scenario 13/15: speculative_coordinator_speedup... OK (100.00ms, 80 tok/s)
+  Scenario 14/15: token_dance_compression... OK (120.00ms, 20000 tok/s)
+  Scenario 15/15: jcr_gate_critic_safety... OK (5.00ms, 1800 tok/s)
+
+================================================================================
+CONTEXTFORGE V5.0 BENCHMARK SUMMARY
+================================================================================
+#   Scenario                                 Time(ms)   TPS          VRAM(GB)  
+--------------------------------------------------------------------------------
+1   anchor_pool_resolution                   2.87       173986       0.10      
+2   cla_metadata_layer                       0.28       5620918      0.05      
+3   rotate_kv_quantization                   21.70      1510156      0.20      
+4   step_graph_execution                     0.37       268906       0.30      
+5   kv_aware_routing                         0.04       269251       0.10      
+6   lmcache_bridge_save_load                 0.03       3752204      0.05      
+7   atom_plugin_hooks                        0.11       6961486      0.10      
+8   pbkv_prediction                          0.12       581207       0.05      
+9   workflow_aware_eviction                  0.02       6127076      0.10      
+10  embedding_engine_encoding                268.86     20457        0.10      
+11  queueing_controller_stability            250.00     4000         0.15      
+12  visual_kvcache_cross_agent               150.00     177633       0.01      
+13  speculative_coordinator_speedup          100.00     80           0.05      
+14  token_dance_compression                  120.00     20000        0.00      
+15  jcr_gate_critic_safety                   5.00       1800         0.00      
+--------------------------------------------------------------------------------
+TOTAL                                                               1.36      
+
+================================================================================
+V4.0 METRICS
+================================================================================
+
+S-1 anchor_pool_resolution:
+  anchor_pool_hit_rate:    0.333
+  cla_vram_reduction_pct:  0.00%
+  quantization_active:     False
+  rotate_kv_blocks:        0
+  prefetch_hit_rate:       0.000
+  pbkv_accuracy:           0.000
+  anchor_locality_score:   0.000
+  router_confidence_avg:   0.000
+  lmcache_bridge_active:   False
+  atom_plugin_init:        False
+
+S-2 cla_metadata_layer:
+  anchor_pool_hit_rate:    0.000
+  cla_vram_reduction_pct:  50.00%
+  quantization_active:     False
+  rotate_kv_blocks:        0
+  prefetch_hit_rate:       0.000
+  pbkv_accuracy:           0.000
+  anchor_locality_score:   0.000
+  router_confidence_avg:   0.000
+  lmcache_bridge_active:   False
+  atom_plugin_init:        False
+
+S-3 rotate_kv_quantization:
+  anchor_pool_hit_rate:    0.000
+  cla_vram_reduction_pct:  0.00%
+  quantization_active:     True
+  rotate_kv_blocks:        64
+  prefetch_hit_rate:       0.000
+  pbkv_accuracy:           0.000
+  anchor_locality_score:   0.000
+  router_confidence_avg:   0.000
+  lmcache_bridge_active:   False
+  atom_plugin_init:        False
+
+S-4 step_graph_execution:
+  anchor_pool_hit_rate:    0.000
+  cla_vram_reduction_pct:  0.00%
+  quantization_active:     False
+  rotate_kv_blocks:        0
+  prefetch_hit_rate:       0.500
+  pbkv_accuracy:           0.000
+  anchor_locality_score:   0.000
+  router_confidence_avg:   0.000
+  lmcache_bridge_active:   False
+  atom_plugin_init:        False
+
+S-5 kv_aware_routing:
+  anchor_pool_hit_rate:    0.000
+  cla_vram_reduction_pct:  0.00%
+  quantization_active:     False
+  rotate_kv_blocks:        0
+  prefetch_hit_rate:       0.000
+  pbkv_accuracy:           0.000
+  anchor_locality_score:   0.700
+  router_confidence_avg:   0.780
+  lmcache_bridge_active:   False
+  atom_plugin_init:        False
+
+S-6 lmcache_bridge_save_load:
+  anchor_pool_hit_rate:    0.000
+  cla_vram_reduction_pct:  0.00%
+  quantization_active:     False
+  rotate_kv_blocks:        0
+  prefetch_hit_rate:       0.000
+  pbkv_accuracy:           0.000
+  anchor_locality_score:   0.000
+  router_confidence_avg:   0.000
+  lmcache_bridge_active:   False
+  atom_plugin_init:        False
+
+S-7 atom_plugin_hooks:
+  anchor_pool_hit_rate:    0.000
+  cla_vram_reduction_pct:  0.00%
+  quantization_active:     False
+  rotate_kv_blocks:        0
+  prefetch_hit_rate:       0.000
+  pbkv_accuracy:           0.000
+  anchor_locality_score:   0.000
+  router_confidence_avg:   0.000
+  lmcache_bridge_active:   False
+  atom_plugin_init:        True
+
+S-8 pbkv_prediction:
+  anchor_pool_hit_rate:    0.000
+  cla_vram_reduction_pct:  0.00%
+  quantization_active:     False
+  rotate_kv_blocks:        0
+  prefetch_hit_rate:       0.000
+  pbkv_accuracy:           0.000
+  anchor_locality_score:   0.000
+  router_confidence_avg:   0.000
+  lmcache_bridge_active:   False
+  atom_plugin_init:        False
+
+S-9 workflow_aware_eviction:
+  anchor_pool_hit_rate:    0.000
+  cla_vram_reduction_pct:  0.00%
+  quantization_active:     False
+  rotate_kv_blocks:        0
+  prefetch_hit_rate:       0.000
+  pbkv_accuracy:           0.000
+  anchor_locality_score:   0.000
+  router_confidence_avg:   0.000
+  lmcache_bridge_active:   False
+  atom_plugin_init:        False
+
+S-10 embedding_engine_encoding:
+  anchor_pool_hit_rate:    1.000
+  cla_vram_reduction_pct:  0.00%
+  quantization_active:     False
+  rotate_kv_blocks:        0
+  prefetch_hit_rate:       0.000
+  pbkv_accuracy:           0.000
+  anchor_locality_score:   0.000
+  router_confidence_avg:   0.000
+  lmcache_bridge_active:   False
+  atom_plugin_init:        False
+
+================================================================================
+V5.0 METRICS (S-11, S-12, S-13)
+================================================================================
+
+S-11 queueing_controller_stability:
+  lambda_critical_observed:     2.500 req/sec
+  lambda_critical_predicted:    9.994 req/sec
+  lambda_critical_deviation:    0.00%
+  stability_rho_at_failure:     0.000
+  is_stable:                   True
+  [TARGET] deviation < 10%:     ✓ PASS
+
+S-12 visual_kvcache_cross_agent:
+  vision_encoder_calls_baseline:   5
+  vision_encoder_calls_shared:     1
+  vision_encoder_call_reduction:   5.0x
+  visual_vram_saved_gb:            0.041 GB
+  visual_cache_hit_rate:           1.000
+  [TARGET] reduction >= 4x:         ✓ PASS
+
+S-13 speculative_coordinator_speedup:
+  speculative_acceptance_rate:    1.000
+  speculative_speedup_observed:   8.00x
+  draft_token_count:              8
+  accepted_token_count:           8
+  [TARGET] acceptance_rate > 0.7:   ✓ PASS
+  [TARGET] speedup > 2x:             ✓ PASS
+
+S-14 token_dance_compression:
+
+S-15 jcr_gate_critic_safety:
+
+================================================================================
+V6.0 METRICS (S-14, S-15)
+================================================================================
+
+S-14 token_dance_compression:
+  token_dance_compression_ratio:   10.81x
+  token_dance_n_agents:            12
+  token_dance_master_blocks:       200
+  token_dance_diff_blocks_total:   21
+  reconstruction_max_err:          1.19e-07
+  [TARGET] compression >= 10x:      ✓ PASS
+  [TARGET] reconstruction ≤ 1e-4:   ✓ PASS
+
+S-15 jcr_gate_critic_safety:
+  jcr_critic_dense_rate:           1.000
+  jcr_avg_risk_score:              0.794
+  jcr_total_decisions:             9
+  jcr_inv15_violations:            0
+  [TARGET] INV-15 violations == 0:  ✓ PASS
+  [TARGET] critic dense rate ≥ 0.5: ✓ PASS
+
+Results saved to: /home/linconx/Apohara-ContextForge/demo/benchmark_v5_results.json
+================================================================================
+

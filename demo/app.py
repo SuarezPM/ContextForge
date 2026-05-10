@@ -13,12 +13,16 @@ import time
 from typing import Any
 
 import gradio as gr
+import numpy as np
 import plotly.express as px
 
 from apohara_context_forge.dedup.faiss_index import FAISSContextIndex
 from apohara_context_forge.dedup.lsh_engine import LSHTokenMatcher
 from apohara_context_forge.registry.context_registry import ContextRegistry
 from apohara_context_forge.registry.vram_aware_cache import VRAMAwareCache
+from apohara_context_forge.safety.jcr_gate import JCRSafetyGate
+from apohara_context_forge.serving.aiter_config import AITERConfig
+from apohara_context_forge.storage.token_dance import TokenDanceStorage
 from apohara_context_forge.token_counter import TokenCounter
 
 
@@ -129,6 +133,10 @@ async def _run_pipeline(query: str, enable_contextforge: bool) -> dict[str, Any]
 
     total_tokens_before = 0
     agent_metrics: list[dict[str, Any]] = []
+    # JCR gate runs even when registry is disabled — INV-15 enforcement is
+    # a property of the pipeline, not of the registry.
+    jcr_gate = JCRSafetyGate()
+    jcr_decisions_by_agent: dict[str, dict[str, Any]] = {}
 
     try:
         for agent_id, role in AGENT_ROLES:
@@ -144,7 +152,21 @@ async def _run_pipeline(query: str, enable_contextforge: bool) -> dict[str, Any]
             t0 = time.perf_counter()
             strategy = "passthrough"
 
-            if registry is not None:
+            # INV-15: ask the JCR gate before registering. Critic with
+            # multiple candidates + shuffled layout gets dense prefill.
+            jcr_decision = jcr_gate.gate_decision(
+                agent_role=agent_id,
+                candidate_count=5 if agent_id == "critic" else 2,
+                reuse_rate=0.85 if enable_contextforge else 0.0,
+                layout_shuffled=(agent_id == "critic"),
+            )
+            jcr_decisions_by_agent[agent_id] = {
+                "use_dense": jcr_decision.use_dense,
+                "risk": round(jcr_decision.risk_score, 3),
+                "reason": jcr_decision.reason,
+            }
+
+            if registry is not None and not jcr_decision.use_dense:
                 try:
                     await registry.register_agent(
                         agent_id, SHARED_SYSTEM_PROMPT, role_prompt
@@ -156,6 +178,8 @@ async def _run_pipeline(query: str, enable_contextforge: bool) -> dict[str, Any]
                             f"register failed ({type(exc).__name__}: {exc})"
                         )
                     strategy = "lsh-only-fallback"
+            elif jcr_decision.use_dense:
+                strategy = "dense-prefill (INV-15)"
 
             ttft_ms = (time.perf_counter() - t0) * 1000
             agent_metrics.append(
@@ -165,6 +189,8 @@ async def _run_pipeline(query: str, enable_contextforge: bool) -> dict[str, Any]
                     "tokens_before": tokens,
                     "tokens_after": tokens,
                     "strategy": strategy,
+                    "jcr_use_dense": jcr_decision.use_dense,
+                    "jcr_risk": round(jcr_decision.risk_score, 3),
                 }
             )
 
@@ -245,6 +271,7 @@ async def _run_pipeline(query: str, enable_contextforge: bool) -> dict[str, Any]
         else 0.0
     )
 
+    jcr_summary = jcr_gate.summary()
     return {
         "enabled": enable_contextforge,
         "total_tokens_before": total_tokens_before,
@@ -258,6 +285,10 @@ async def _run_pipeline(query: str, enable_contextforge: bool) -> dict[str, Any]
         "vram_mode": vram_mode,
         "vram_pressure": round(vram_pressure, 4),
         "warning": registry_warning,
+        "jcr": {
+            "summary": jcr_summary,
+            "decisions": jcr_decisions_by_agent,
+        },
     }
 
 
@@ -277,6 +308,16 @@ def _format_summary(query: str, result: dict[str, Any]) -> str:
         f"vram_pressure: {result['vram_pressure']:.4f}\n"
         f"strategy: {strat}"
     )
+    jcr = result.get("jcr") or {}
+    decisions = jcr.get("decisions") or {}
+    if "critic" in decisions:
+        crit = decisions["critic"]
+        summary += (
+            f"\n\n[JCR Safety Gate / INV-15]\n"
+            f"  critic risk: {crit['risk']:.3f}\n"
+            f"  critic dense_prefill: {crit['use_dense']}\n"
+            f"  reason: {crit['reason']}"
+        )
     if result.get("warning"):
         summary += f"\nwarning: {result['warning']}"
     return summary
@@ -469,8 +510,79 @@ def create_benchmark_tab():
     )
 
 
+def _v6_snapshot() -> str:
+    """Run a quick TokenDance + JCR + AITER snapshot for the dashboard."""
+    rng = np.random.default_rng(0)
+    master = rng.standard_normal((128, 64), dtype=np.float32)
+    store = TokenDanceStorage(diff_threshold=1e-4)
+    store.register_master("retriever", master)
+    for aid in ("reranker", "summarizer", "critic", "responder"):
+        kv = master.copy()
+        idx = rng.choice(128, size=2, replace=False)
+        kv[idx] += rng.standard_normal((2, 64), dtype=np.float32) * 0.5
+        store.register_mirror(aid, kv)
+    td_ratio = store.compression_ratio()
+    td_stats = store.stats()
+
+    gate = JCRSafetyGate()
+    decision = gate.gate_decision(
+        agent_role="critic",
+        candidate_count=5,
+        reuse_rate=0.85,
+        layout_shuffled=True,
+    )
+
+    aiter = AITERConfig()
+    aiter_status = aiter.status()
+
+    speedup_rows = "\n".join(
+        f"| {k} | {v} |" for k, v in aiter_status["expected_speedups"].items()
+    )
+
+    return f"""
+## V6 Additions — Live Snapshot
+
+### TokenDance Master-Mirror Storage  *(arXiv:2604.03143, Apr 2026)*
+
+| Field | Value |
+|-------|-------|
+| compression_ratio | **{td_ratio:.2f}x** |
+| n_agents | {td_stats['n_mirrors'] + 1} |
+| master_blocks | {td_stats['master_blocks']} |
+| diff_blocks_total | {td_stats['diff_blocks_total']} |
+| diff_threshold | {td_stats['diff_threshold']:.0e} |
+
+### JCR Safety Gate  *(arXiv:2601.08343, Jan 2026)*
+
+| Field | Value |
+|-------|-------|
+| critic role |  `critic` |
+| candidate_count | 5 |
+| reuse_rate | 0.85 |
+| layout_shuffled | True |
+| risk_score | **{decision.risk_score:.3f}** |
+| use_dense_prefill (INV-15) | **{decision.use_dense}** |
+
+> {decision.reason}
+
+### AITER ROCm Config  *(MI300X)*
+
+| Field | Value |
+|-------|-------|
+| rocm_available | {aiter_status['rocm_available']} |
+| applied | {aiter_status['applied']} |
+| documented vars | {len(aiter.AITER_ENV_VARS)} |
+
+**Documented speedups**
+
+| Workload | Speedup |
+|----------|---------|
+{speedup_rows}
+"""
+
+
 def create_architecture_tab():
-    """Tab 4: Architecture - ASCII diagram and references."""
+    """Tab 4: Architecture - ASCII diagram, V6 snapshot, references."""
     references = """
 ## References
 
@@ -483,17 +595,26 @@ def create_architecture_tab():
 - **vLLM APC**: [Prefix Caching](https://docs.vllm.ai/en/latest/features/prefill_caching.html)
   - KV-cache reuse for shared prefixes
 
+- **TokenDance** (Apr 2026): [arXiv:2604.03143](https://arxiv.org/abs/2604.03143)
+  - Collective KV cache sharing — 11–17x compression in multi-agent inference
+
+- **JCR Failure Mode** (Jan 2026): [arXiv:2601.08343](https://arxiv.org/abs/2601.08343)
+  - When KV cache reuse fails in multi-agent systems (Critic safety)
+
 ## Key Statistics
 
 | Metric | Value |
 |--------|-------|
 | Multi-agent VRAM reduction | 68% |
 | TTFT improvement | 7.8x |
-| Compression ratio | 2x-5x |
+| Compression ratio (legacy) | 2x-5x |
 | Token savings | 66% |
+| TokenDance compression ratio | 10–17x |
+| JCR safety gate activations | tracked per run |
 """
 
     gr.Markdown(ARCHITECTURE_DIAGRAM)
+    gr.Markdown(_v6_snapshot())
     gr.Markdown(references)
 
 
