@@ -5,9 +5,11 @@ Camera-ready LaTeX source for:
 > **INV-15: A Formal Safety Invariant for KV-Cache Reuse in
 > Multi-Agent Judge Pipelines**
 > Pablo M. Suarez · APOHARA · ContextForge · May 2026
+> **DOI: [10.5281/zenodo.20114594](https://doi.org/10.5281/zenodo.20114594)** (Zenodo, indexed by Google Scholar)
 
 Target venues:
-- arXiv (`cs.LG`, `cs.DC`) — primary, submit this week.
+- **Zenodo** — ✅ deposited. DOI `10.5281/zenodo.20114594`, permanent timestamp, indexed by Google Scholar.
+- arXiv (`cs.LG`, `cs.DC`) — next: mirror the Zenodo deposit to arXiv for an `arXiv:YYMM.XXXXX` ID.
 - MLSys 2027 — full conference submission.
 - NeurIPS 2026 Workshop on Efficient LLM Inference — workshop track.
 

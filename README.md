@@ -18,6 +18,7 @@
   <a href="#-benchmark-results"><img src="https://img.shields.io/badge/benchmark-15%2F15%20PASS-27AE60.svg" alt="V6.0 15/15 PASS"></a>
   <a href="#-verification"><img src="https://img.shields.io/badge/tests-310%20passed%20%C2%B7%200%20failed-27AE60.svg" alt="310 tests passing"></a>
   <a href="https://youtu.be/swEcn-6pAmA"><img src="https://img.shields.io/badge/%E2%96%B6%EF%B8%8F-watch%20demo%20on%20YouTube-FF0000.svg" alt="Watch the demo on YouTube"></a>
+  <a href="https://doi.org/10.5281/zenodo.20114594"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.20114594.svg" alt="DOI: 10.5281/zenodo.20114594"></a>
 </p>
 
 <p align="center">
@@ -409,11 +410,35 @@ System invariants enforced:
 
 ---
 
+## 📚 Cite
+
+ContextForge has a permanent Zenodo DOI and is indexed by Google Scholar:
+
+> Suarez, P. M. (2026). *INV-15: A Formal Safety Invariant for KV-Cache Reuse in Multi-Agent Judge Pipelines* (APOHARA · ContextForge). Zenodo. [https://doi.org/10.5281/zenodo.20114594](https://doi.org/10.5281/zenodo.20114594)
+
+BibTeX:
+
+```bibtex
+@software{contextforge2026,
+  author    = {Suarez, Pablo M.},
+  title     = {{INV-15: A Formal Safety Invariant for KV-Cache Reuse in
+               Multi-Agent Judge Pipelines}},
+  publisher = {Zenodo},
+  year      = {2026},
+  doi       = {10.5281/zenodo.20114594},
+  url       = {https://doi.org/10.5281/zenodo.20114594}
+}
+```
+
+The accompanying paper PDF lives at [`paper/inv15_paper.pdf`](paper/inv15_paper.pdf).
+
+---
+
 ## 🤝 Contributing & License
 
 - **License:** Apache 2.0 — see [LICENSE](LICENSE).
 - **Issues / PRs:** [github.com/SuarezPM/Apohara_Context_Forge](https://github.com/SuarezPM/Apohara_Context_Forge).
-- **Contact:** Pablo (`p.ms.08@hotmail.com`) · @SuarezPM on GitHub - https://www.linkedin.com/in/suarezpm/
+- **Contact:** Pablo (`suarezpm@csnat.unt.edu.ar`) · [@SuarezPM on GitHub](https://github.com/SuarezPM) · [LinkedIn](https://www.linkedin.com/in/suarezpm/).
 
 ---
 
