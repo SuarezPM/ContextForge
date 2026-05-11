@@ -9,17 +9,49 @@
   Silicon-native KV cache coordination for AMD Instinct MI300X.
 </p>
 
+<!-- Row 1 — academic credibility -->
 <p align="center">
-  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11%2B-2B5DF2.svg" alt="Python 3.11+"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-2ECC71.svg" alt="License Apache 2.0"></a>
-  <a href="https://rocm.docs.amd.com/"><img src="https://img.shields.io/badge/ROCm-7.x-FF6B00.svg" alt="ROCm 7.x"></a>
-  <a href="https://lablab.ai/event/amd-hackathon"><img src="https://img.shields.io/badge/AMD-Hackathon-ED1C24.svg" alt="AMD Hackathon"></a>
-  <a href="#-research-foundation"><img src="https://img.shields.io/badge/papers-10%20implemented-9B59B6.svg" alt="10 Papers"></a>
-  <a href="#-benchmark-results"><img src="https://img.shields.io/badge/benchmark-15%2F15%20PASS-27AE60.svg" alt="V6.0 15/15 PASS"></a>
-  <a href="#-verification"><img src="https://img.shields.io/badge/tests-310%20passed%20%C2%B7%200%20failed-27AE60.svg" alt="310 tests passing"></a>
-  <a href="https://youtu.be/swEcn-6pAmA"><img src="https://img.shields.io/badge/%E2%96%B6%EF%B8%8F-watch%20demo%20on%20YouTube-FF0000.svg" alt="Watch the demo on YouTube"></a>
-  <a href="https://doi.org/10.5281/zenodo.20114594"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.20114594.svg" alt="DOI: 10.5281/zenodo.20114594"></a>
+  <a href="https://doi.org/10.5281/zenodo.20114594"><img src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.20114594-1A73E8?style=flat-square&logo=doi&logoColor=white" alt="DOI: 10.5281/zenodo.20114594"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-2ECC71.svg?style=flat-square" alt="License Apache 2.0"></a>
+  <a href="#-research-foundation"><img src="https://img.shields.io/badge/papers-10%20implemented-9B59B6.svg?style=flat-square" alt="10 Papers"></a>
+  <a href="paper/inv15_paper.pdf"><img src="https://img.shields.io/badge/paper-PDF-EC1C24?style=flat-square&logo=adobe-acrobat-reader&logoColor=white" alt="Read the paper"></a>
 </p>
+
+<!-- Row 2 — validation status -->
+<p align="center">
+  <a href="#-benchmark-results"><img src="https://img.shields.io/badge/benchmark-15%2F15%20PASS-27AE60.svg?style=flat-square" alt="V6.0 15/15 PASS"></a>
+  <a href="#-verification"><img src="https://img.shields.io/badge/tests-310%20passed%20%C2%B7%200%20failed-27AE60.svg?style=flat-square" alt="310 tests passing"></a>
+  <a href="https://youtu.be/swEcn-6pAmA"><img src="https://img.shields.io/badge/%E2%96%B6%EF%B8%8F-watch%20demo%20on%20YouTube-FF0000.svg?style=flat-square" alt="Watch the demo on YouTube"></a>
+</p>
+
+<!-- Row 3 — stack -->
+<p align="center">
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11%2B-2B5DF2.svg?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+"></a>
+  <a href="https://rocm.docs.amd.com/"><img src="https://img.shields.io/badge/ROCm-7.x-FF6B00.svg?style=flat-square&logo=amd&logoColor=white" alt="ROCm 7.x"></a>
+  <a href="https://lablab.ai/event/amd-hackathon"><img src="https://img.shields.io/badge/AMD-Hackathon%202026-ED1C24.svg?style=flat-square&logo=amd&logoColor=white" alt="AMD Hackathon 2026"></a>
+</p>
+
+<!-- Hero stat strip — the four headline numbers, video-ready -->
+<table align="center" width="100%">
+  <tr>
+    <td align="center" width="25%">
+      <h2><a href="#-live-demo">79.85%</a></h2>
+      <sub><b>Live token savings</b><br/>5-agent demo</sub>
+    </td>
+    <td align="center" width="25%">
+      <h2><a href="#-benchmark-results">15&thinsp;/&thinsp;15</a></h2>
+      <sub><b>Benchmark scenarios PASS</b><br/>real MI300X · DevCloud ATL1</sub>
+    </td>
+    <td align="center" width="25%">
+      <h2><a href="#-benchmark-results">10.81&times;</a></h2>
+      <sub><b>TokenDance compression</b><br/>12-agent committee</sub>
+    </td>
+    <td align="center" width="25%">
+      <h2><a href="paper/inv15_paper.pdf">0</a></h2>
+      <sub><b>INV-15 violations</b><br/>JCR Safety Gate</sub>
+    </td>
+  </tr>
+</table>
 
 <p align="center">
   <a href="#-the-problem">Problem</a> ·
@@ -28,7 +60,7 @@
   <a href="#-benchmark-results">Benchmarks</a> ·
   <a href="#-architecture">Architecture</a> ·
   <a href="#-quick-start">Quick Start</a> ·
-  <a href="#-research-foundation">Research</a> ·
+  <a href="#-cite"><b>📚 Cite (DOI)</b></a> ·
   <a href="#-business-value">Business Value</a>
 </p>
 
