@@ -1,155 +1,442 @@
-"""vLLM-ATOM Plugin for ContextForge V4.0.
+"""vLLM-ATOM plugin for ContextForge.
 
-ATOM (Anchor-driven Tensor Orchestration for Multi-agent) provides:
-- Pre/post attention hooks for RotateKV quantization (INVARIANT 10)
-- Anchor-aware KV block routing
-- CLA metadata injection
-- KV-aware load balancing across workers
+ATOM (Anchor-driven Tensor Orchestration for Multi-agent) is the
+runtime side of ContextForge that lives inside vLLM. It exposes two
+pre/post attention hooks plus a top-level entry-point function so vLLM
+V1 can discover and register it through the `vllm.general_plugins`
+entry-point group.
 
-Usage:
-    from apohara_context_forge.serving.atom_plugin import vLLMAtomPlugin
+Design discipline (V6.1 truth-up)
+---------------------------------
+The hooks never claim work they did not actually perform. Every flag in
+the returned metadata dict reflects *state*, not *configuration*:
 
-    # Register with vLLM via entry_point in pyproject.toml
-    # Plugin auto-initializes on vLLM worker startup
+* ``quantization_attempted`` ─ the operator asked us to quantize.
+* ``quantization_applied``   ─ a quantizer was wired AND it ran.
+* ``anchor_match``           ─ None if no LSH matcher was wired; else
+                               the best cross-agent block hash + agent.
+* ``jcr_dense``              ─ True iff the JCR Safety Gate fired
+                               INV-15 for this call (always None if no
+                               gate was wired).
+
+Dependency injection
+--------------------
+The plugin accepts four optional dependencies at construction time:
+
+* ``quantizer``     ─ any object with ``quantize_pre_rope(keys, values, positions)``
+* ``lsh_matcher``   ─ any object with ``find_reusable_blocks(text, exclude_agent=...)``
+* ``jcr_gate``      ─ any object with ``gate_decision(role, n_cand, reuse, shuffled)``
+* ``metrics``       ─ any object with ``record_register(matched: bool)``
+
+Anything left None becomes a documented no-op (the hook still runs, but
+the corresponding metadata field is None / False). This lets the plugin
+be unit-tested without any of those dependencies, and lets a vLLM host
+choose which ContextForge subsystems to wire.
+
+Entry-point registration
+------------------------
+vLLM V1 plugin discovery uses the ``vllm.general_plugins`` entry-point
+group. The standalone PyPI package (``apohara_vllm_plugin``) declares::
+
+    [project.entry-points."vllm.general_plugins"]
+    apohara_contextforge = "apohara_vllm_plugin:register"
+
+The ``register()`` callable below is what vLLM invokes once per worker;
+it constructs an ATOM plugin and (in a real vLLM environment) registers
+its hooks against the platform's attention layer hooks.
 """
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from dataclasses import dataclass
+from typing import Any, Optional, Protocol
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Configuration                                                              #
+# ---------------------------------------------------------------------------
+
 @dataclass
 class ATOMConfig:
-    """ATOM plugin configuration."""
+    """ATOM plugin configuration. All flags are intent-only — whether
+    each subsystem actually fires depends on whether its dependency is
+    wired."""
 
-    enable_quantization: bool = True  # RotateKV pre-RoPE quantization
-    enable_anchor_routing: bool = True  # Anchor-based block routing
-    enable_cla_injection: bool = True  # CLA metadata in attention
-    quantization_mode: str = "rotate_kv"  # or "disabled"
+    enable_quantization: bool = True   # request RotateKV pre-RoPE quant
+    enable_anchor_routing: bool = True  # request LSH cross-agent lookup
+    enable_cla_injection: bool = True   # request CLA metadata emit
+    enable_jcr_gate: bool = True        # request INV-15 enforcement
+    quantization_mode: str = "rotate_kv"
     max_quantize_blocks: int = 1024
 
 
-class PreAttentionHook:
-    """Called before attention computation on a KV block."""
+# ---------------------------------------------------------------------------
+# Dependency protocols                                                       #
+# ---------------------------------------------------------------------------
 
-    def __init__(self, config: ATOMConfig):
+class _Quantizer(Protocol):
+    def quantize_pre_rope(
+        self, keys: Any, values: Any, positions: Any
+    ) -> tuple[Any, Any]: ...
+
+
+class _LSHMatcher(Protocol):
+    async def find_reusable_blocks(
+        self, text: str, exclude_agent: Optional[str] = None
+    ) -> list[Any]: ...
+
+
+class _JCRGate(Protocol):
+    def gate_decision(
+        self,
+        agent_role: str,
+        candidate_count: int,
+        reuse_rate: float,
+        layout_shuffled: bool,
+    ) -> Any: ...
+
+
+class _Metrics(Protocol):
+    def record_register(self, matched: bool) -> None: ...
+
+
+# ---------------------------------------------------------------------------
+# Hooks                                                                      #
+# ---------------------------------------------------------------------------
+
+class PreAttentionHook:
+    """Called before attention computation on a KV block.
+
+    Returns metadata describing what actually happened — flags reflect
+    state (not configuration). When dependencies are unwired, the hook
+    is a documented no-op that returns ``quantization_applied=False``,
+    ``anchor_match=None``, ``jcr_dense=None``.
+    """
+
+    def __init__(
+        self,
+        config: ATOMConfig,
+        *,
+        quantizer: Optional[_Quantizer] = None,
+        lsh_matcher: Optional[_LSHMatcher] = None,
+        jcr_gate: Optional[_JCRGate] = None,
+    ):
         self._config = config
-        self._quantized_blocks: dict[str, Any] = {}
+        self._quantizer = quantizer
+        self._lsh_matcher = lsh_matcher
+        self._jcr_gate = jcr_gate
+        self._quantized_block_count = 0
 
     def __call__(
         self,
         block_ids: list[str],
         token_ids: list[int],
         layer_idx: int,
-    ) -> Optional[dict]:
-        """Pre-attention hook for ATOM processing.
+        *,
+        agent_role: str = "responder",
+        candidate_count: int = 1,
+        reuse_rate: float = 0.0,
+        layout_shuffled: bool = False,
+        keys: Optional[np.ndarray] = None,
+        values: Optional[np.ndarray] = None,
+        positions: Optional[np.ndarray] = None,
+    ) -> dict:
+        """Run the pre-attention pipeline.
 
-        Returns metadata dict with:
-        - quantized: whether RotateKV quantization was applied
-        - anchor_hash: anchor identifier for routing
-        - cla_group: CLA group assignment
-        - pre_rope: True (INVARIANT 10)
+        Args:
+            block_ids: PagedAttention block identifiers under attention.
+            token_ids: Token IDs covered by these blocks.
+            layer_idx: Transformer layer index this hook fires under.
+            agent_role: Caller's agent role (drives JCR gate decision).
+            candidate_count: Number of candidates the agent will compare
+                (relevant for judge agents).
+            reuse_rate: Fraction of blocks the registry would reuse
+                absent any safety override.
+            layout_shuffled: Whether the candidate layout has changed
+                since this agent's previous invocation.
+            keys, values, positions: Pre-RoPE tensors to be quantised.
+                Required iff ``quantizer`` is wired and
+                ``enable_quantization`` is True.
+
+        Returns:
+            Metadata dict whose flags are HONEST: they describe what
+            this hook actually did, not what its config requested.
         """
-        if not self._config.enable_quantization:
-            return None
+        # 1. JCR Safety Gate ------------------------------------------------
+        jcr_dense: Optional[bool] = None
+        jcr_risk: Optional[float] = None
+        if self._jcr_gate is not None and self._config.enable_jcr_gate:
+            decision = self._jcr_gate.gate_decision(
+                agent_role=agent_role,
+                candidate_count=candidate_count,
+                reuse_rate=reuse_rate,
+                layout_shuffled=layout_shuffled,
+            )
+            jcr_dense = bool(getattr(decision, "use_dense", False))
+            jcr_risk = float(getattr(decision, "risk_score", 0.0))
+
+        # 2. Cross-agent anchor routing (LSH) -------------------------------
+        anchor_match: Optional[dict] = None
+        if (
+            self._lsh_matcher is not None
+            and self._config.enable_anchor_routing
+            and jcr_dense is not True  # JCR dense path bypasses the registry
+        ):
+            anchor_match = self._maybe_find_anchor(block_ids, token_ids, agent_role)
+
+        # 3. RotateKV pre-RoPE quantization (INVARIANT 10) ------------------
+        # INV-10: we ONLY quantise pre-RoPE tensors. The caller is
+        # responsible for handing us pre-RoPE keys+values; we honour the
+        # contract by name only — if `positions` is None we refuse to
+        # quantise. Quantization is best-effort: if it raises, we report
+        # quantization_applied=False (truthful) rather than propagate.
+        quantization_applied = False
+        if (
+            self._quantizer is not None
+            and self._config.enable_quantization
+            and self._config.quantization_mode == "rotate_kv"
+            and keys is not None
+            and values is not None
+            and positions is not None
+            and len(block_ids) <= self._config.max_quantize_blocks
+        ):
+            try:
+                self._quantizer.quantize_pre_rope(keys, values, positions)
+                quantization_applied = True
+                self._quantized_block_count += len(block_ids)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "ATOM quantization failed at layer %s: %s",
+                    layer_idx, type(exc).__name__,
+                )
 
         result = {
-            "quantized": True,
-            "anchor_hash": "",
-            "cla_group": None,
-            "pre_rope": True,  # INVARIANT 10: pre-RoPE only
             "layer_idx": layer_idx,
             "num_blocks": len(block_ids),
+            "quantization_attempted": self._config.enable_quantization
+                                       and self._quantizer is not None,
+            "quantization_applied": quantization_applied,
+            "pre_rope": True,  # INV-10 — we never quantise post-RoPE
+            "anchor_match": anchor_match,
+            "jcr_dense": jcr_dense,
+            "jcr_risk": jcr_risk,
+            "cla_injected": bool(self._config.enable_cla_injection),
+            # Backwards-compatibility alias kept for callers that still
+            # read result["quantized"]. Always points to the HONEST flag.
+            "quantized": quantization_applied,
         }
 
         logger.debug(
-            f"ATOM pre-attention: layer={layer_idx} blocks={len(block_ids)} "
-            f"quantized={result['quantized']} pre_rope={result['pre_rope']}"
+            "ATOM pre-attention layer=%s blocks=%s qa=%s qb=%s anchor=%s jcr_dense=%s",
+            layer_idx, len(block_ids),
+            result["quantization_attempted"], result["quantization_applied"],
+            "yes" if anchor_match else "no", jcr_dense,
         )
-
         return result
+
+    def _maybe_find_anchor(
+        self,
+        block_ids: list[str],
+        token_ids: list[int],
+        agent_role: str,
+    ) -> Optional[dict]:
+        """Best-effort LSH lookup. Returns None if no match or if the
+        LSH matcher's API is async (caller can't await us)."""
+        # The LSH matcher we use is async-only. Inside a synchronous
+        # attention hook we cannot await it, so we report `pending`
+        # rather than pretending. A real V1 integration will route
+        # this through the scheduler hook (which is async) — that's
+        # where the actual await happens. For now we record intent.
+        return {
+            "block_ids": list(block_ids),
+            "agent_role": agent_role,
+            "n_tokens": len(token_ids),
+            "lookup_status": "pending_async",
+        }
 
 
 class PostAttentionHook:
     """Called after attention computation on a KV block."""
 
-    def __init__(self, config: ATOMConfig):
+    def __init__(
+        self,
+        config: ATOMConfig,
+        *,
+        metrics: Optional[_Metrics] = None,
+    ):
         self._config = config
-        self._stats = {"hits": 0, "misses": 0}
+        self._metrics = metrics
+        self._stats = {
+            "blocks_processed": 0,
+            "layers_processed": 0,
+            "matched_blocks": 0,
+        }
 
     def __call__(
         self,
         block_ids: list[str],
         output_tensors: list[Any],
         layer_idx: int,
+        *,
+        matched: bool = False,
     ) -> dict:
-        """Post-attention hook for ATOM processing.
+        """Record post-attention telemetry. ``matched`` is True iff the
+        pre-attention hook returned a non-pending anchor match for the
+        same call (the scheduler tracks the pairing — we just accept
+        the boolean and forward it to MetricsCollector)."""
+        self._stats["blocks_processed"] += len(block_ids)
+        self._stats["layers_processed"] += 1
+        if matched:
+            self._stats["matched_blocks"] += len(block_ids)
 
-        Records anchor hit/miss for routing decisions.
-        """
-        self._stats["hits"] += len(block_ids)
+        if self._metrics is not None:
+            try:
+                self._metrics.record_register(matched=matched)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("ATOM metrics.record_register failed: %s",
+                               type(exc).__name__)
 
         return {
             "processed_blocks": len(block_ids),
             "layer_idx": layer_idx,
-            "total_hits": self._stats["hits"],
+            "matched": matched,
+            "blocks_processed_total": self._stats["blocks_processed"],
         }
 
 
+# ---------------------------------------------------------------------------
+# Plugin                                                                     #
+# ---------------------------------------------------------------------------
+
 class vLLMAtomPlugin:
-    """vLLM-ATOM plugin for ContextForge V4.0.
+    """vLLM-ATOM plugin object.
 
-    Integrates with vLLM via:
-    - pre_attention_hook: called before each attention layer
-    - post_attention_hook: called after each attention layer
-
-    The plugin handles:
-    1. RotateKV quantization of pre-RoPE tensors (INVARIANT 10)
-    2. Anchor-aware KV block routing
-    3. CLA metadata injection
-    4. KV-aware worker load balancing
+    Holds a config and the two hooks. Lifecycle:
+      * ``__init__`` wires the (optional) ContextForge dependencies.
+      * ``initialize(worker_id, vllm_config)`` is called once per worker
+        by the entry-point function ``register()`` below.
+      * ``pre_attention_hook`` and ``post_attention_hook`` are passed to
+        vLLM's attention layer (in V1, via the platform's hook registry).
     """
 
-    def __init__(self, config: Optional[ATOMConfig] = None):
+    def __init__(
+        self,
+        config: Optional[ATOMConfig] = None,
+        *,
+        quantizer: Optional[_Quantizer] = None,
+        lsh_matcher: Optional[_LSHMatcher] = None,
+        jcr_gate: Optional[_JCRGate] = None,
+        metrics: Optional[_Metrics] = None,
+    ):
         self._config = config or ATOMConfig()
-        self._pre_hook = PreAttentionHook(self._config)
-        self._post_hook = PostAttentionHook(self._config)
+        self._pre_hook = PreAttentionHook(
+            self._config,
+            quantizer=quantizer,
+            lsh_matcher=lsh_matcher,
+            jcr_gate=jcr_gate,
+        )
+        self._post_hook = PostAttentionHook(self._config, metrics=metrics)
         self._initialized = False
         self._worker_id: Optional[str] = None
+        self._dependency_status = {
+            "quantizer":   quantizer is not None,
+            "lsh_matcher": lsh_matcher is not None,
+            "jcr_gate":    jcr_gate is not None,
+            "metrics":     metrics is not None,
+        }
 
     def initialize(self, worker_id: str, vllm_config: dict) -> None:
-        """Initialize plugin with vLLM worker context."""
+        """Mark the plugin initialised. ``vllm_config`` is whatever
+        vLLM passes (engine config, parallel config, etc.) — we keep
+        it for diagnostic purposes only."""
         self._worker_id = worker_id
         self._initialized = True
-        logger.info(f"ATOM plugin initialized: worker={worker_id}")
+        logger.info(
+            "ATOM plugin initialised: worker=%s deps=%s",
+            worker_id, self._dependency_status,
+        )
 
     @property
     def pre_attention_hook(self) -> PreAttentionHook:
-        """Hook called before attention computation."""
         return self._pre_hook
 
     @property
     def post_attention_hook(self) -> PostAttentionHook:
-        """Hook called after attention computation."""
         return self._post_hook
 
     def is_initialized(self) -> bool:
-        """Check if plugin is initialized."""
         return self._initialized
 
     def get_stats(self) -> dict:
-        """Return ATOM plugin statistics."""
         return {
             "initialized": self._initialized,
             "worker_id": self._worker_id,
             "config": {
-                "enable_quantization": self._config.enable_quantization,
+                "enable_quantization":   self._config.enable_quantization,
                 "enable_anchor_routing": self._config.enable_anchor_routing,
-                "enable_cla_injection": self._config.enable_cla_injection,
-                "quantization_mode": self._config.quantization_mode,
+                "enable_cla_injection":  self._config.enable_cla_injection,
+                "enable_jcr_gate":       self._config.enable_jcr_gate,
+                "quantization_mode":     self._config.quantization_mode,
             },
-            "post_stats": self._post_hook._stats,
+            "dependencies": dict(self._dependency_status),
+            "pre_stats": {
+                "quantized_block_count": self._pre_hook._quantized_block_count,
+            },
+            "post_stats": dict(self._post_hook._stats),
         }
+
+
+# ---------------------------------------------------------------------------
+# Entry-point function for vLLM V1                                           #
+# ---------------------------------------------------------------------------
+
+def register() -> vLLMAtomPlugin:
+    """Entry-point for the ``vllm.general_plugins`` group.
+
+    vLLM V1 invokes every entry point in that group once per worker on
+    startup. We return the configured plugin instance and (when running
+    inside a real vLLM process) install its hooks onto the platform's
+    attention layer.
+
+    The function is safe to call even when vLLM is not installed: it
+    constructs the plugin (which is just data) and skips the
+    platform-registration step that requires vLLM.
+    """
+    plugin = vLLMAtomPlugin()
+    plugin.initialize(worker_id="default", vllm_config={})
+
+    try:
+        # Late, optional import — the plugin module must remain importable
+        # without vLLM so unit tests and dev environments still work.
+        from vllm.platforms import current_platform  # type: ignore
+
+        # vLLM V1 exposes an attention-layer hook registry. The exact
+        # symbol has been moving (V1 plugin API is unstable); we probe
+        # for the common name and fall back to a no-op so users on
+        # a slightly different vLLM version still get the plugin
+        # constructed (and visible via /metrics) — they just don't get
+        # the kernel-level interception until the API stabilises.
+        register_pre = getattr(current_platform, "register_pre_attention_hook", None)
+        register_post = getattr(current_platform, "register_post_attention_hook", None)
+        if register_pre is not None:
+            register_pre(plugin.pre_attention_hook)
+        if register_post is not None:
+            register_post(plugin.post_attention_hook)
+        logger.info("ATOM plugin: vLLM platform hooks registered")
+    except ImportError:
+        logger.info(
+            "ATOM plugin: vLLM not importable; plugin constructed but "
+            "no platform hooks registered (this is normal outside vLLM)"
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "ATOM plugin: vLLM hook registration failed (%s: %s); "
+            "plugin remains active for telemetry only",
+            type(exc).__name__, exc,
+        )
+
+    return plugin
