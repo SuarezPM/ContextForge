@@ -19,7 +19,9 @@
 
 <!-- Row 2 — validation status -->
 <p align="center">
-  <a href="#-benchmark-results"><img src="https://img.shields.io/badge/benchmark-15%2F15%20PASS-27AE60.svg?style=flat-square" alt="V6.0 15/15 PASS"></a>
+  <a href="#-benchmark-results"><img src="https://img.shields.io/badge/V6.1%20benchmark-14%2F15%20honest-27AE60.svg?style=flat-square" alt="V6.1 14/15 honest PASS"></a>
+  <a href="#-benchmark-results"><img src="https://img.shields.io/badge/V6.2%20adversarial-6%2F6%20PASS-27AE60.svg?style=flat-square" alt="V6.2 adversarial 6/6"></a>
+  <a href="AUDIT.md"><img src="https://img.shields.io/badge/AUDIT.md-public-FF6B00.svg?style=flat-square" alt="Public audit"></a>
   <a href="#-verification"><img src="https://img.shields.io/badge/tests-310%20passed%20%C2%B7%200%20failed-27AE60.svg?style=flat-square" alt="310 tests passing"></a>
   <a href="https://youtu.be/swEcn-6pAmA"><img src="https://img.shields.io/badge/%E2%96%B6%EF%B8%8F-watch%20demo%20on%20YouTube-FF0000.svg?style=flat-square" alt="Watch the demo on YouTube"></a>
 </p>
@@ -226,8 +228,23 @@ flowchart TB
 ## 📊 Benchmark Results
 
 > ✅ **Validated on AMD Instinct MI300X (192 GB HBM3) — AMD DevCloud ATL1 · 2026-05-10**
+> 🧯 **V6.1 truth-up applied 2026-05-12** — see [AUDIT.md](AUDIT.md) for the full list of V6.0 overclaims that V6.1 closes, and [CHANGELOG.md](CHANGELOG.md) for the release notes.
 
-### V6.0 Benchmark — 15 / 15 PASS
+### V6.1 Benchmark — 14 / 15 honest
+
+V6.0 reported 15/15. The V6.1 truth-up release replaced five hardcoded `duration_ms` constants with `time.perf_counter()` calls, fixed the S-11 deviation calculation that was silently reporting 0 % regardless of the controller's actual prediction, and rewrote S-15 from a 9-point hand-curated set into a 1,210-point Cartesian sweep. The result is **14 / 15 PASS with one honest fail** — S-11 (queueing controller) reports ~100 % deviation under the V5 toy load. The math is correct (see V6.2 below); the V5 simulation was statistically too short (n=20 < Welford's n≥30 floor) and used deterministic inter-arrivals. The honest fail is the point of the release.
+
+### V6.2 adversarial — 6 / 6 PASS
+
+`demo/benchmark_v62_adversarial.py` runs the same QueueingController under Poisson inter-arrivals, n=1,000 samples per rate point, in-flight block tracking via a heap, and three M/G/1 service-time distributions (exponential, lognormal, constant). All 6 scenarios PASS with prediction deviation of **1.6 % – 29.9 %** against the theoretical λ_critical = 905.8 req/s derived from the simulation parameters.
+
+| Distribution | Light (λ=10) | Moderate (λ=200) | Threshold |
+|--------------|-------------|------------------|-----------|
+| exponential  | **1.87 %**  | **17.90 %**       | < 25 %    |
+| lognormal    | 7.53 %      | 29.91 %           | < 50 %    |
+| constant     | **1.60 %**  | **22.40 %**       | < 50 %    |
+
+### V6.0 Benchmark — 15 / 15 PASS *(historical, see AUDIT.md)*
 
 | #  | Scenario | Time (ms) | Throughput (tok/s) | VRAM (GB) | Result |
 |----|----------|-----------|--------------------|-----------|--------|
@@ -425,8 +442,13 @@ System invariants enforced:
 | V4.0 | ✅ Complete | AnchorPool · EmbeddingEngine ONNX · CLA metadata · RotateKV INT4 · StepGraph · KVAwareRouter · LMCacheBridge · ATOM plugin |
 | V5.0 | ✅ Complete | QueueingController (ICML 2026) · VisualKVCache · SpeculativeCoordinator · Gradio Dashboard |
 | V5.x | ✅ Complete | S-3 4D-indexing fix · S-13 acceptance criterion → 13 / 13 PASS |
-| **V6.0** | ✅ **Complete** | **TokenDance Master-Mirror · JCR Safety Gate (INV-15) · AITER ROCm config → 15 / 15 PASS** |
-| V6.x | 📋 Planned | Multi-node distributed KV via LMCache · HIP custom kernels for RotateKV FWHT · Plugin marketplace SDK |
+| V6.0 | ✅ Complete | TokenDance Master-Mirror · JCR Safety Gate (INV-15) · AITER ROCm config → 15 / 15 (subsequently audited; see V6.1) |
+| **V6.1** | ✅ **Complete** | **Truth-up release · [`AUDIT.md`](AUDIT.md) + [`CHANGELOG.md`](CHANGELOG.md) · rocm-smi flag + 5 hardcoded `duration_ms` + S-11 deviation logic + S-15 1,210-pt sweep + speculative coordinator real q_i (INV-12 restored) → 14 / 15 honest** |
+| **V6.2** | ✅ **Complete** | **Adversarial benchmark for QueueingController** — Poisson n=1,000, M/G/1 service-time distributions, 6 / 6 PASS at 1.6–29.9 % deviation vs theoretical λ_critical |
+| **V6.x #1** | ✅ **Complete** | **[`apohara-vllm-plugin` 0.1.0](pypi/apohara-vllm-plugin/) — standalone PyPI package, `vllm.general_plugins` entry-point, honest hooks (DI-ready), wheel built and entry-point smoke-tested in clean venv. Pending: manual `vllm-plugin-v0.1.0` tag to trigger the [release workflow](.github/workflows/release-plugin.yml).** |
+| V6.x #2 | 🚧 Next | Public HuggingFace Spaces benchmark sandbox |
+| V6.x #3 | 📋 Planned | Multi-node distributed KV via LMCache (depends on V6.x #1 upstream traction) |
+| V7+ | 📋 Planned | K8s operator · plugin marketplace SDK · enterprise SLA + audit-grade INV-15 telemetry export |
 
 ---
 
