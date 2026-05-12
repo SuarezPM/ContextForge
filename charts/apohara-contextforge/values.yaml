@@ -1,0 +1,61 @@
+# Default values for apohara-contextforge Helm chart.
+
+# workerCount is the number of vLLM+Apohara plugin worker pods.
+workerCount: 4
+
+# model is the HuggingFace model identifier to load on each worker.
+model: meta-llama/Llama-3-8b
+
+# lmcacheRedisUrl is an optional Redis URL for the shared LMCache backend.
+# If empty, a Redis pod is provisioned via redis.enabled below.
+lmcacheRedisUrl: ""
+
+# gpuType selects the GPU hardware profile (used for nodeSelector).
+# Valid values: mi300x, h100, a100
+gpuType: mi300x
+
+# image is the container image for the apohara-vllm-plugin workers.
+image:
+  repository: ghcr.io/suarezpm/apohara-contextforge
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# resources sets CPU/memory requests and limits for worker pods.
+resources:
+  requests:
+    cpu: "4"
+    memory: "16Gi"
+  limits:
+    cpu: "8"
+    memory: "32Gi"
+
+# redis controls the optional LMCache Redis sidecar pod.
+redis:
+  # enabled: true provisions a Redis pod; set false if lmcacheRedisUrl is provided.
+  enabled: true
+  image:
+    repository: redis
+    tag: 7-alpine
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+  port: 6379
+
+# service configures the headless service for worker discovery.
+service:
+  port: 8000
+
+# configmap holds JSON config consumed by the workers.
+config:
+  chunkSize: 256
+  localDevice: "cuda:0"
+  blockingStore: false
+  blockingRetrieve: true
+
+# nameOverride and fullnameOverride allow chart name customisation.
+nameOverride: ""
+fullnameOverride: ""

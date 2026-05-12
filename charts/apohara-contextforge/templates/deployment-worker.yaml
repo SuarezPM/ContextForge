@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "apohara-contextforge.fullname" . }}-worker
+  labels:
+    {{- include "apohara-contextforge.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.workerCount }}
+  selector:
+    matchLabels:
+      {{- include "apohara-contextforge.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "apohara-contextforge.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      nodeSelector:
+        apohara.dev/gpu-type: {{ .Values.gpuType }}
+      containers:
+      - name: worker
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.port }}
+          protocol: TCP
+        env:
+        - name: MODEL
+          value: {{ .Values.model | quote }}
+        - name: LMCACHE_REDIS_URL
+          value: {{ include "apohara-contextforge.redisUrl" . | quote }}
+        - name: GPU_TYPE
+          value: {{ .Values.gpuType | quote }}
+        - name: WORKER_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        volumeMounts:
+        - name: config
+          mountPath: /etc/apohara
+          readOnly: true
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 90
+          periodSeconds: 15
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "apohara-contextforge.fullname" . }}-config

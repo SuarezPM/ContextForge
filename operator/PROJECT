@@ -1,0 +1,18 @@
+domain: apohara.dev
+layout:
+- go.kubebuilder.io/v4
+plugins:
+  go.kubebuilder.io/v4: {}
+projectName: apohara-contextforge-operator
+repo: github.com/SuarezPM/Apohara_Context_Forge/operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: apohara.dev
+  group: contextforge
+  kind: ApohraContextForgeCluster
+  path: github.com/SuarezPM/Apohara_Context_Forge/operator/api/v1alpha1
+  version: v1alpha1
+version: "3"

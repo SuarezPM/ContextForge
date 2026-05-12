@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "apohara-contextforge.fullname" . }}-worker
+  labels:
+    {{- include "apohara-contextforge.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  # Headless service: callerSideCar discover individual pod IPs via DNS SRV records.
+  clusterIP: None
+  selector:
+    {{- include "apohara-contextforge.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+  ports:
+  - name: http
+    port: {{ .Values.service.port }}
+    targetPort: http
+    protocol: TCP

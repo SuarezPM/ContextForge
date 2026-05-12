@@ -1,0 +1,16 @@
+apiVersion: v2
+name: apohara-contextforge
+description: Helm chart for Apohara ContextForge — KV-cache coordination layer for multi-agent LLM pipelines on AMD MI300X.
+type: application
+version: 0.1.0
+appVersion: 7.0.0
+keywords:
+- llm
+- kv-cache
+- vllm
+- amd
+- mi300x
+home: https://github.com/SuarezPM/Apohara_Context_Forge
+maintainers:
+- name: Pablo M. Suarez
+  email: dimensionequix@gmail.com

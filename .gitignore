@@ -55,3 +55,9 @@ paper/*.toc
 .tectonic-cache/
 
 # uv lock not in use; pin requirements via pyproject.toml only
+
+# --- V7 observability runtime data ---------------------------------------
+# JSONL audit log dir auto-created by apohara_context_forge.observability
+# at runtime / during tests. Production deployments should mount this to
+# persistent storage; the in-repo path is transient.
+.apohara/

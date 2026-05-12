@@ -1,0 +1,44 @@
+{{- if and .Values.redis.enabled (not .Values.lmcacheRedisUrl) }}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "apohara-contextforge.fullname" . }}-redis
+  labels:
+    {{- include "apohara-contextforge.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  containers:
+  - name: redis
+    image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
+    ports:
+    - name: redis
+      containerPort: {{ .Values.redis.port }}
+      protocol: TCP
+    resources:
+      {{- toYaml .Values.redis.resources | nindent 6 }}
+    livenessProbe:
+      exec:
+        command:
+        - redis-cli
+        - ping
+      initialDelaySeconds: 10
+      periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "apohara-contextforge.fullname" . }}-redis
+  labels:
+    {{- include "apohara-contextforge.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  selector:
+    {{- include "apohara-contextforge.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+  ports:
+  - name: redis
+    port: {{ .Values.redis.port }}
+    targetPort: redis
+    protocol: TCP
+{{- end }}

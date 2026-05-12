@@ -156,6 +156,21 @@ class JCRSafetyGate:
             reason=reason,
         )
         self.gate_log.append(decision)
+
+        # Late import avoids circular dependency; best-effort telemetry.
+        try:
+            from apohara_context_forge.observability.recorders import record_inv15_decision
+            gate_action = "block" if use_dense else "allow"
+            record_inv15_decision(
+                agent_id=role,
+                anchor_hash="",
+                risk_score=risk,
+                gate_action=gate_action,
+                predicted_jcr_delta=0.0,
+            )
+        except Exception:
+            pass
+
         return decision
 
     # ------------------------------------------------------------------ #
