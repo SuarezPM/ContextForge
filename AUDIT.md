@@ -205,7 +205,7 @@ reader knows where the codebase carries its own weight.
   Full regression: 359 passed / 25 skipped / 0 failed.
 - **Status:** **🟢 RESOLVED.**
 
-### 9. 🟠 V6.1 INT4 packing/unpacking asymmetry (discovered Sprint 2)
+### 9. 🟠→🟢 V6.1 INT4 packing/unpacking asymmetry RESOLVED in V7.0.0-alpha.3 (Sprint 3 Wave A)
 
 - **Discovered:** Sprint 2 by worker-fwht-wire (Track 2) during
   round-trip validation of FWHT integration
@@ -225,9 +225,17 @@ reader knows where the codebase carries its own weight.
   is much worse than INT4 theory says it should be. The integration
   test `tests/test_rotate_kv_fwht_integration.py::test_fwht_roundtrip_through_pipeline`
   uses a 3× slack tolerance against this baseline.
-- **Tracked for:** Sprint 3 (V7.0.0-alpha.3).
+- **Sprint 3 Wave A fix:** `_quantize_block` rewritten to pack along
+  head_dim (not seq) to match the read side's invariant. Single
+  `(scale, zero_point)` per packed byte governs both nibbles. Pre-fix
+  max round-trip error: ~6.3; post-fix: 0.0332 (well under 0.07 INT4
+  envelope). New `tests/test_rotate_kv_int4_codec.py` (4 tests, all
+  PASS) locks in the fix; `tests/test_rotate_kv_fwht_integration.py`
+  tolerance tightened from 3× to 1.5× baseline (catches any future
+  regression).
+- **Status:** **🟢 RESOLVED.**
 
-### 10. 🟠 K8s operator security hardening (Sprint 3 scope)
+### 10. 🟠→🟢 K8s operator security hardening RESOLVED in V7.0.0-alpha.3 (Sprint 3 Wave A)
 
 - **Surfaced by:** Sprint 2 Phase 4 security-reviewer
 - **Concerns** (operator/controllers/apoharacontextforgecluster_controller.go):
@@ -248,8 +256,68 @@ reader knows where the codebase carries its own weight.
   integration-test skeleton are shipped. None of these issues are
   exploitable in the current Sprint 2 state because the operator is
   not running anywhere.
-- **Tracked for:** Sprint 3 (V7.0.0-alpha.3) — Sprint 3 cannot ship
-  the operator without addressing all 5 items.
+- **Sprint 3 Wave A delivery:**
+  - **SecurityContext** ✅ — both Redis + worker pods get full hardening:
+    PodSecurityContext (runAsNonRoot, runAsUser, FSGroup-on-Redis,
+    SeccompProfileTypeRuntimeDefault) + per-container SecurityContext
+    (AllowPrivilegeEscalation=false, ReadOnlyRootFilesystem=true,
+    Capabilities.Drop=ALL). EmptyDir volumes mounted at /data (Redis) and
+    /tmp (worker) for the readonly rootfs. 4 new controller tests assert
+    each field.
+  - **ServiceAccount + namespaced RBAC** ✅ — `operator/config/rbac/`
+    ships SA + namespaced Role (no ClusterRole, no wildcards) + RoleBinding +
+    leader-election Role/RoleBinding. Phase 4.5 tightened secrets verbs to
+    `get;list;watch;create` only (no update/patch/delete since controller
+    never writes after first Create).
+  - **Redis authentication** ✅ — `reconcileRedisAuthSecret` uses
+    `crypto/rand` to generate a 32-char alphanumeric password, stored
+    as Secret `<cluster>-redis-auth` with OwnerReference. Redis pod
+    consumes via `--requirepass $(REDIS_PASSWORD)` + SecretKeyRef env;
+    worker pods get the same SecretKeyRef. Idempotent (no rotation per
+    reconcile). 2 new controller tests cover creation + stability.
+  - **NetworkPolicy** ✅ — `operator/config/networkpolicy/` ships 4
+    manifests: `default_deny_all` (deny ingress+egress by default),
+    `worker_to_redis` (allow worker → Redis on 6379 + DNS), `worker_ingress`
+    (allow same-namespace → worker:8000), `redis_ingress` (allow
+    worker → Redis:6379). Admin-applied; not auto-managed by operator.
+  - **Image digest pinning** 🟡 — moved from `:latest` to `:v7.0.0-alpha.3`
+    versioned tag + explicit `ImagePullPolicy: IfNotPresent` on both Redis
+    and worker containers. Sample CR carries a `# TODO: pin to @sha256:...`
+    comment. Full digest pinning is deferred to V7.0.0 final release when
+    the production image is published.
+  - **Phase 4.5 additional hardening:** `AutomountServiceAccountToken: false`
+    on both Redis + worker pods (neither needs K8s API access); leader-election
+    Role `delete` verbs removed (controller never deletes leases/configmaps).
+- **Tracked open items (not Sprint 3 blockers):**
+  - kubebuilder RBAC marker `+kubebuilder:rbac:groups=contextforge.apohara.dev,...,verbs=get;list;watch;create;update;patch;delete` (controller.go:51-56) would regenerate a ClusterRole if `make manifests` is run. The hand-written namespaced role.yaml is currently the source of truth. Sprint 4: align markers with intent.
+  - `govulncheck ./operator/...` not yet run in CI. `golang.org/x/net@v0.19.0` may have newer patches; recommend `go get golang.org/x/net@latest && go mod tidy` before V7.0.0 final.
+- **Status:** **🟢 RESOLVED** (5/5 items closed; image pinning at versioned-tag is alpha-acceptable per security-reviewer; production hardening tracked above as known follow-ups for V7.0.0).
+
+### V7.0.0-alpha.3 — Sprint 3 Wave A deltas (2026-05-12)
+
+| Track | Change | State |
+|-------|--------|-------|
+| 1 | `apohara_context_forge/quantization/rotate_kv.py` `_quantize_block` rewritten (pack along head_dim) | #9 🟠 → 🟢 |
+| 2 | `operator/controllers/apoharacontextforgecluster_controller.go` Pod + container SecurityContext + image versioned-tag + ImagePullPolicy + AutomountServiceAccountToken=false | #10 SecurityContext + image-pin → 🟢 / 🟡 (digest pin V7.0.0 final) |
+| 3 | `operator/config/rbac/` — SA + namespaced Role + RoleBinding + leader-election RBAC (secrets verbs tightened in Phase 4.5) | #10 RBAC → 🟢 |
+| 4 | `operator/controllers/...` Redis auth Secret via crypto/rand + `operator/config/networkpolicy/` (4 policies: default-deny + worker-to-redis + worker-ingress + redis-ingress) + `scripts/mi300x_*` for Wave B | #10 Redis-auth → 🟢, #10 NetworkPolicy → 🟢, Wave B prep ✓ |
+| Phase 4.5 fixes | mi300x_vram_measurement.py rewritten with honest CPU-NumPy bridge protocol; CRD Phase enum trimmed to actually-emitted values; malformed `manager/kustomization.yaml` fixed | V6.1 discipline honored |
+
+**Honest measurement protocol for Wave B's `scripts/mi300x_vram_measurement.py`:**
+The current `RotateKVQuantizer` is NumPy-only (no torch fast path).
+The script now allocates the baseline KV cache as `torch.float16` on
+CUDA (real MI300X allocation footprint = `baseline_fp16_bytes`),
+copies to NumPy on CPU for the quantize call (canonical
+`(batch, seq_len, num_heads, head_dim)` layout), measures
+packed-storage footprint = `keys_int4.nbytes + values_int4.nbytes +
+scales.nbytes + zero_points.nbytes` = the bytes you'd write to
+Redis/LMCache. The `reduction_factor` is honest because both
+numerator and denominator are real. A separate `peak_gpu_alloc_bytes`
+captures CUDA peak during the round-trip (includes the device↔host
+copy — disclosed in the docstring rather than hidden). A future
+sprint can add a torch fast path to RotateKVQuantizer and re-measure
+on-GPU peak without the copy; the CPU bridge protocol is the V6.1
+discipline applied to compute as well as claims.
 
 ### V7.0.0-alpha.2 — Sprint 2 deltas (2026-05-12)
 

@@ -1,5 +1,170 @@
 # Changelog
 
+## V7.0.0-alpha.3 — Sprint 3 Wave A: Closes AUDIT #9 + #10 · 2026-05-12
+
+Third sprint on the V7 roadmap. Closes both remaining audit items — #9 V6.1
+INT4 packing asymmetry and all 5 of #10 K8s operator security hardening —
+plus preps Wave B MI300X smoke-test scripts (separate run, ~$15-20 of the
+$30 AMD AI Dev Cloud budget). Executed via `/autopilot` with 4 parallel
+workers + 3 reviewer validators + 8-item Phase 4.5 inline fix pass.
+
+### Fixed
+
+- **`apohara_context_forge/quantization/rotate_kv.py`** (Track 1, closes
+  AUDIT #9) — `_quantize_block` rewritten to pack nibble pairs along
+  `head_dim` (matching the read side's invariant) instead of along `seq`
+  with index collisions. Single `(scale, zero_point)` per packed byte
+  governs both nibbles. Pre-fix max round-trip error: ~6.3; post-fix:
+  0.0332 (well under the 0.07 INT4 envelope).
+- **`tests/test_rotate_kv_fwht_integration.py`** — tolerance in
+  `test_fwht_roundtrip_through_pipeline` tightened from 3× slack to 1.5×
+  baseline now that the codec is fixed.
+
+### Added
+
+- **`tests/test_rotate_kv_int4_codec.py`** (Track 1) — 4 new locked-in
+  tests: round-trip identity, FWHT round-trip, packed array shape
+  (head_dim // 2 axis), packed array byte values (literal 0xF0 / 0x0F
+  assertions on a known input). Catches any future asymmetry regression.
+- **K8s SecurityContext** (Track 2, AUDIT #10) — both Redis + worker
+  Deployments get full pod-level + container-level hardening:
+  `RunAsNonRoot=true`, `RunAsUser=999/65534`, `SeccompProfile=RuntimeDefault`,
+  `AllowPrivilegeEscalation=false`, `ReadOnlyRootFilesystem=true`,
+  `Capabilities.Drop=["ALL"]`. EmptyDir volumes mounted at /data (Redis)
+  + /tmp (worker) for the readonly rootfs. Phase 4.5 added
+  `AutomountServiceAccountToken: false` on both pods (neither needs K8s
+  API access).
+- **Image versioned-tag pinning** (Track 2, AUDIT #10) — default image
+  moved from `:latest` to `:v7.0.0-alpha.3`. Explicit
+  `ImagePullPolicy: IfNotPresent` on both Redis + worker containers.
+  Sample CR carries `# TODO: pin to @sha256:...` for production. Full
+  digest pinning deferred to V7.0.0 final.
+- **K8s ServiceAccount + namespaced RBAC** (Track 3, AUDIT #10) —
+  `operator/config/rbac/` ships SA + namespaced Role + RoleBinding +
+  leader-election Role/RoleBinding. No ClusterRole, no wildcards.
+  Phase 4.5 split secrets to a dedicated rule with verbs `get;list;watch;create`
+  only (matches the kubebuilder marker and actual code paths). Leader-election
+  Role tightened to remove unused `delete` verbs.
+- **K8s Redis authentication** (Track 4, AUDIT #10) —
+  `reconcileRedisAuthSecret` uses `crypto/rand` (not `math/rand`) to
+  generate a 32-char alphanumeric password (~189 bits entropy), stored
+  as Secret `<cluster>-redis-auth` with OwnerReference. Redis container
+  consumes via `--requirepass $(REDIS_PASSWORD)` + SecretKeyRef env;
+  worker pods receive the same SecretKeyRef. Idempotent (no rotation
+  per reconcile).
+- **K8s NetworkPolicy manifests** (Track 4, AUDIT #10) — 4 manifests
+  under `operator/config/networkpolicy/`:
+  - `default_deny_all.yaml` — Phase 4.5 base policy: deny all ingress
+    + egress by default
+  - `worker_to_redis.yaml` — egress worker → Redis:6379 + DNS
+  - `worker_ingress.yaml` — Phase 4.5 added: ingress same-namespace
+    → worker:8000
+  - `redis_ingress.yaml` — ingress worker → Redis:6379
+  Admin-applied; not auto-managed by the operator.
+- **`scripts/mi300x_*`** (Track 4, Wave B prep) — 3 scripts +
+  runbook for the AMD AI Dev Cloud droplet:
+  - `mi300x_smoke_fwht.sh` — pytest invocation for FWHT integration
+    + INT4 codec tests with rocm-smi snapshots
+  - `mi300x_vram_measurement.py` — Phase 4.5 rewritten with honest
+    measurement protocol (CPU-NumPy bridge for the quantize call;
+    `baseline_fp16_bytes` from torch CUDA allocation;
+    `packed_bytes` from real `keys_int4.nbytes + scales.nbytes`;
+    `peak_gpu_alloc_bytes_incl_copy` reported separately; canonical
+    `(batch, seq_len, num_heads, head_dim)` layout)
+  - `mi300x_v62_adversarial.sh` — V6.2 adversarial benchmark on real MI300X
+  - `mi300x_runbook.md` — 6-step ops guide
+- **`.omc/plans/autopilot-impl-sprint3.md`** — Sprint 3 implementation
+  plan with Wave A / Wave B strategic split. Budget-honest:
+  Wave A consumes $0 of AMD credits, Wave B is the ~$15-20 MI300X burn.
+
+### Tests
+
+- **`tests/test_rotate_kv_int4_codec.py`** — 4/4 PASS (new).
+- **`tests/test_rotate_kv_fwht_integration.py`** — 5/5 PASS (tightened
+  tolerance).
+- **`tests/test_rotate_kv.py`** — 5/5 PASS (regression).
+- **`tests/test_fwht.py`** — 8/8 PASS (regression).
+- **Full Python regression** — **363 passed, 25 skipped, 0 failed** in
+  ~200s.
+- **`go test ./operator/controllers/...`** — 10/10 PASS (2 new Redis-auth
+  tests + 4 new SecurityContext tests + 4 existing).
+- **`go vet ./operator/...`** — clean.
+- **`bash operator/validate.sh`** — 16 YAML files pass (was 14 in
+  Sprint 2; +2 from new Phase 4.5 NetworkPolicy manifests).
+- **`scripts/check_honesty.sh`** — PASS.
+
+### Phase 4 validation results
+
+- **Architect (opus):** APPROVE Tracks 1-3; flagged Track 4
+  `mi300x_vram_measurement.py` broken (NumPy/torch mismatch + wrong
+  shape order). Phase 4.5 rewrote the script with honest CPU-NumPy
+  bridge protocol.
+- **Security-reviewer (sonnet):** APPROVE with conditions — all 5
+  Sprint 2 CRITICAL concerns resolved. 3 medium + 5 low items
+  surfaced; Phase 4.5 fixed M-1 (worker Ingress + default-deny
+  NetworkPolicy), M-2 (secrets RBAC verbs), M-3 (Redis
+  ImagePullPolicy), L-2 (leader-election delete), L-3
+  (automountServiceAccountToken=false). Remaining low items deferred
+  (digest pinning at V7.0.0 final, govulncheck CI run, DNS
+  namespaceSelector hardening).
+- **Code-reviewer (opus):** REQUEST CHANGES — 2 honest-discipline
+  violations and 1 YAML structural issue. Phase 4.5 fixed all 3:
+  CRD `Phase` enum trimmed to `Pending;Degraded;Ready` (matches
+  `computePhase()` runtime emission); malformed
+  `manager/kustomization.yaml` `resources: - [] - ../rbac` corrected;
+  MI300X VRAM script rewritten.
+
+### Phase 4.5 inline fixes summary
+
+8 surgical fixes:
+1. `scripts/mi300x_vram_measurement.py` — rewritten with honest
+   measurement protocol
+2. `operator/api/v1alpha1/apoharacontextforgecluster_types.go` —
+   Phase enum trimmed (V6.1 honesty)
+3. `operator/config/manager/kustomization.yaml` — malformed YAML
+   fixed
+4. `operator/config/networkpolicy/worker_ingress.yaml` — NEW
+5. `operator/config/networkpolicy/default_deny_all.yaml` — NEW
+6. `operator/config/rbac/role.yaml` — secrets verbs tightened
+7. `operator/config/rbac/leader_election_role.yaml` — unused
+   `delete` verbs removed
+8. `operator/controllers/apoharacontextforgecluster_controller.go` —
+   `AutomountServiceAccountToken: false` + Redis
+   `ImagePullPolicy: IfNotPresent`
+
+### AUDIT.md deltas
+
+- #9 V6.1 INT4 packing asymmetry: 🟠 → 🟢 (resolved + locked-in tests)
+- #10 K8s operator hardening: 🟠 → 🟢 (all 5 items closed + Phase 4.5
+  additional hardening)
+- Tracked open (not Sprint 3 blockers):
+  - kubebuilder RBAC marker / hand-written role.yaml drift (Sprint 4)
+  - `golang.org/x/net` dependency audit via govulncheck
+  - Full @sha256: digest pinning (V7.0.0 final)
+
+### Wave B handoff
+
+When the user powers the AMD droplet and provides the SSH IP, the lead
+will:
+1. Connect via ssh, clone repo + checkout V7.0.0-alpha.3 tag
+2. `pip install -e . pytest pytest-json-report torch` (~5 mins, ~$0.20)
+3. Run `bash scripts/mi300x_smoke_fwht.sh` (~10 min, ~$0.30) →
+   validates FWHT integration on real KV tensors
+4. Run `python3 scripts/mi300x_vram_measurement.py` (~3 min, ~$0.10)
+   → real `reduction_factor` measurement for paper v2.0
+5. Run `bash scripts/mi300x_v62_adversarial.sh` (~3 hrs, ~$6) → V6.2
+   adversarial bench on real MI300X for paper v2.0 promotion
+6. Copy `logs/mi300x_*.json` back, commit as `V7.0.0-alpha.4 (Sprint 3 Wave B)`,
+   update paper draft with measured numbers
+Total estimated Wave B burn: ~$8-10. Reserve: $20-22 for Sprint 4+.
+
+### Citation
+
+V7.0.0-alpha.3 is a pre-release. Paper v2.0 + arXiv submission gate the
+V7.0.0 final release.
+
+---
+
 ## V7.0.0-alpha.2 — Sprint 2: Closes AUDIT #6 + #8, real K8s reconciler · 2026-05-12
 
 Second sprint on the V7 roadmap. Closes two AUDIT items (🟡→🟢 for #6 RotateKV

@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: worker-to-redis
+spec:
+  podSelector:
+    matchLabels:
+      apohara.dev/role: worker
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          apohara.dev/role: redis
+    ports:
+    - port: 6379
+      protocol: TCP
+  # Allow DNS resolution so workers can resolve service names.
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP

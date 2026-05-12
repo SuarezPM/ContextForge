@@ -1,25 +1,20 @@
 # Apohara ContextForge — K8s Operator
 
-> **⚠️ NOT PRODUCTION READY.** Sprint 2 shipped real Reconcile() logic + 4 controller tests, but the operator is missing all of the following before any shared-cluster deployment:
-> - **SecurityContext** on worker + Redis pods (runAsNonRoot, readOnlyRootFilesystem, drop ALL capabilities)
-> - **ServiceAccount + namespaced RBAC** (Role + RoleBinding under `operator/config/rbac/`)
-> - **Redis authentication** (auto-provisioned Redis currently runs unauth on cluster ClusterIP)
-> - **NetworkPolicy** (no traffic isolation between worker pods or to Redis)
-> - **Image digest pinning** (`:latest` tag is mutable, supply-chain risk)
+> **Note:** The operator is not yet deployed to a live cluster. Sprint 3 Wave A shipped the remaining security hardening items below. The one open item before shared-cluster deployment is **image digest pinning** (`:latest` tag is mutable; replace with `@sha256:...` before production use).
 >
-> These are explicit Sprint 3 work items. See `AUDIT.md` for the audit log and `.omc/plans/v7-roadmap.md` §1.B for the V7 roadmap context. Sprint 2 verified the reconciliation logic on a fake-client unit test (`go test ./controllers/...` 4/4 PASS) and a kind-skipped integration script — that is the scope of "shipped" right now.
+> Sprint 3 Wave A deliverables (this PR): SecurityContext (Track 2), RBAC (Track 3), Redis auth + NetworkPolicy (Track 4). See `AUDIT.md` for the full audit log.
 
 ## What this is
 
-This directory is the V7 Sprint 2 Kubernetes operator for Apohara ContextForge. The operator lets users deploy an N-worker ContextForge cluster with a shared LMCache Redis backend via a single `kubectl apply`.
+This directory is the V7 Sprint 3 Kubernetes operator for Apohara ContextForge. The operator lets users deploy an N-worker ContextForge cluster with a shared LMCache Redis backend via a single `kubectl apply`.
 
 The Custom Resource Definition (CRD) is `ApohraContextForgeCluster` in group `contextforge.apohara.dev/v1alpha1`.
 
-## Current status: reconciler logic written + unit-tested; not deployed
+## Current status: Sprint 3 security hardening complete; binary not yet deployed
 
-The `Reconcile()` controller logic now actively creates worker Deployments (matching `Spec.WorkerCount`), provisions an optional Redis sidecar when `Spec.LMCacheRedisUrl` is empty, and updates `Status.{ReadyWorkers, Phase}` from real pod readiness. 4 controller-runtime unit tests cover the happy path + the 4 main branches. `go vet ./...` passes.
+The `Reconcile()` controller logic actively creates worker Deployments, provisions an authenticated Redis sidecar, and updates `Status.{ReadyWorkers, Phase, RedisSecretName}`. 6 controller-runtime unit tests pass. `go vet ./...` passes.
 
-The operator **binary is not built and not deployed** in Sprint 2. The integration test (`integration_test.sh`) only verifies that `kubectl apply` of the CRD + sample CR succeeds; it does NOT run the controller against the resource. Real end-to-end deployment is Sprint 3, gated on the security hardening listed at the top of this README.
+The operator **binary is not built and not deployed** yet. Real end-to-end deployment is the next milestone, gated on image digest pinning.
 
 ## Validate Sprint 1 deliverables
 
@@ -95,13 +90,45 @@ bash operator/integration_test.sh
 
 The controller binary is **not** deployed during the integration test (Sprint 3+). The test validates schema acceptance and kubectl round-trips only — not reconciliation behaviour.
 
+## Sprint 3 deliverables
+
+| Track | Deliverable | Files | Status |
+|-------|-------------|-------|--------|
+| Track 2 | SecurityContext (runAsNonRoot, readOnlyRootFilesystem, drop ALL) | `controller.go` | SHIPPED |
+| Track 3 | ServiceAccount + namespaced RBAC (Role + RoleBinding) | `config/rbac/` | SHIPPED |
+| Track 4 | Redis authentication (auto-provisioned Secret, crypto/rand password) | `controller.go`, `types.go` | SHIPPED |
+| Track 4 | NetworkPolicy manifests for admin apply | `config/networkpolicy/` | SHIPPED |
+| Track 4 | MI300X smoke-test scripts for Wave B | `scripts/` | SHIPPED |
+
+### NetworkPolicy note
+
+The manifests under `config/networkpolicy/` are **NOT auto-managed by the operator**. They are provisioned once by a cluster-admin:
+
+```bash
+kubectl apply -n <namespace> -f operator/config/networkpolicy/
+```
+
+The policies use `apohara.dev/role: worker` and `apohara.dev/role: redis` labels that the operator automatically stamps on its managed pods.
+
+### Redis authentication
+
+When `spec.lmcacheRedisUrl` is empty (auto-provisioned Redis), the operator:
+
+1. Creates a Secret named `<cluster>-redis-auth` with a 32-character alphanumeric password generated via `crypto/rand`.
+2. Injects `REDIS_PASSWORD` into both the Redis Deployment (via `--requirepass $(REDIS_PASSWORD)`) and worker pods (via `SecretKeyRef`).
+3. Sets `status.redisSecretName` for operator visibility.
+4. Never rotates the password on subsequent reconciles (stable across restarts).
+
+Worker pods read `REDIS_PASSWORD` via `os.environ.get` in the LMCacheConnector.
+
 ## Roadmap
 
 | Sprint | Target | Content |
 |--------|--------|---------|
 | Sprint 1 | Scaffold | CRD + types + controller skeleton + Helm chart |
-| Sprint 2 (current) | Real reconciler | Worker Deployment + Redis sidecar + status updates (authored, not compiled) |
-| Sprint 3 | Build + deploy | Compile operator binary, push image, deploy to kind with full reconciliation test |
-| Sprint 4 | AMD AI Cloud | Reference deployment on MI300X cluster with $100 credit budget |
+| Sprint 2 | Real reconciler | Worker Deployment + Redis sidecar + status updates |
+| Sprint 3 (current) | Security hardening | SecurityContext + RBAC + Redis auth + NetworkPolicy + MI300X Wave B scripts |
+| Sprint 4 | Build + deploy | Compile operator binary, push image, deploy to kind with full reconciliation test |
+| Sprint 5 | AMD AI Cloud | Reference deployment on MI300X cluster |
 
 Full V7 plan: [`.omc/plans/v7-roadmap.md`](../.omc/plans/v7-roadmap.md) §4 Track 3.

@@ -207,6 +207,125 @@ func TestReconcile_SkipsRedisWhenURLProvided(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Test 5 — Reconcile auto-creates Redis auth Secret when LMCacheRedisUrl is empty
+// ---------------------------------------------------------------------------
+
+func TestReconcile_RedisAuthSecret_AutoCreated(t *testing.T) {
+	const (
+		clusterName = "auth-test-cluster"
+		ns          = "default"
+	)
+
+	cluster := sampleCluster(clusterName, ns, 1, "")
+	r := reconcilerFor(t, cluster)
+
+	_, err := r.Reconcile(context.Background(), requestFor(clusterName, ns))
+	if err != nil {
+		t.Fatalf("Reconcile returned error: %v", err)
+	}
+
+	// The Redis auth Secret must exist with key "password".
+	secret := &corev1.Secret{}
+	secretKey := types.NamespacedName{Name: clusterName + "-redis-auth", Namespace: ns}
+	if err := r.Get(context.Background(), secretKey, secret); err != nil {
+		t.Fatalf("Redis auth Secret not found after reconcile: %v", err)
+	}
+	pwd, ok := secret.Data["password"]
+	if !ok {
+		t.Fatal("Redis auth Secret missing key 'password'")
+	}
+	if len(pwd) != 32 {
+		t.Errorf("want password length=32, got %d", len(pwd))
+	}
+
+	// The Redis Deployment must reference the Secret via REDIS_PASSWORD env var.
+	redisDep := &appsv1.Deployment{}
+	if err := r.Get(context.Background(), types.NamespacedName{Name: clusterName + "-redis", Namespace: ns}, redisDep); err != nil {
+		t.Fatalf("Redis Deployment not found: %v", err)
+	}
+	if len(redisDep.Spec.Template.Spec.Containers) == 0 {
+		t.Fatal("Redis Deployment has no containers")
+	}
+	foundSecretRef := false
+	for _, env := range redisDep.Spec.Template.Spec.Containers[0].Env {
+		if env.Name == "REDIS_PASSWORD" &&
+			env.ValueFrom != nil &&
+			env.ValueFrom.SecretKeyRef != nil &&
+			env.ValueFrom.SecretKeyRef.Name == clusterName+"-redis-auth" &&
+			env.ValueFrom.SecretKeyRef.Key == "password" {
+			foundSecretRef = true
+		}
+	}
+	if !foundSecretRef {
+		t.Errorf("Redis Deployment missing REDIS_PASSWORD SecretKeyRef; envs=%v",
+			redisDep.Spec.Template.Spec.Containers[0].Env)
+	}
+
+	// Worker Deployment must also have REDIS_PASSWORD injected.
+	workerDep := &appsv1.Deployment{}
+	workerKey := types.NamespacedName{Name: clusterName + "-workers", Namespace: ns}
+	if err := r.Get(context.Background(), workerKey, workerDep); err != nil {
+		t.Fatalf("worker Deployment not found: %v", err)
+	}
+	foundWorkerSecretRef := false
+	for _, env := range workerDep.Spec.Template.Spec.Containers[0].Env {
+		if env.Name == "REDIS_PASSWORD" &&
+			env.ValueFrom != nil &&
+			env.ValueFrom.SecretKeyRef != nil &&
+			env.ValueFrom.SecretKeyRef.Name == clusterName+"-redis-auth" {
+			foundWorkerSecretRef = true
+		}
+	}
+	if !foundWorkerSecretRef {
+		t.Errorf("worker Deployment missing REDIS_PASSWORD SecretKeyRef; envs=%v",
+			workerDep.Spec.Template.Spec.Containers[0].Env)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test 6 — Second Reconcile does not rotate the Redis auth password
+// ---------------------------------------------------------------------------
+
+func TestReconcile_RedisAuthSecret_NotRotated(t *testing.T) {
+	const (
+		clusterName = "no-rotate-cluster"
+		ns          = "default"
+	)
+
+	cluster := sampleCluster(clusterName, ns, 1, "")
+	r := reconcilerFor(t, cluster)
+
+	// First reconcile — creates the Secret.
+	_, err := r.Reconcile(context.Background(), requestFor(clusterName, ns))
+	if err != nil {
+		t.Fatalf("first Reconcile error: %v", err)
+	}
+
+	secret := &corev1.Secret{}
+	secretKey := types.NamespacedName{Name: clusterName + "-redis-auth", Namespace: ns}
+	if err := r.Get(context.Background(), secretKey, secret); err != nil {
+		t.Fatalf("Redis auth Secret not found after first reconcile: %v", err)
+	}
+	firstPassword := string(secret.Data["password"])
+
+	// Second reconcile — must leave the Secret unchanged.
+	_, err = r.Reconcile(context.Background(), requestFor(clusterName, ns))
+	if err != nil {
+		t.Fatalf("second Reconcile error: %v", err)
+	}
+
+	if err := r.Get(context.Background(), secretKey, secret); err != nil {
+		t.Fatalf("Redis auth Secret not found after second reconcile: %v", err)
+	}
+	secondPassword := string(secret.Data["password"])
+
+	if firstPassword != secondPassword {
+		t.Errorf("Redis password was rotated between reconciles (want stable): first=%q second=%q",
+			firstPassword, secondPassword)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Test 4 — Reconcile updates Status.ReadyWorkers based on pod readiness
 // ---------------------------------------------------------------------------
 
@@ -269,5 +388,182 @@ func TestReconcile_UpdatesStatusReadyWorkers(t *testing.T) {
 	}
 	if updated.Status.Phase != phaseDegraded {
 		t.Errorf("want Phase=%s, got %s", phaseDegraded, updated.Status.Phase)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test 5 — Worker Deployment has the expected pod-level SecurityContext
+// ---------------------------------------------------------------------------
+
+func TestReconcile_WorkerDeployment_HasSecurityContext(t *testing.T) {
+	const (
+		clusterName = "sc-worker-cluster"
+		ns          = "default"
+	)
+
+	cluster := sampleCluster(clusterName, ns, 1, "redis://external:6379")
+	r := reconcilerFor(t, cluster)
+
+	_, err := r.Reconcile(context.Background(), requestFor(clusterName, ns))
+	if err != nil {
+		t.Fatalf("Reconcile returned error: %v", err)
+	}
+
+	dep := &appsv1.Deployment{}
+	if err := r.Get(context.Background(), types.NamespacedName{Name: clusterName + "-workers", Namespace: ns}, dep); err != nil {
+		t.Fatalf("worker Deployment not found: %v", err)
+	}
+
+	sc := dep.Spec.Template.Spec.SecurityContext
+	if sc == nil {
+		t.Fatal("worker PodSpec.SecurityContext is nil")
+	}
+	if sc.RunAsNonRoot == nil || !*sc.RunAsNonRoot {
+		t.Error("want RunAsNonRoot=true")
+	}
+	if sc.RunAsUser == nil || *sc.RunAsUser != 65534 {
+		t.Errorf("want RunAsUser=65534, got %v", sc.RunAsUser)
+	}
+	if sc.SeccompProfile == nil || sc.SeccompProfile.Type != corev1.SeccompProfileTypeRuntimeDefault {
+		t.Error("want SeccompProfile.Type=RuntimeDefault")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test 6 — Redis Deployment has the expected pod-level SecurityContext
+// ---------------------------------------------------------------------------
+
+func TestReconcile_RedisDeployment_HasSecurityContext(t *testing.T) {
+	const (
+		clusterName = "sc-redis-cluster"
+		ns          = "default"
+	)
+
+	// Empty LMCacheRedisUrl triggers auto Redis provisioning.
+	cluster := sampleCluster(clusterName, ns, 1, "")
+	r := reconcilerFor(t, cluster)
+
+	_, err := r.Reconcile(context.Background(), requestFor(clusterName, ns))
+	if err != nil {
+		t.Fatalf("Reconcile returned error: %v", err)
+	}
+
+	redisDep := &appsv1.Deployment{}
+	if err := r.Get(context.Background(), types.NamespacedName{Name: clusterName + "-redis", Namespace: ns}, redisDep); err != nil {
+		t.Fatalf("Redis Deployment not found: %v", err)
+	}
+
+	sc := redisDep.Spec.Template.Spec.SecurityContext
+	if sc == nil {
+		t.Fatal("Redis PodSpec.SecurityContext is nil")
+	}
+	if sc.RunAsNonRoot == nil || !*sc.RunAsNonRoot {
+		t.Error("want RunAsNonRoot=true")
+	}
+	if sc.RunAsUser == nil || *sc.RunAsUser != 999 {
+		t.Errorf("want RunAsUser=999 (redis uid), got %v", sc.RunAsUser)
+	}
+	if sc.FSGroup == nil || *sc.FSGroup != 999 {
+		t.Errorf("want FSGroup=999, got %v", sc.FSGroup)
+	}
+	if sc.SeccompProfile == nil || sc.SeccompProfile.Type != corev1.SeccompProfileTypeRuntimeDefault {
+		t.Error("want SeccompProfile.Type=RuntimeDefault")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test 7 — Worker container drops ALL capabilities
+// ---------------------------------------------------------------------------
+
+func TestReconcile_WorkerContainer_DropsCapabilities(t *testing.T) {
+	const (
+		clusterName = "caps-worker-cluster"
+		ns          = "default"
+	)
+
+	cluster := sampleCluster(clusterName, ns, 1, "redis://external:6379")
+	r := reconcilerFor(t, cluster)
+
+	_, err := r.Reconcile(context.Background(), requestFor(clusterName, ns))
+	if err != nil {
+		t.Fatalf("Reconcile returned error: %v", err)
+	}
+
+	dep := &appsv1.Deployment{}
+	if err := r.Get(context.Background(), types.NamespacedName{Name: clusterName + "-workers", Namespace: ns}, dep); err != nil {
+		t.Fatalf("worker Deployment not found: %v", err)
+	}
+	if len(dep.Spec.Template.Spec.Containers) == 0 {
+		t.Fatal("worker Deployment has no containers")
+	}
+
+	csc := dep.Spec.Template.Spec.Containers[0].SecurityContext
+	if csc == nil {
+		t.Fatal("worker container SecurityContext is nil")
+	}
+	if csc.AllowPrivilegeEscalation == nil || *csc.AllowPrivilegeEscalation {
+		t.Error("want AllowPrivilegeEscalation=false")
+	}
+	if csc.ReadOnlyRootFilesystem == nil || !*csc.ReadOnlyRootFilesystem {
+		t.Error("want ReadOnlyRootFilesystem=true")
+	}
+	if csc.Capabilities == nil {
+		t.Fatal("worker container Capabilities is nil")
+	}
+	found := false
+	for _, cap := range csc.Capabilities.Drop {
+		if cap == "ALL" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("want Capabilities.Drop to include ALL, got %v", csc.Capabilities.Drop)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test 8 — Default worker image does NOT end with :latest
+// ---------------------------------------------------------------------------
+
+func TestReconcile_WorkerImage_NotLatestTag(t *testing.T) {
+	const (
+		clusterName = "img-pin-cluster"
+		ns          = "default"
+	)
+
+	// Use a cluster with no explicit image to exercise the controller default.
+	cluster := &contextforgev1alpha1.ApohraContextForgeCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: ns,
+			UID:       "test-uid-img-pin",
+		},
+		Spec: contextforgev1alpha1.ApohraContextForgeClusterSpec{
+			WorkerCount:     1,
+			Model:           "meta-llama/Llama-3-8b",
+			LMCacheRedisUrl: "redis://external:6379",
+			GpuType:         "mi300x",
+			// Image intentionally omitted — controller falls back to its default.
+		},
+	}
+	r := reconcilerFor(t, cluster)
+
+	_, err := r.Reconcile(context.Background(), requestFor(clusterName, ns))
+	if err != nil {
+		t.Fatalf("Reconcile returned error: %v", err)
+	}
+
+	dep := &appsv1.Deployment{}
+	if err := r.Get(context.Background(), types.NamespacedName{Name: clusterName + "-workers", Namespace: ns}, dep); err != nil {
+		t.Fatalf("worker Deployment not found: %v", err)
+	}
+	if len(dep.Spec.Template.Spec.Containers) == 0 {
+		t.Fatal("worker Deployment has no containers")
+	}
+
+	image := dep.Spec.Template.Spec.Containers[0].Image
+	if len(image) >= 7 && image[len(image)-7:] == ":latest" {
+		t.Errorf("default worker image must not end with :latest, got %q", image)
 	}
 }

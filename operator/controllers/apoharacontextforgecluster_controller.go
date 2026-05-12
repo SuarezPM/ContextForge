@@ -2,7 +2,9 @@ package controllers
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
+	"math/big"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -13,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -50,6 +53,7 @@ type ApohraContextForgeClusterReconciler struct {
 // +kubebuilder:rbac:groups=contextforge.apohara.dev,resources=apoharacontextforgeclusters/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services;configmaps;pods,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create
 
 // Reconcile is the main controller loop for ApohraContextForgeCluster.
 //
@@ -99,23 +103,103 @@ func (r *ApohraContextForgeClusterReconciler) Reconcile(ctx context.Context, req
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 }
 
+// redisAuthPasswordLen is the length of the auto-generated Redis password.
+const redisAuthPasswordLen = 32
+
+// redisAuthPasswordAlphabet is the character set used for the auto-generated password.
+const redisAuthPasswordAlphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+// reconcileRedisAuthSecret ensures a Secret named "<cluster.Name>-redis-auth" exists
+// in cluster.Namespace. If absent, a 32-character alphanumeric password is generated
+// using crypto/rand and stored under key "password". If the Secret already exists it
+// is left unchanged (no rotation per reconcile). An OwnerReference is set so the Secret
+// is garbage-collected when the CR is deleted.
+//
+// Returns the Secret name so callers can inject it as a SecretKeyRef.
+func (r *ApohraContextForgeClusterReconciler) reconcileRedisAuthSecret(ctx context.Context, cluster *contextforgev1alpha1.ApohraContextForgeCluster) (string, error) {
+	logger := log.FromContext(ctx)
+	secretName := cluster.Name + "-redis-auth"
+	ns := cluster.Namespace
+
+	existing := &corev1.Secret{}
+	err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: ns}, existing)
+	if err == nil {
+		// Secret already exists — do not rotate.
+		return secretName, nil
+	}
+	if !errors.IsNotFound(err) {
+		return "", fmt.Errorf("get Redis auth Secret %s/%s: %w", ns, secretName, err)
+	}
+
+	// Generate a random password using crypto/rand.
+	alphabet := []byte(redisAuthPasswordAlphabet)
+	alphabetLen := big.NewInt(int64(len(alphabet)))
+	pass := make([]byte, redisAuthPasswordLen)
+	for i := range pass {
+		idx, err := rand.Int(rand.Reader, alphabetLen)
+		if err != nil {
+			return "", fmt.Errorf("generate Redis password: %w", err)
+		}
+		pass[i] = alphabet[idx.Int64()]
+	}
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: ns,
+			OwnerReferences: []metav1.OwnerReference{
+				ownerRef(cluster, r.Scheme),
+			},
+		},
+		Data: map[string][]byte{
+			"password": pass,
+		},
+	}
+	if err := r.Create(ctx, secret); err != nil {
+		return "", fmt.Errorf("create Redis auth Secret %s/%s: %w", ns, secretName, err)
+	}
+	logger.Info("created Redis auth Secret", "name", secretName, "namespace", ns)
+	return secretName, nil
+}
+
 // reconcileRedisSidecar ensures a Redis Deployment and its ClusterIP Service
 // exist in cluster.Namespace. When both already exist, no changes are made.
 // The created Service is named "<cluster.Name>-redis" and the operator sets
 // it as an owner reference so it is garbage-collected when the CR is deleted.
+//
+// The Redis Deployment is configured with --requirepass sourced from the
+// auto-provisioned auth Secret (see reconcileRedisAuthSecret).
 func (r *ApohraContextForgeClusterReconciler) reconcileRedisSidecar(ctx context.Context, cluster *contextforgev1alpha1.ApohraContextForgeCluster) error {
 	logger := log.FromContext(ctx)
 	redisName := cluster.Name + "-redis"
 	ns := cluster.Namespace
 
+	// --- Auth Secret (must exist before Deployment) ---
+	secretName, err := r.reconcileRedisAuthSecret(ctx, cluster)
+	if err != nil {
+		return fmt.Errorf("reconcileRedisAuthSecret: %w", err)
+	}
+
+	// Update status with the secret name for operator visibility.
+	if cluster.Status.RedisSecretName != secretName {
+		patch := client.MergeFrom(cluster.DeepCopy())
+		cluster.Status.RedisSecretName = secretName
+		if patchErr := r.Status().Patch(ctx, cluster, patch); patchErr != nil {
+			// Non-fatal: status will be refreshed on next reconcile.
+			logger.Info("warning: failed to patch RedisSecretName status", "err", patchErr)
+		}
+	}
+
 	// --- Deployment ---
 	redisLabels := map[string]string{
-		"app.kubernetes.io/name":       "apohara-contextforge",
-		"app.kubernetes.io/instance":   cluster.Name,
-		workerLabelKey:                 redisLabelValue,
+		"app.kubernetes.io/name":     "apohara-contextforge",
+		"app.kubernetes.io/instance": cluster.Name,
+		workerLabelKey:               redisLabelValue,
+		// apohara.dev/role is used by NetworkPolicy selectors.
+		"apohara.dev/role": "redis",
 	}
 	redisDeployment := &appsv1.Deployment{}
-	err := r.Get(ctx, types.NamespacedName{Name: redisName, Namespace: ns}, redisDeployment)
+	err = r.Get(ctx, types.NamespacedName{Name: redisName, Namespace: ns}, redisDeployment)
 	if errors.IsNotFound(err) {
 		one := int32(1)
 		desired := &appsv1.Deployment{
@@ -133,14 +217,56 @@ func (r *ApohraContextForgeClusterReconciler) reconcileRedisSidecar(ctx context.
 				Template: corev1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{Labels: redisLabels},
 					Spec: corev1.PodSpec{
+						AutomountServiceAccountToken: ptr.To(false),
+						SecurityContext: &corev1.PodSecurityContext{
+							RunAsNonRoot: ptr.To(true),
+							RunAsUser:    ptr.To(int64(999)), // redis default uid
+							FSGroup:      ptr.To(int64(999)),
+							SeccompProfile: &corev1.SeccompProfile{
+								Type: corev1.SeccompProfileTypeRuntimeDefault,
+							},
+						},
 						Containers: []corev1.Container{
 							{
-								Name:  "redis",
-								Image: defaultRedisImage,
+								Name:            "redis",
+								Image:           defaultRedisImage,
+								ImagePullPolicy: corev1.PullIfNotPresent,
+								// Use $(REDIS_PASSWORD) shell variable expansion so the
+								// password is never stored in plain text in the pod spec.
+								Args: []string{"redis-server", "--requirepass", "$(REDIS_PASSWORD)"},
+								Env: []corev1.EnvVar{
+									{
+										Name: "REDIS_PASSWORD",
+										ValueFrom: &corev1.EnvVarSource{
+											SecretKeyRef: &corev1.SecretKeySelector{
+												LocalObjectReference: corev1.LocalObjectReference{Name: secretName},
+												Key:                  "password",
+											},
+										},
+									},
+								},
 								Ports: []corev1.ContainerPort{
 									{ContainerPort: redisSidecarPort, Protocol: corev1.ProtocolTCP},
 								},
 								Resources: corev1.ResourceRequirements{},
+								SecurityContext: &corev1.SecurityContext{
+									AllowPrivilegeEscalation: ptr.To(false),
+									ReadOnlyRootFilesystem:   ptr.To(true),
+									Capabilities: &corev1.Capabilities{
+										Drop: []corev1.Capability{"ALL"},
+									},
+								},
+								VolumeMounts: []corev1.VolumeMount{
+									{Name: "redis-data", MountPath: "/data"},
+								},
+							},
+						},
+						Volumes: []corev1.Volume{
+							{
+								Name: "redis-data",
+								VolumeSource: corev1.VolumeSource{
+									EmptyDir: &corev1.EmptyDirVolumeSource{},
+								},
 							},
 						},
 					},
@@ -190,26 +316,40 @@ func (r *ApohraContextForgeClusterReconciler) reconcileRedisSidecar(ctx context.
 // reconcileWorkers ensures a single Deployment with cluster.Spec.WorkerCount
 // replicas exists in cluster.Namespace. If the Deployment already exists its
 // replica count and image are updated to match the spec.
+//
+// When LMCacheRedisUrl is empty (auto-provisioned Redis), REDIS_PASSWORD is
+// injected into the worker pods so they can authenticate against Redis.
+// The LMCacheConnector in the worker image reads REDIS_PASSWORD via os.environ.get.
 func (r *ApohraContextForgeClusterReconciler) reconcileWorkers(ctx context.Context, cluster *contextforgev1alpha1.ApohraContextForgeCluster) error {
 	logger := log.FromContext(ctx)
 	workerName := cluster.Name + "-workers"
 	ns := cluster.Namespace
 
 	workerLabels := map[string]string{
-		"app.kubernetes.io/name":       "apohara-contextforge",
-		"app.kubernetes.io/instance":   cluster.Name,
-		workerLabelKey:                 workerLabelValue,
+		"app.kubernetes.io/name":     "apohara-contextforge",
+		"app.kubernetes.io/instance": cluster.Name,
+		workerLabelKey:               workerLabelValue,
+		// apohara.dev/role is used by NetworkPolicy selectors.
+		"apohara.dev/role": "worker",
 	}
 
 	image := cluster.Spec.Image
 	if image == "" {
-		image = "ghcr.io/suarezpm/apohara-contextforge:latest"
+		image = "ghcr.io/suarezpm/apohara-contextforge:v7.0.0-alpha.3"
 	}
 
 	// Resolve the Redis URL: use what the user provided or the auto-provisioned sidecar.
 	redisURL := cluster.Spec.LMCacheRedisUrl
-	if redisURL == "" {
+	autoRedis := redisURL == ""
+	if autoRedis {
 		redisURL = fmt.Sprintf("redis://%s-redis.%s.svc.cluster.local:%d", cluster.Name, ns, redisSidecarPort)
+	}
+
+	// When using auto-provisioned Redis, resolve the auth secret name so worker
+	// pods can authenticate. The secret was created in reconcileRedisAuthSecret.
+	var redisSecretName string
+	if autoRedis {
+		redisSecretName = cluster.Name + "-redis-auth"
 	}
 
 	replicas := cluster.Spec.WorkerCount
@@ -217,7 +357,7 @@ func (r *ApohraContextForgeClusterReconciler) reconcileWorkers(ctx context.Conte
 	existing := &appsv1.Deployment{}
 	err := r.Get(ctx, types.NamespacedName{Name: workerName, Namespace: ns}, existing)
 	if errors.IsNotFound(err) {
-		desired := r.workerDeployment(cluster, workerName, ns, workerLabels, image, redisURL, replicas)
+		desired := r.workerDeployment(cluster, workerName, ns, workerLabels, image, redisURL, redisSecretName, replicas)
 		if err := r.Create(ctx, desired); err != nil {
 			return fmt.Errorf("create worker Deployment %s/%s: %w", ns, workerName, err)
 		}
@@ -249,13 +389,41 @@ func (r *ApohraContextForgeClusterReconciler) reconcileWorkers(ctx context.Conte
 }
 
 // workerDeployment builds the desired appsv1.Deployment object for the worker fleet.
+//
+// redisSecretName: when non-empty (auto-provisioned Redis case), a REDIS_PASSWORD
+// env var is injected via SecretKeyRef so workers can authenticate against Redis.
+// The LMCacheConnector reads REDIS_PASSWORD via os.environ.get.
 func (r *ApohraContextForgeClusterReconciler) workerDeployment(
 	cluster *contextforgev1alpha1.ApohraContextForgeCluster,
 	name, ns string,
 	lbls map[string]string,
 	image, redisURL string,
+	redisSecretName string,
 	replicas int32,
 ) *appsv1.Deployment {
+	workerEnv := []corev1.EnvVar{
+		{
+			Name:  "LMCACHE_REDIS_URL",
+			Value: redisURL,
+		},
+		{
+			Name:  "MODEL",
+			Value: cluster.Spec.Model,
+		},
+	}
+	// Inject Redis password for auto-provisioned Redis so LMCacheConnector can auth.
+	if redisSecretName != "" {
+		workerEnv = append(workerEnv, corev1.EnvVar{
+			Name: "REDIS_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: redisSecretName},
+					Key:                  "password",
+				},
+			},
+		})
+	}
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -271,20 +439,20 @@ func (r *ApohraContextForgeClusterReconciler) workerDeployment(
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: lbls},
 				Spec: corev1.PodSpec{
+					AutomountServiceAccountToken: ptr.To(false),
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsNonRoot: ptr.To(true),
+						RunAsUser:    ptr.To(int64(65534)), // nobody
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
 					Containers: []corev1.Container{
 						{
-							Name:  "contextforge-worker",
-							Image: image,
-							Env: []corev1.EnvVar{
-								{
-									Name:  "LMCACHE_REDIS_URL",
-									Value: redisURL,
-								},
-								{
-									Name:  "MODEL",
-									Value: cluster.Spec.Model,
-								},
-							},
+							Name:            "contextforge-worker",
+							Image:           image,
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Env:             workerEnv,
 							Ports: []corev1.ContainerPort{
 								{Name: "http", ContainerPort: 8000, Protocol: corev1.ProtocolTCP},
 							},
@@ -298,6 +466,24 @@ func (r *ApohraContextForgeClusterReconciler) workerDeployment(
 								InitialDelaySeconds: 30,
 								PeriodSeconds:       10,
 								FailureThreshold:    3,
+							},
+							SecurityContext: &corev1.SecurityContext{
+								AllowPrivilegeEscalation: ptr.To(false),
+								ReadOnlyRootFilesystem:   ptr.To(true),
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{Name: "tmp", MountPath: "/tmp"},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "tmp",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
 							},
 						},
 					},
@@ -371,12 +557,14 @@ func (r *ApohraContextForgeClusterReconciler) updateStatus(ctx context.Context, 
 }
 
 // SetupWithManager registers the reconciler with the controller-runtime manager
-// and sets up watches on owned Deployments so changes bubble up to the CR.
+// and sets up watches on owned Deployments, Services, and Secrets so changes
+// bubble up to the CR.
 func (r *ApohraContextForgeClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&contextforgev1alpha1.ApohraContextForgeCluster{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
+		Owns(&corev1.Secret{}).
 		Complete(r)
 }
 

@@ -203,59 +203,66 @@ class RotateKVQuantizer:
         return block, remaining_for_rope
     
     def _quantize_block(self, states: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Quantize a block of states to INT4."""
+        """Quantize a block of states to INT4.
+
+        Packing: each byte at packed[blk, i, h, d] encodes head_dim positions
+        (2*d, 2*d+1) at seq position (start + i). Lower nibble = 2*d, upper = 2*d+1.
+        A single (scale, zero_point) governs both nibbles of the pair.
+        """
         cfg = self._config
         batch, seq, num_heads, head_dim = states.shape
-        
+
         # For INT4, we pack 2 values per byte
         # Store as uint8 with 2 values per entry
         n_blocks = seq // cfg.group_size
         if seq % cfg.group_size != 0:
             n_blocks += 1
-        
+
         # Packed shape: (n_blocks, group_size, num_heads, head_dim // 2)
         packed_head_dim = head_dim // 2
-        
+
         keys_int4 = np.zeros((n_blocks, cfg.group_size, num_heads, packed_head_dim), dtype=np.uint8)
         scales = np.zeros((n_blocks, num_heads, packed_head_dim), dtype=np.float32)
         zero_points = np.zeros((n_blocks, num_heads, packed_head_dim), dtype=np.float32)
-        
+
         for b in range(batch):
             for h in range(num_heads):
                 for d in range(packed_head_dim):
+                    d_lo = 2 * d
+                    d_hi = 2 * d + 1
                     for blk in range(n_blocks):
                         start = blk * cfg.group_size
                         end = min(start + cfg.group_size, seq)
-                        block_data = states[b, start:end, h, d]
-                        
-                        if len(block_data) == 0:
+                        block_lo = states[b, start:end, h, d_lo]
+                        block_hi = states[b, start:end, h, d_hi]
+
+                        if len(block_lo) == 0:
                             continue
-                        
-                        # Asymmetric quantization
-                        min_val = np.min(block_data)
-                        max_val = np.max(block_data)
-                        
+
+                        # Joint asymmetric quantization over the (d_lo, d_hi) pair so
+                        # a single scale/zero_point governs both nibbles of the byte.
+                        min_val = float(min(np.min(block_lo), np.min(block_hi)))
+                        max_val = float(max(np.max(block_lo), np.max(block_hi)))
+
                         if cfg.bits == 4:
                             max_range = 15.0
                         else:
                             max_range = 255.0
-                        
+
                         scale = (max_val - min_val) / max_range if max_val > min_val else 1.0
                         zero_point = -round(min_val / scale) if scale != 0 else 0
-                        
-                        # Quantize
-                        quantized = np.clip(np.round(block_data / scale + zero_point), 0, max_range).astype(np.uint8)
-                        
-                        # Pack 2 values per byte
-                        for i, val in enumerate(quantized):
-                            if i % 2 == 0:
-                                keys_int4[blk, i, h, d] = val
-                            else:
-                                keys_int4[blk, i, h, d] |= (val << 4)
-                        
+
+                        # Quantize both head_dim slots with the shared (scale, zp).
+                        q_lo = np.clip(np.round(block_lo / scale + zero_point), 0, max_range).astype(np.uint8)
+                        q_hi = np.clip(np.round(block_hi / scale + zero_point), 0, max_range).astype(np.uint8)
+
+                        # Pack: lower nibble = 2*d slot, upper nibble = 2*d+1 slot.
+                        for i in range(len(q_lo)):
+                            keys_int4[blk, i, h, d] = (q_lo[i] & 0xF) | ((q_hi[i] & 0xF) << 4)
+
                         scales[blk, h, d] = scale
                         zero_points[blk, h, d] = zero_point
-        
+
         return keys_int4, scales, zero_points
     
     def dequantize(

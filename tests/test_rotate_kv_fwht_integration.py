@@ -107,9 +107,11 @@ def test_fwht_roundtrip_through_pipeline():
     assert k_deq_on.shape == fwht_k.shape
     assert v_deq_on.shape == fwht_v.shape
 
-    # Error must stay within ~baseline magnitude (allow 3x slack for FWHT range change).
-    assert np.abs(k_deq_on - fwht_k).max() <= baseline_err_k * 3.0
-    assert np.abs(v_deq_on - fwht_v).max() <= baseline_err_v * 3.0
+    # Error must stay within ~baseline magnitude. With the AUDIT #9 codec fix
+    # the observed ratio is ~1.1x, so 1.5x INT4 envelope catches any future
+    # nibble-packing regression while leaving small headroom for FP epsilon.
+    assert np.abs(k_deq_on - fwht_k).max() <= baseline_err_k * 1.5
+    assert np.abs(v_deq_on - fwht_v).max() <= baseline_err_v * 1.5
 
 
 def test_fwht_batched_kv():

@@ -1,0 +1,5 @@
+resources:
+- default_deny_all.yaml
+- worker_to_redis.yaml
+- worker_ingress.yaml
+- redis_ingress.yaml

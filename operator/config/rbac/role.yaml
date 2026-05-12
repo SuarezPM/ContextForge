@@ -1,0 +1,30 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: apohara-contextforge-manager-role
+  namespace: system
+rules:
+- apiGroups: ["contextforge.apohara.dev"]
+  resources: ["apoharacontextforgeclusters"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: ["contextforge.apohara.dev"]
+  resources: ["apoharacontextforgeclusters/status", "apoharacontextforgeclusters/finalizers"]
+  verbs: ["update", "patch", "get"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["services", "configmaps"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Secrets: the controller only creates the Redis auth Secret once and reads
+# it back on subsequent reconciles — never updates, patches, or deletes. Tight
+# verb set matches the actual code path in reconcileRedisAuthSecret.
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch", "create"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
