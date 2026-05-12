@@ -1,0 +1,57 @@
+# --- Python ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+.tox/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+*.egg-info/
+*.egg
+
+# --- Build artefacts ------------------------------------------------------
+build/
+dist/
+sdist/
+wheels/
+*.whl
+*.tar.gz
+pip-wheel-metadata/
+
+# --- Virtual envs ---------------------------------------------------------
+venv/
+.venv/
+env/
+ENV/
+
+# --- Editor / OS ----------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- Project-specific -----------------------------------------------------
+# Benchmark output (regenerated each run); keep logs/ for the audit trail
+demo/benchmark_v5_results.json
+logs/*.log
+
+# Paper LaTeX intermediate files (the .pdf is committed)
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.bbl
+paper/*.blg
+paper/*.toc
+
+# tectonic cache
+.tectonic-cache/
+
+# uv lock not in use; pin requirements via pyproject.toml only

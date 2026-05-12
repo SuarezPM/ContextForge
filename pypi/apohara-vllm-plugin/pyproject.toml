@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "apohara-vllm-plugin"
+version = "0.1.0"
+description = "Apohara ContextForge plugin for vLLM V1 — multi-agent KV-cache coordination, JCR Safety Gate (INV-15), RotateKV INT4 hooks, on AMD Instinct MI300X."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [
+  { name = "Pablo M. Suarez", email = "suarezpm@csnat.unt.edu.ar" },
+]
+maintainers = [
+  { name = "Pablo M. Suarez", email = "suarezpm@csnat.unt.edu.ar" },
+]
+keywords = [
+  "vllm", "kv-cache", "multi-agent", "llm", "amd", "rocm", "mi300x",
+  "kv-coordination", "speculative-decoding", "judge-consistency",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: System :: Distributed Computing",
+]
+
+# Hard deps: numpy + the core ContextForge package this thin wrapper
+# delegates to. vLLM itself is intentionally NOT a runtime dep — the
+# plugin must remain importable without vLLM so it can be unit-tested
+# and so vLLM can discover and load it before its own runtime is fully
+# bootstrapped.
+dependencies = [
+  "numpy>=1.26",
+  "apohara-context-forge>=6.1.0",
+]
+
+[project.optional-dependencies]
+# Bring in vLLM only when the user wants the actual platform hooks.
+# The plugin still works without this group (constructed at startup,
+# but the kernel-level interception is skipped — see register()).
+vllm = ["vllm>=0.9.0"]
+test = ["pytest>=8.3", "pytest-asyncio>=0.24", "numpy>=1.26"]
+
+[project.urls]
+Homepage      = "https://github.com/SuarezPM/Apohara_Context_Forge"
+Repository    = "https://github.com/SuarezPM/Apohara_Context_Forge"
+Documentation = "https://github.com/SuarezPM/Apohara_Context_Forge#readme"
+Changelog     = "https://github.com/SuarezPM/Apohara_Context_Forge/blob/main/CHANGELOG.md"
+Audit         = "https://github.com/SuarezPM/Apohara_Context_Forge/blob/main/AUDIT.md"
+Paper         = "https://doi.org/10.5281/zenodo.20114594"
+Issues        = "https://github.com/SuarezPM/Apohara_Context_Forge/issues"
+
+# ----------------------------------------------------------------------------
+# THIS is the line that makes vLLM discover and load the plugin at
+# worker startup. vLLM V1 walks the `vllm.general_plugins` entry-point
+# group and invokes each callable once per worker. Our callable is
+# `apohara_vllm_plugin:register`, which returns an initialised
+# vLLMAtomPlugin and (when running inside vLLM) registers its pre/post
+# attention hooks against `vllm.platforms.current_platform`.
+# ----------------------------------------------------------------------------
+[project.entry-points."vllm.general_plugins"]
+apohara_contextforge = "apohara_vllm_plugin:register"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+apohara_vllm_plugin = ["py.typed"]

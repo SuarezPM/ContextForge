@@ -9,7 +9,7 @@ apohara = "apohara_context_forge.main:main"
 name = "apohara-context-forge"
 version = "6.1.0"
 description = "APOHARA: Context Forge — Silicon-native KV cache coordination for multi-agent LLM pipelines on AMD Instinct MI300X"
-requires-python = ">=3.11,<3.13"
+requires-python = ">=3.11,<3.15"
 license = {text = "MIT"}
 dependencies = [
   "fastapi>=0.115,<0.116",
