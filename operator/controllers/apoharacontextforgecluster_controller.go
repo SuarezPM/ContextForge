@@ -48,11 +48,19 @@ type ApohraContextForgeClusterReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=contextforge.apohara.dev,resources=apoharacontextforgeclusters,verbs=get;list;watch;create;update;patch;delete
+// Kubebuilder RBAC markers aligned with the hand-written namespaced Role
+// at operator/config/rbac/role.yaml. The Role is the source of truth; these
+// markers exist so a future `make manifests` regeneration produces the
+// same namespaced verbs (NOT a ClusterRole) and the same minimal verb set.
+// The controller never creates/deletes its own CRs, never patches Secrets
+// after first Create, and only reads pods.
+// +kubebuilder:rbac:groups=contextforge.apohara.dev,resources=apoharacontextforgeclusters,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=contextforge.apohara.dev,resources=apoharacontextforgeclusters/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=contextforge.apohara.dev,resources=apoharacontextforgeclusters/finalizers,verbs=update
+// +kubebuilder:rbac:groups=contextforge.apohara.dev,resources=apoharacontextforgeclusters/finalizers,verbs=update;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=services;configmaps;pods,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=services;configmaps,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create
 
 // Reconcile is the main controller loop for ApohraContextForgeCluster.

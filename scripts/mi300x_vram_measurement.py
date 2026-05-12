@@ -80,11 +80,16 @@ def measure(use_fwht: bool) -> dict:
     duration_ms = (time.perf_counter() - t0) * 1000.0
 
     # Packed-storage footprint = the bytes you'd write to Redis / LMCache.
+    # Sink-token fp16 carve-outs DO go on the wire, so include them honestly.
     packed_bytes = int(
         packed.keys_int4.nbytes
         + packed.values_int4.nbytes
-        + packed.scales.nbytes
-        + packed.zero_points.nbytes
+        + packed.scales_k.nbytes
+        + packed.zero_points_k.nbytes
+        + packed.scales_v.nbytes
+        + packed.zero_points_v.nbytes
+        + packed.keys_sink_fp16.nbytes
+        + packed.values_sink_fp16.nbytes
     )
 
     peak_alloc_bytes = (
