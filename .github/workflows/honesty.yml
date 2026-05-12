@@ -1,0 +1,21 @@
+# Honesty guard — fails the build if a hardcoded perf number, a
+# fabricated q_i path, or the Chinese-character rocm-smi flag ever
+# regresses into the codebase. Backstop for AUDIT.md.
+name: honesty
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run honesty guard
+        run: bash scripts/check_honesty.sh
