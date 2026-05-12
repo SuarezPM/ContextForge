@@ -151,25 +151,24 @@ reader knows where the codebase carries its own weight.
   one: "cache lookup latency vs. encoder-call latency = O(µs) vs O(ms)
   on the same hardware". Drop the "5×" claim unless we measure it.
 
-### 6. 🟠→🟡 RotateKV: FWHT rotation now exists as a standalone module (not yet integrated)
+### 6. 🟠→🟡→🟢 RotateKV: FWHT rotation fully wired in V7.0.0-alpha.2
 
 - **Claim** *(README, paper §2 mechanism #5)*: "Pre-RoPE INT4 grouped-head
   rotation, 3.97× VRAM reduction".
 - **Original V6.0 reality** *(`apohara_context_forge/quantization/rotate_kv.py:215-247`)*:
-  The `use_fwht` flag is read in `__init__` but the Fast Walsh-Hadamard
-  Transform step **never executes** — only channel reordering and
-  asymmetric block-wise quantization are present.
-- **V7.0.0-alpha.1 update** *(`apohara_context_forge/quantization/fwht.py`, 112 LOC)*:
-  Real orthonormal FWHT now exists as a standalone module — in-place
-  butterfly recursion in O(d log d), 8/8 tests passing (round-trip
-  identity, Hadamard orthogonality, batched inputs, dtype preservation,
-  zero-padding for non-power-of-two dims). The module itself is **🟢
-  PRODUCTION**. The remaining 🟡 status is because
-  `RotateKVQuantizer.quantize_pre_rope()` still does NOT call this
-  module — that integration is Sprint 2 (V7.0.0-alpha.2). After
-  Sprint 2 lands the wire-up, this item will be 🟢.
-- **Severity:** Low (now). The pre-rotation quantization itself is
-  unchanged; this delta is purely about closing the substrate honestly.
+  `use_fwht` flag read but never applied — only channel reordering + INT4 quant.
+- **V7.0.0-alpha.1 (Sprint 1):** Real orthonormal FWHT shipped as standalone
+  module at `apohara_context_forge/quantization/fwht.py` (112 LOC, 8/8 tests).
+  Module itself **🟢**, but `quantize_pre_rope()` still didn't call it → 🟡.
+- **V7.0.0-alpha.2 (Sprint 2):** Wire-up landed at
+  `apohara_context_forge/quantization/rotate_kv.py:24` (import) +
+  lines 162-166 (conditional `fwht(key_states)` + `fwht(value_states)` when
+  `cfg.use_fwht=True`, applied after channel reordering and before sink
+  separation). INV-10 (pre_rope=True) preserved — verified by
+  `tests/test_rotate_kv_fwht_integration.py::test_fwht_preserves_inv10`.
+  All 18 tests across the FWHT + RotateKV stack pass (8 FWHT + 5 integration
+  + 5 RotateKV).
+- **Status:** **🟢 PRODUCTION** — FWHT really executes when configured.
 
 ### 7. 🟠 S-15 JCR gate: cherry-picked sweep cases
 
@@ -188,24 +187,80 @@ reader knows where the codebase carries its own weight.
   the *closed-form check* that the gate matches the spec on all points.
   Frame as "exhaustive contract check" rather than "empirical violation rate".
 
-### 8. 🟠 `tests/test_pipeline.py` — pre-existing failures on branch HEAD
+### 8. 🟠→🟢 `tests/test_pipeline.py` — pre-existing regression FIXED in V7.0.0-alpha.2
 
-- **Discovered:** 2026-05-12 during V7.0.0-alpha.1 Sprint 1 verification
-- **Symptom:** `TestDemoAgents::test_pipeline_run` and
-  `TestPipeline::test_pipeline_metrics_tracking` both fail with
-  `assert pipeline.metrics["total_tokens_before"] > 0` returning 0.
-- **Provenance check:** Sprint 1 introduced exactly ONE prod-code
-  change (a 15-line late-import wire-up in `safety/jcr_gate.py:159`).
-  Verified by `git stash`-ing that file and re-running the test —
-  failure persists with our change reverted. Therefore the regression
-  is **pre-existing on branch HEAD**, not introduced by Sprint 1.
-- **Severity:** Medium. The pipeline metrics tracking is what the
-  Gradio demo uses to display "tokens saved" — if it reads 0, the demo
-  shows 0 savings even when the registry is working.
-- **Tracked for:** Sprint 2 (V7.0.0-alpha.2). Likely cause: the demo's
-  `Pipeline` class stopped wiring `TokenCounter` into the per-agent
-  metrics tally somewhere between V6.1 and V6.x #3. Will reproduce on
-  V6.1.0 tag to isolate the regressing commit.
+- **Discovered:** 2026-05-12 (V7.0.0-alpha.1 verification)
+- **Root cause:** Commit `466cc3d` ("fix: test_mcp_server 12 failures
+  resolved") introduced `_passthrough_decision` in
+  `apohara_context_forge/mcp/server.py` which hardcodes `original_tokens=0`
+  in the 503-fallback response when the coordinator is unavailable.
+  `test_mcp_server.py:307` LOCKS IN this server contract — so the server
+  cannot be changed. The fix belongs in the CLIENT.
+- **V7.0.0-alpha.2 fix:** `agents/base_agent.py:46-50` — when
+  `call_contextforge_optimize` receives `original_tokens=0` on a
+  non-empty context (the coordinator_unavailable passthrough),
+  fall back to local `len(context.split())` count. Server contract
+  preserved (12 mcp tests still pass); client metrics restored.
+- **Verification:** `tests/test_pipeline.py` 6/6 PASS (was 4/6).
+  Full regression: 359 passed / 25 skipped / 0 failed.
+- **Status:** **🟢 RESOLVED.**
+
+### 9. 🟠 V6.1 INT4 packing/unpacking asymmetry (discovered Sprint 2)
+
+- **Discovered:** Sprint 2 by worker-fwht-wire (Track 2) during
+  round-trip validation of FWHT integration
+- **Symptom:** Round-trip `quantize_pre_rope → dequantize_pre_rope` of a
+  random KV tensor shows ~6.3 max absolute error — far above the
+  theoretical INT4 step bound. Reproduced with `use_fwht=False` too,
+  proving the bug is **pre-existing in V6.1**, not introduced by FWHT.
+- **Reality** *(`apohara_context_forge/quantization/rotate_kv.py:222-229` and `:287-294`)*:
+  `_quantize_block` packs two nibbles into `keys_int4[blk, i, h, d] |= (val << 4)`
+  using the SAME `i` index (write side). `_dequantize_block` unpacks both
+  `val1` and `val2` from a SINGLE byte at `packed_int4[blk, i, h, d]`
+  (read side). The two routines are **asymmetric** — write puts each
+  nibble in a different byte position; read expects them in the same
+  byte. Hence the codec round-trip is broken.
+- **Severity:** Medium. The 3.97× VRAM reduction claim is unaffected
+  (compression IS happening), but the *fidelity* of dequantization
+  is much worse than INT4 theory says it should be. The integration
+  test `tests/test_rotate_kv_fwht_integration.py::test_fwht_roundtrip_through_pipeline`
+  uses a 3× slack tolerance against this baseline.
+- **Tracked for:** Sprint 3 (V7.0.0-alpha.3).
+
+### 10. 🟠 K8s operator security hardening (Sprint 3 scope)
+
+- **Surfaced by:** Sprint 2 Phase 4 security-reviewer
+- **Concerns** (operator/controllers/apoharacontextforgecluster_controller.go):
+  - **No SecurityContext** on worker or Redis pods (`runAsNonRoot`,
+    `readOnlyRootFilesystem`, drop ALL capabilities are all unset).
+    Pods would run as root with all Linux capabilities → node-level
+    compromise potential under RCE.
+  - **No dedicated ServiceAccount + RBAC manifests** (deferred per
+    `operator/config/manager/kustomization.yaml:6` comment).
+  - **Redis sidecar runs unauthenticated** (no `--requirepass`); any
+    namespace pod can read/write the shared KV cache.
+  - **No NetworkPolicy** isolating worker pods or Redis.
+  - **Default image is `:latest`** (mutable tag — supply-chain risk).
+- **Mitigation in V7.0.0-alpha.2:** `operator/README.md` carries a
+  prominent ⚠️ NOT PRODUCTION READY warning listing these 5 items as
+  Sprint 3 prerequisites. The operator binary is **not** built or
+  deployed in Sprint 2 — only the reconcile logic + unit tests +
+  integration-test skeleton are shipped. None of these issues are
+  exploitable in the current Sprint 2 state because the operator is
+  not running anywhere.
+- **Tracked for:** Sprint 3 (V7.0.0-alpha.3) — Sprint 3 cannot ship
+  the operator without addressing all 5 items.
+
+### V7.0.0-alpha.2 — Sprint 2 deltas (2026-05-12)
+
+| Change | State delta |
+|--------|-------------|
+| `apohara_context_forge/quantization/rotate_kv.py` — FWHT wired into `quantize_pre_rope()` | #6 🟡 → 🟢 |
+| `agents/base_agent.py` — token-count client fallback for `original_tokens=0` server passthrough | #8 🟠 → 🟢 |
+| `apohara_context_forge/observability/otlp_exporter.py` + recorders OTLP fan-out + `dashboards/inv15.json` | 🟢 (new) — Track 3 |
+| `operator/controllers/apoharacontextforgecluster_controller.go` 40→453 LOC real reconciler + 4 tests | 🟡 (real logic, not deployed) — Track 4 |
+| (security-reviewer Phase 4) | NEW: #9 INT4 packing bug (pre-existing) + #10 K8s operator hardening (Sprint 3) |
+| Inline security fixes Phase 4.5 (`raise_for_status()` in base_agent.py, OTLP `insecure=False` default, path canonicalization for `APOHARA_OBSERVABILITY_DIR`) | Security baseline hardened |
 
 ### V7.0.0-alpha.1 — Sprint 1 deltas added (2026-05-12)
 

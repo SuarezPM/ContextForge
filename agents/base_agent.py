@@ -31,6 +31,7 @@ class BaseAgent(ABC):
                 f"http://localhost:{settings.contextforge_port}/tools/register_context",
                 json={"agent_id": self.agent_id, "context": context},
             )
+            response.raise_for_status()
             return response.json()
 
     async def call_contextforge_optimize(self, context: str) -> dict[str, Any]:
@@ -40,7 +41,14 @@ class BaseAgent(ABC):
                 f"http://localhost:{settings.contextforge_port}/tools/get_optimized_context",
                 json={"agent_id": self.agent_id, "context": context},
             )
-            return response.json()
+            response.raise_for_status()
+            data = response.json()
+            # When the server reports original_tokens=0 on a non-empty context
+            # (e.g. coordinator_unavailable passthrough), fall back to local count
+            # so downstream metrics stay accurate.
+            if not data.get("original_tokens") and context:
+                data["original_tokens"] = len(context.split())
+            return data
 
     async def call_vllm(
         self,

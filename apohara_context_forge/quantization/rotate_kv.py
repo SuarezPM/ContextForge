@@ -21,6 +21,8 @@ from typing import Optional, Tuple, Union
 
 import numpy as np
 
+from apohara_context_forge.quantization.fwht import fwht
+
 
 @dataclass
 class RotateKVConfig:
@@ -156,6 +158,12 @@ class RotateKVQuantizer:
         if self._channel_order is not None:
             key_states = key_states[:, :, :, self._channel_order]
             # Value states don't need reordering (handled separately)
+
+        # Apply FWHT rotation along head_dim before block-wise quantization
+        # (INV-10 preserved: RoPE has not been applied yet).
+        if cfg.use_fwht:
+            key_states = fwht(key_states)
+            value_states = fwht(value_states)
 
         # Sink token separation
         # positions shape: (batch, seq_len) — identify sink positions

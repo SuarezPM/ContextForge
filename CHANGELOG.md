@@ -1,5 +1,126 @@
 # Changelog
 
+## V7.0.0-alpha.2 — Sprint 2: Closes AUDIT #6 + #8, real K8s reconciler · 2026-05-12
+
+Second sprint on the V7 roadmap. Closes two AUDIT items (🟡→🟢 for #6 RotateKV
+FWHT wire-up; 🟠→🟢 for #8 pipeline regression), ships a real K8s reconciler,
+extends observability with Grafana dashboard + OTLP. All 4 tracks ran via
+`/autopilot` with parallel workers and 3 reviewer validators.
+
+### Fixed
+
+- **`agents/base_agent.py`** (Track 1, resolves AUDIT #8) — client-side
+  fallback when `call_contextforge_optimize` receives `original_tokens=0`
+  on a non-empty context (the coordinator_unavailable passthrough from
+  `mcp/server.py`). Uses `len(context.split())` as a local approximation.
+  Pipeline metrics tests 6/6 PASS (was 4/6). Root cause traced to commit
+  `466cc3d` which locked the server-side 0-value into a test contract;
+  the fix belongs in the client.
+- **`agents/base_agent.py`** (Phase 4.5 security fix) — added
+  `response.raise_for_status()` to both `call_contextforge_register` and
+  `call_contextforge_optimize`, matching the existing `call_vllm` pattern.
+  Prevents leaking raw server bodies through `JSONDecodeError` tracebacks
+  on 4xx/5xx responses.
+
+### Added
+
+- **`apohara_context_forge/quantization/rotate_kv.py`** (Track 2,
+  closes AUDIT #6) — wire-up of `fwht.fwht()` into `quantize_pre_rope()`
+  conditional on `cfg.use_fwht=True`. Applied after channel reordering
+  and before sink-token separation + INT4 quantization. INV-10
+  (pre_rope=True) preserved. 8 lines added at lines 162-166 + import
+  at line 24.
+- **`tests/test_rotate_kv_fwht_integration.py`** (5 new tests) — 5/5
+  PASS. Covers FWHT-on vs FWHT-off divergence, INV-10 preservation,
+  pipeline round-trip, batched-shape stack.
+- **`dashboards/inv15.json`** (Track 3) — full Grafana 11.x dashboard
+  with 5 panels (gate decisions over time, current risk score, anchor
+  hit rate, LMCache hits, decisions by agent). Templated Prometheus
+  data source, schemaVersion 39.
+- **`apohara_context_forge/observability/otlp_exporter.py`** (Track 3) —
+  `OTLPExporter` with OpenTelemetry gRPC export. Honest-fallback when
+  `opentelemetry-exporter-otlp-proto-grpc` is not installed.
+  **Phase 4.5 security fix:** default `insecure=False` (TLS by default;
+  plaintext requires explicit opt-in for localhost endpoints, warning
+  if remote).
+- **`apohara_context_forge/observability/recorders.py`** (+28 lines) —
+  OTLP singleton via `APOHARA_OTLP_ENDPOINT` env var. **Phase 4.5
+  security fix:** `APOHARA_OBSERVABILITY_DIR` is now canonicalized via
+  `pathlib.Path(...).expanduser().resolve()` before use, defanging
+  `../` traversal.
+- **`tests/test_otlp_exporter.py`** (4 tests, 3 PASS + 1 SKIP) — covers
+  honest-fallback, idempotent shutdown, fan-out via the singleton.
+- **`operator/controllers/apoharacontextforgecluster_controller.go`**
+  (Track 4) — went from 40-LOC log-only stub to 453-LOC real reconciler.
+  Provisions worker `appsv1.Deployment` matching `Spec.WorkerCount`,
+  optional Redis sidecar when `Spec.LMCacheRedisUrl` is empty, owner
+  references for GC, status updates with `phase` state machine
+  (Pending → Degraded → Ready). Removes unused `phaseProvisioning`
+  constant (Phase 4.5 nitpick fix).
+- **`operator/controllers/apoharacontextforgecluster_controller_test.go`**
+  (273 LOC, 4 tests) — fake-client unit tests for the 4 critical paths.
+  `go test ./controllers/...` PASS 4/4 in ~15ms.
+- **`operator/integration_test.sh`** (~155 LOC) — bash script that
+  uses `kind` to spin a test cluster and apply the CRD + sample CR.
+  Honest SKIP path when `kind` not installed.
+- **`operator/api/v1alpha1/zz_generated_deepcopy.go`** (~116 LOC,
+  hand-authored) — DeepCopyObject/DeepCopyInto for both types (would
+  normally come from `controller-gen`).
+- **`operator/api/v1alpha1/groupversion_info.go`** (rewritten) — fixed
+  Sprint 1 bug where `SchemeBuilder` was zero-valued; now uses
+  `runtime.NewSchemeBuilder` with `addKnownTypes`. Required for
+  `go vet` cleanness.
+- **`operator/go.mod`** — added `k8s.io/api`, `k8s.io/apimachinery`,
+  `sigs.k8s.io/controller-runtime` v0.17.0 deps.
+- **`.omc/plans/autopilot-impl-sprint2.md`** — Sprint 2 implementation
+  plan (auto-approved by `/autopilot`).
+
+### Updated
+
+- **`operator/README.md`** — prominent ⚠️ NOT PRODUCTION READY warning
+  listing the 5 Sprint 3 prerequisites: SecurityContext, ServiceAccount
+  + RBAC, Redis authentication, NetworkPolicy, image digest pinning.
+  Operator binary is NOT built or deployed in Sprint 2 — only reconcile
+  logic + unit tests + integration-test skeleton.
+
+### Tests
+
+- **`tests/test_pipeline.py`** — 6/6 PASS (was 4/6 in Sprint 1).
+- **`tests/test_rotate_kv_fwht_integration.py`** — 5/5 PASS (new).
+- **`tests/test_otlp_exporter.py`** — 3 PASS + 1 SKIP (new).
+- **`tests/test_observability.py`** — 6/6 PASS (regression — recorders.py changed).
+- **Full regression** — **359 passed, 25 skipped, 0 failed** in 200s.
+- **`go test ./operator/controllers/...`** — 4/4 PASS.
+- **`go vet ./operator/...`** — clean.
+- **`scripts/check_honesty.sh`** — PASS, no regressions.
+
+### Phase 4 validation (autopilot Phase 4)
+
+- **Architect (opus):** APPROVE all 4 tracks. Flagged pre-existing V6.1
+  INT4 packing/unpacking asymmetry (AUDIT.md #9).
+- **Security-reviewer (sonnet):** REQUEST CHANGES — 7 issues. Easy fixes
+  applied in Phase 4.5 (raise_for_status, OTLP TLS default, path
+  canonicalization). Operator-deployment-scope issues (SecurityContext,
+  RBAC, Redis auth, NetworkPolicy, image pinning) deferred to Sprint 3
+  and documented as hard prerequisites in `operator/README.md` + AUDIT.md
+  #10.
+- **Code-reviewer (opus):** APPROVE with low nitpicks. Unused
+  `phaseProvisioning` constant removed in Phase 4.5.
+
+### AUDIT.md deltas
+
+- #6 RotateKV FWHT: 🟡 → 🟢 (fully wired)
+- #8 pipeline regression: 🟠 → 🟢 (resolved)
+- #9 NEW: V6.1 INT4 packing asymmetry (pre-existing, tracked for Sprint 3)
+- #10 NEW: K8s operator security hardening (Sprint 3 scope, blocks deployment)
+
+### Citation
+
+V7.0.0-alpha.2 is a pre-release. Paper v2.0 + arXiv submission gate the
+V7.0.0 final release.
+
+---
+
 ## V7.0.0-alpha.1 — Sprint 1: Quad-track kickoff · 2026-05-12
 
 First commit on the V7 roadmap (`.omc/plans/v7-roadmap.md`). V7 thesis:
