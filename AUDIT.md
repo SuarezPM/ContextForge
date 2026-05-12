@@ -151,22 +151,25 @@ reader knows where the codebase carries its own weight.
   one: "cache lookup latency vs. encoder-call latency = O(µs) vs O(ms)
   on the same hardware". Drop the "5×" claim unless we measure it.
 
-### 6. 🟠 RotateKV: FWHT rotation never executes; pure-Python loop
+### 6. 🟠→🟡 RotateKV: FWHT rotation now exists as a standalone module (not yet integrated)
 
 - **Claim** *(README, paper §2 mechanism #5)*: "Pre-RoPE INT4 grouped-head
   rotation, 3.97× VRAM reduction".
-- **Reality** *(`apohara_context_forge/quantization/rotate_kv.py:215-247`)*:
+- **Original V6.0 reality** *(`apohara_context_forge/quantization/rotate_kv.py:215-247`)*:
   The `use_fwht` flag is read in `__init__` but the Fast Walsh-Hadamard
   Transform step **never executes** — only channel reordering and
-  asymmetric block-wise quantization are present. The quantization loop
-  is a pure-Python quadruple-nested `for` (batch × heads × dim × blocks)
-  — orders of magnitude slower than torch / triton.
-- **Severity:** Medium. The 3.97× number is the paper's published claim,
-  cited verbatim without measurement on Apohara's code. Honest if framed
-  as "literature target", dishonest if framed as "achieved by Apohara".
-- **V6.1 fix:** Either implement the FWHT step and benchmark it on real
-  KV tensors, or relabel the entry in the README mechanism table as
-  "follows RotateKV (IJCAI 2025); FWHT step pending in V6.x".
+  asymmetric block-wise quantization are present.
+- **V7.0.0-alpha.1 update** *(`apohara_context_forge/quantization/fwht.py`, 112 LOC)*:
+  Real orthonormal FWHT now exists as a standalone module — in-place
+  butterfly recursion in O(d log d), 8/8 tests passing (round-trip
+  identity, Hadamard orthogonality, batched inputs, dtype preservation,
+  zero-padding for non-power-of-two dims). The module itself is **🟢
+  PRODUCTION**. The remaining 🟡 status is because
+  `RotateKVQuantizer.quantize_pre_rope()` still does NOT call this
+  module — that integration is Sprint 2 (V7.0.0-alpha.2). After
+  Sprint 2 lands the wire-up, this item will be 🟢.
+- **Severity:** Low (now). The pre-rotation quantization itself is
+  unchanged; this delta is purely about closing the substrate honestly.
 
 ### 7. 🟠 S-15 JCR gate: cherry-picked sweep cases
 
@@ -184,6 +187,38 @@ reader knows where the codebase carries its own weight.
   × (reuse ∈ [0.1..1.0]) × (shuffle ∈ {0,1})`. Report both fire-rate and
   the *closed-form check* that the gate matches the spec on all points.
   Frame as "exhaustive contract check" rather than "empirical violation rate".
+
+### 8. 🟠 `tests/test_pipeline.py` — pre-existing failures on branch HEAD
+
+- **Discovered:** 2026-05-12 during V7.0.0-alpha.1 Sprint 1 verification
+- **Symptom:** `TestDemoAgents::test_pipeline_run` and
+  `TestPipeline::test_pipeline_metrics_tracking` both fail with
+  `assert pipeline.metrics["total_tokens_before"] > 0` returning 0.
+- **Provenance check:** Sprint 1 introduced exactly ONE prod-code
+  change (a 15-line late-import wire-up in `safety/jcr_gate.py:159`).
+  Verified by `git stash`-ing that file and re-running the test —
+  failure persists with our change reverted. Therefore the regression
+  is **pre-existing on branch HEAD**, not introduced by Sprint 1.
+- **Severity:** Medium. The pipeline metrics tracking is what the
+  Gradio demo uses to display "tokens saved" — if it reads 0, the demo
+  shows 0 savings even when the registry is working.
+- **Tracked for:** Sprint 2 (V7.0.0-alpha.2). Likely cause: the demo's
+  `Pipeline` class stopped wiring `TokenCounter` into the per-agent
+  metrics tally somewhere between V6.1 and V6.x #3. Will reproduce on
+  V6.1.0 tag to isolate the regressing commit.
+
+### V7.0.0-alpha.1 — Sprint 1 deltas added (2026-05-12)
+
+Three new modules entered the audit, all marked at their honest status:
+
+| Module | State | Why |
+|--------|-------|-----|
+| `apohara_context_forge/quantization/fwht.py` | 🟢 PRODUCTION | Real butterfly recursion, 8/8 tests, orthonormal, fp16 upcast. Standalone — not yet called by `RotateKVQuantizer` (closing #6 from 🟠 to 🟡 above). |
+| `apohara_context_forge/observability/{prometheus_exporter,audit_log,recorders}.py` | 🟢 PRODUCTION | Real `prometheus_client` Counter/Gauge + real JSONL audit log. Honest-fallback when `prometheus_client` not installed. Smoke wire-up at `safety/jcr_gate.py:159` (late import, best-effort). 6/6 tests. |
+| `operator/` + `charts/apohara-contextforge/` | 🟡 HONEST STUB | CRD + helm chart YAML validate (`bash operator/validate.sh` exits 0). Reconciler logs "reconciled" only — real reconciliation is Sprint 2. README declares this status. |
+
+The community-policy track (CONTRIBUTING + DCO + CoC + PR template) is
+governance, not a code module, so it does not enter the state table.
 
 ---
 

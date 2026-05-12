@@ -1,0 +1,152 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: apoharacontextforgeclusters.contextforge.apohara.dev
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+spec:
+  group: contextforge.apohara.dev
+  names:
+    kind: ApohraContextForgeCluster
+    listKind: ApohraContextForgeClusterList
+    plural: apoharacontextforgeclusters
+    singular: apoharacontextforgecluster
+    shortNames:
+    - acfc
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    subresources:
+      status: {}
+    additionalPrinterColumns:
+    - name: Workers
+      type: integer
+      jsonPath: .spec.workerCount
+    - name: Ready
+      type: integer
+      jsonPath: .status.readyWorkers
+    - name: Phase
+      type: string
+      jsonPath: .status.phase
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+    schema:
+      openAPIV3Schema:
+        description: ApohraContextForgeCluster represents a desired N-worker ContextForge
+          cluster with a shared LMCache Redis backend.
+        type: object
+        required:
+        - spec
+        properties:
+          apiVersion:
+            description: APIVersion defines the versioned schema of this representation
+              of an object.
+            type: string
+          kind:
+            description: Kind is a string value representing the REST resource this
+              object represents.
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ApohraContextForgeClusterSpec defines the desired state.
+            type: object
+            required:
+            - workerCount
+            - model
+            properties:
+              workerCount:
+                description: WorkerCount is the number of vLLM+plugin worker pods to provision.
+                type: integer
+                format: int32
+                minimum: 1
+                maximum: 32
+              model:
+                description: Model is the HuggingFace model identifier to load on each worker.
+                  Example "meta-llama/Llama-3-8b".
+                type: string
+                minLength: 1
+              lmcacheRedisUrl:
+                description: LMCacheRedisUrl is the Redis URL for the shared LMCache backend.
+                  If omitted, the operator provisions a Redis sidecar automatically.
+                type: string
+              gpuType:
+                description: GpuType selects the GPU hardware profile for scheduling.
+                type: string
+                default: mi300x
+                enum:
+                - mi300x
+                - h100
+                - a100
+              image:
+                description: Image is the container image for the apohara-vllm-plugin workers.
+                type: string
+                default: ghcr.io/suarezpm/apohara-contextforge:latest
+          status:
+            description: ApohraContextForgeClusterStatus defines the observed state.
+            type: object
+            properties:
+              readyWorkers:
+                description: ReadyWorkers is the count of worker pods currently in Ready state.
+                type: integer
+                format: int32
+              phase:
+                description: Phase summarises the overall cluster lifecycle state.
+                type: string
+                enum:
+                - Pending
+                - Provisioning
+                - Ready
+                - Degraded
+                - Failed
+              conditions:
+                description: Conditions holds standard Kubernetes condition objects.
+                type: array
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  type: object
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  properties:
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      type: string
+                      format: date-time
+                    message:
+                      description: Message is a human readable message indicating
+                        details about the transition.
+                      type: string
+                      maxLength: 32768
+                    observedGeneration:
+                      description: ObservedGeneration represents the .metadata.generation
+                        that the condition was set based upon.
+                      type: integer
+                      format: int64
+                      minimum: 0
+                    reason:
+                      description: Reason contains a programmatic identifier indicating
+                        the reason for the condition's last transition.
+                      type: string
+                      maxLength: 1024
+                      minLength: 1
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                    type:
+                      description: Type of condition in CamelCase.
+                      type: string
+                      maxLength: 316

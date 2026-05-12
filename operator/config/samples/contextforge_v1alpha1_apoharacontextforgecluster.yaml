@@ -1,0 +1,14 @@
+apiVersion: contextforge.apohara.dev/v1alpha1
+kind: ApohraContextForgeCluster
+metadata:
+  name: my-contextforge-cluster
+  namespace: default
+  labels:
+    app.kubernetes.io/name: apohara-contextforge
+    app.kubernetes.io/version: v7.0.0
+spec:
+  workerCount: 4
+  model: meta-llama/Llama-3-8b
+  # lmcacheRedisUrl: redis://my-redis:6379  # omit to let operator provision Redis sidecar
+  gpuType: mi300x
+  image: ghcr.io/suarezpm/apohara-contextforge:latest

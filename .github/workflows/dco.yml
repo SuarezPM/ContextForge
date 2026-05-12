@@ -1,0 +1,44 @@
+name: DCO
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  check-dco:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check all commits have Signed-off-by
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE_SHA="HEAD~1"
+            HEAD_SHA="HEAD"
+          fi
+
+          MISSING=0
+          for sha in $(git rev-list "$BASE_SHA".."$HEAD_SHA"); do
+            if ! git log -1 --format=%B "$sha" | grep -q "^Signed-off-by:"; then
+              echo "Commit $sha is missing the Signed-off-by trailer"
+              MISSING=1
+            fi
+          done
+
+          if [ "$MISSING" -eq 1 ]; then
+            echo ""
+            echo "DCO check failed. Sign off your commits with:"
+            echo "  git commit -s -m \"...\""
+            echo "  # or amend the last commit:"
+            echo "  git commit -s --amend --no-edit"
+            exit 1
+          fi
+
+          echo "DCO check passed."
