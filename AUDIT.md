@@ -293,6 +293,23 @@ reader knows where the codebase carries its own weight.
   - `govulncheck ./operator/...` not yet run in CI. `golang.org/x/net@v0.19.0` may have newer patches; recommend `go get golang.org/x/net@latest && go mod tidy` before V7.0.0 final.
 - **Status:** **🟢 RESOLVED** (5/5 items closed; image pinning at versioned-tag is alpha-acceptable per security-reviewer; production hardening tracked above as known follow-ups for V7.0.0).
 
+### V7.0.0-alpha.4 — Sprint 3 Wave B deltas (2026-05-12, real MI300X)
+
+| Claim | Source | Status post-Wave B |
+|-------|--------|--------------------|
+| **RotateKV pre-RoPE INT4 → 3.97× VRAM reduction** (paper §2 mech #5) | Literature target (RotateKV, IJCAI 2025) | **🟡 NOT measured by Apohara on MI300X.** Real measurement on AMD Instinct MI300X VF (192 GB, gfx942, ROCm 7.2.0, torch 2.5.1+rocm6.2) across 8 shape configs (4K-32K seq × 16-64 heads × 64-256 head_dim): `reduction_factor = 3.55×` essentially constant. Paper v2.0 MUST report 3.55× measured, not 3.97× literature target. |
+| **FWHT integration runs on real MI300X** | V7.0.0-alpha.2 + V7.0.0-alpha.3 wire-up | **🟢** — 9/9 tests pass on MI300X in 1.33 s. Log `logs/mi300x_fwht_*.json`. |
+| **`reduction_factor` scales with sequence length** | Paper assumption | **🟢 CONFIRMED** — constant 3.55× from seq=4K to seq=32K. Per-block scale/zero_point + sink-fp16 overhead amortizes well. |
+| **`reduction_factor` scales with head_dim and num_heads** | Paper assumption | **🟢 CONFIRMED** — same 3.55× across head_dim=64/128/256 and num_heads=16/32/64. |
+| **V6.2 adversarial bench needs MI300X** | Sprint 3 Wave B plan | **🟢→ honest skip.** `demo/benchmark_v62_adversarial.py` is pure NumPy simulation (no torch, no GPU). MI300X execution would have produced identical numbers to laptop. Saved $6 of $30 budget for future sprints. |
+
+The 0.42× gap between literature target (3.97×) and Apohara's measured
+3.55× is the cost of single (scale, zero_point) per packed byte (V7.0.0-alpha.3
+AUDIT #9 fix) instead of per-nibble independent scales. The choice was forced
+by the read-side byte layout (see #9). Reclaiming the 0.42× would require a
+codec rewrite (per-nibble scales, ~2× metadata overhead) — paper v2.0 reports
+the trade-off honestly rather than chasing the literature number.
+
 ### V7.0.0-alpha.3 — Sprint 3 Wave A deltas (2026-05-12)
 
 | Track | Change | State |

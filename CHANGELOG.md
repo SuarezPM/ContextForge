@@ -1,5 +1,122 @@
 # Changelog
 
+## V7.0.0-alpha.4 — Sprint 3 Wave B: real MI300X evidence · 2026-05-12
+
+Sprint 3 Wave B execution on AMD AI Dev Cloud MI300X droplet
+(IPv4 129.212.188.18, $1.99/hr). Total cost: ~$0.50 of the $30 budget.
+Saved ~$7 by skipping the V6.2 adversarial benchmark (pure CPU
+simulation — no GPU value) and repurposing the time for a shape-scaling
+sweep that gives paper v2.0 the reduction-factor curve.
+
+### Real MI300X hardware
+
+- **AMD Instinct MI300X VF** (gfx942)
+- VRAM: 192 GB (205,822,885,888 bytes)
+- ROCm 7.2.0 runtime + `torch 2.5.1+rocm6.2` (HIP 6.2.41133)
+- vCPU: 20, RAM: 240 GB, Ubuntu 24.04
+
+### Stage 1 — FWHT smoke (`scripts/mi300x_smoke_fwht.sh`)
+
+- 9/9 tests PASS in 1.33 s on real MI300X
+- `tests/test_rotate_kv_fwht_integration.py`: 5/5 PASS
+- `tests/test_rotate_kv_int4_codec.py`: 4/4 PASS
+- Log: `logs/mi300x_fwht_1778623189.json` (pytest-json-report)
+- rocm-smi snapshots pre/post: `logs/rocm_smi_{pre,post}_1778623189.json`
+
+### Stage 2 — VRAM measurement (`scripts/mi300x_vram_measurement.py`)
+
+Single config: seq_len=32768, num_heads=32, head_dim=128 (canonical
+32K-token KV cache used by paper §5).
+
+| Metric | with_fwht | without_fwht |
+|--------|-----------|--------------|
+| Baseline FP16 bytes | 536,870,912 (512 MB) | 536,870,912 |
+| Packed INT4 + scales + sinks | 151,060,480 (144 MB) | 151,060,480 |
+| **`reduction_factor`** | **3.5540×** | **3.5540×** |
+| Peak GPU alloc (incl host↔device copy) | 537,133,056 | 537,133,056 |
+| Quantization duration | 84.0 s | 73.2 s |
+
+FWHT adds ~10 s of overhead on the 32K cache (Hadamard butterfly in
+NumPy CPU bridge — same algorithmic cost regardless of GPU). Log:
+`logs/mi300x_vram_1778623322.json`.
+
+### Stage 3 — Shape-scaling sweep (`scripts/mi300x_vram_sweep.py` NEW)
+
+Replaces the original Stage 3 V6.2 adversarial benchmark, which on
+inspection is pure NumPy/Python simulation (no torch, no GPU usage)
+and would have wasted ~$6 of MI300X time. The repurposed sweep is
+exactly the data paper v2.0 needs: how does `reduction_factor` scale
+with sequence length, head_dim, and num_heads?
+
+8 configs × 2 fwht states = 16 measurements on real MI300X:
+
+| seq_len | num_heads | head_dim | reduction_factor (no-fwht / fwht) | dur (s) |
+|---------|-----------|----------|------------------------------------|---------|
+| 4096    | 32        | 128      | 3.54× / 3.54×                      | 9.0 / 9.5 |
+| 8192    | 32        | 128      | 3.55× / 3.55×                      | 17.7 / 19.8 |
+| 16384   | 32        | 128      | 3.55× / 3.55×                      | 35.6 / 40.7 |
+| 32768   | 32        | 128      | 3.55× / 3.55×                      | 71.2 / 83.0 |
+| 16384   | 32        | 64       | 3.55× / 3.55×                      | 17.7 / 19.2 |
+| 16384   | 32        | 256      | 3.55× / 3.55×                      | 71.7 / 91.9 |
+| 16384   | 16        | 128      | 3.55× / 3.55×                      | 17.9 / 19.4 |
+| 16384   | 64        | 128      | 3.55× / 3.55×                      | 73.0 / 92.1 |
+
+**Honest finding:** `reduction_factor` is essentially constant at
+**3.55×** across all shapes. The literature claim of 3.97× (RotateKV,
+IJCAI 2025) is NOT reached by Apohara's implementation because the
+codec uses a single (scale, zero_point) pair per packed byte
+(see V7.0.0-alpha.3 AUDIT #9 fix). The ~0.4× gap from theoretical 4×
+(FP16 → INT4) is absorbed by per-block FP32 scales + zero_points +
+the fp16 sink-token carve-outs.
+
+Log: `logs/mi300x_vram_sweep_1778624264.json`.
+
+### Stage 4 (skipped) — V6.2 adversarial benchmark
+
+`scripts/mi300x_v62_adversarial.sh` was NOT run on MI300X.
+`demo/benchmark_v62_adversarial.py` imports only `numpy` and
+`apohara_context_forge.scheduling.queueing_controller` — pure CPU
+simulation, no GPU usage. Running it on MI300X would have produced
+identical numbers to running on the dev laptop. The honest call:
+skip Stage 4 and bank the $6.
+
+### Cost accounting
+
+| Stage | Cost | Wall clock |
+|-------|------|------------|
+| Setup (clone + venvless pip install) | ~$0.15 | ~5 min |
+| Stage 1 smoke FWHT | ~$0.01 | 1.33 s |
+| Stage 2 single VRAM | ~$0.10 | ~3 min |
+| Stage 3 sweep (16 configs) | ~$0.25 | ~13 min |
+| Stage 4 (skipped) | $0 | 0 |
+| **Total Wave B** | **~$0.51** | **~22 min** |
+| Remaining AMD budget | **~$29.49** | for Sprint 4+ |
+
+### AUDIT.md deltas
+
+- 3.97× literature claim → 🟡 NOT MEASURED by Apohara. Measured value
+  is 3.55× across 8 shape configs (see Stage 3 sweep above). Paper v2.0
+  must report 3.55× MI300X-measured, not 3.97× literature.
+- New AUDIT line item: per-byte joint quantization in Apohara's codec
+  trades fidelity (small) for byte-aligned storage; the 0.4× gap to
+  theoretical 4× is the cost of this choice.
+
+### Files added
+
+- `scripts/mi300x_vram_sweep.py` — shape-scaling sweep script
+- `logs/mi300x_fwht_1778623189.json` — Stage 1 pytest-json-report
+- `logs/mi300x_vram_1778623322.json` — Stage 2 single config result
+- `logs/mi300x_vram_sweep_1778624264.json` — Stage 3 sweep results
+- `logs/rocm_smi_{pre,post}_1778623189.json` — Stage 1 GPU telemetry
+
+### Citation
+
+V7.0.0-alpha.4 is a pre-release. Paper v2.0 + arXiv submission gate the
+V7.0.0 final release. The 3.55× measured number replaces the 3.97×
+literature target in paper v2.0 §5 (RotateKV mechanism).
+
+---
+
 ## V7.0.0-alpha.3 — Sprint 3 Wave A: Closes AUDIT #9 + #10 · 2026-05-12
 
 Third sprint on the V7 roadmap. Closes both remaining audit items — #9 V6.1
