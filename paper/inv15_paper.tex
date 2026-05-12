@@ -665,38 +665,64 @@ knob, breaking INV-12 mathematically; V6.1 added a
 \code{draft\_logprobs} argument and recovered the Leviathan
 $\min(1, p_i / q_i)$ identity).
 
-\begin{table}[t]
+\begin{table*}[t]
   \centering
   \small
   \caption{End-to-end metrics on MI300X (DevCloud ATL1, 2026-05-10;
            V6.1 truth-up applied, V6.2 adversarial benchmark
-           appended). Numbers in bold are the \INV{15}-relevant subset.
-           S-11's honest deviation under the V5 toy ramp is reported
-           openly; the V6.2 row gives the same controller under a
-           statistically rigorous Poisson load.}
+           appended). Numbers in bold are the \INV{15}-relevant
+           subset. S-11's honest deviation under the V5 toy ramp is
+           reported openly; the V6.2 row gives the same controller
+           under a statistically rigorous Poisson load.}
   \label{tab:e2e}
-  \begin{tabular}{@{}lr@{}}
+  \begin{tabular}{@{}lrl@{}}
     \toprule
-    Metric & Value \\
+    Metric & Value & Notes \\
     \midrule
-    Benchmark scenarios passed (V6.1, honest)   & $14 / 15$ \\
-    Adversarial scenarios passed (V6.2)         & $6 / 6$ \\
-    Unit tests passed                           & $310 / 310$ \\
-    Failed tests                                & $0$ \\
+    Benchmark scenarios passed (V6.1, honest)
+        & $14 / 15$
+        & S-11 honestly fails under the V5 bursty load; see V6.2 row \\
+    Adversarial scenarios passed (V6.2)
+        & $6 / 6$
+        & Poisson $n{=}1{,}000$, three M/G/1 service distributions \\
+    Unit tests passed
+        & $310 / 310$
+        & Includes the rewritten speculative-coordinator suite \\
+    Failed tests
+        & $0$
+        & \\
     \midrule
-    \textbf{\INV{15} violations (1{,}210-pt sweep)} & $\mathbf{0}$ \\
-    \textbf{Critic dense prefill rate}          & $\mathbf{0.851}$ \\
-    \textbf{Gate throughput}                    & $\mathbf{6\!\times\!10^{5}\,\mathrm{decisions/s}}$ \\
-    \textbf{Mean gate latency}                  & $\mathbf{1.7\,\mathrm{\mu s}}$ \\
+    \textbf{\INV{15} violations (1{,}210-pt sweep)}
+        & $\mathbf{0}$
+        & 5 roles $\times$ 11 cand. $\times$ 11 reuse $\times$ 2 shuffle \\
+    \textbf{Critic dense prefill rate}
+        & $\mathbf{0.851}$
+        & over the 242-point Critic input subspace \\
+    \textbf{Gate throughput}
+        & $\mathbf{6\!\times\!10^{5}\,\mathrm{decisions/s}}$
+        & pure-Python, single thread, no GPU \\
+    \textbf{Mean gate latency}
+        & $\mathbf{1.7\,\mathrm{\mu s}}$
+        & 5 orders of magnitude below KV-block materialisation \\
     \midrule
-    TokenDance compression                      & $10.81\times$ \\
-    TokenDance reconstruction error             & $1.19\times10^{-7}$ \\
-    M/G/1 $\lambda_{\text{crit}}$ deviation (V6.2) & $1.6\,\%\!-\!29.9\,\%$ \\
-    Live token savings (5-agent demo)           & $79.85\,\%$ \\
-    Mean TTFT (5-agent demo)                    & $23.78\,\mathrm{ms}$ \\
+    TokenDance compression
+        & $10.81\times$
+        & 12-agent committee, 200-block master, $\leq 2$ diffs/mirror \\
+    TokenDance reconstruction error
+        & $1.19\times10^{-7}$
+        & float32 round-off floor; bound $\leq 1\times10^{-4}$ \\
+    M/G/1 $\lambda_{\text{crit}}$ deviation (V6.2)
+        & $1.6\,\%\!-\!29.9\,\%$
+        & vs.\ $\lambda_{\text{crit}}\!=\!905.8\,\mathrm{req/s}$ theoretical \\
+    Live token savings (5-agent demo)
+        & $79.85\,\%$
+        & $263 \to 53$ tokens on the 5-agent reference pipeline \\
+    Mean TTFT (5-agent demo)
+        & $23.78\,\mathrm{ms}$
+        & registration latency on MI300X \\
     \bottomrule
   \end{tabular}
-\end{table}
+\end{table*}
 
 % ============================================================================
 \section{Discussion}
