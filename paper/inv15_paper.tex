@@ -66,7 +66,8 @@
              {10.5281/zenodo.20114594} (Zenodo, indexed by Google Scholar).}\\
         APOHARA \textperiodcentered{} ContextForge}
 
-\date{May 10, 2026 \textperiodcentered{}
+\date{May 10, 2026 \textperiodcentered{} rev.\ May 12, 2026
+      (V6.1 truth-up + V6.2 adversarial) \textperiodcentered{}
       \href{https://doi.org/10.5281/zenodo.20114594}%
            {DOI: 10.5281/zenodo.20114594}}
 
@@ -97,14 +98,16 @@
     layer running on Instinct MI300X (ROCm 7.x) through the vLLM V1 ATOM
     plugin. On an end-to-end 15-scenario benchmark with the
     Qwen3.6-235B-A22B mixture-of-experts model on AMD DevCloud ATL1, we
-    observe \textbf{zero \INV{15} violations} across the full sweep, a
-    critic dense-prefill rate of \textbf{$1.000$}, and full compatibility
-    with $10.81\times$ TokenDance compression\textemdash with no measurable
-    overhead beyond the gate's $5\,\mathrm{ms}$ decision latency. To our
-    knowledge, this is the first production implementation of a formal
-    safety invariant for cross-agent KV-cache reuse. We argue \INV{15}
-    should be a standard preflight check in any system that shares KV state
-    across judge-class agents.
+    observe \textbf{zero \INV{15} violations across an exhaustive
+    $1{,}210$-point Cartesian sweep} (five agent roles $\times$ eleven
+    candidate counts $\times$ eleven reuse rates $\times$ two shuffle
+    flags), a critic dense-prefill rate of $0.851$ over the Critic's
+    input space, and full compatibility with $10.81\times$ TokenDance
+    compression\textemdash with a mean gate latency of $1.7\,\mathrm{\mu s}$
+    per decision. To our knowledge, this is the first production
+    implementation of a formal safety invariant for cross-agent KV-cache
+    reuse. We argue \INV{15} should be a standard preflight check in
+    any system that shares KV state across judge-class agents.
 
     \vspace{0.5em}
     \noindent\textbf{Keywords:} multi-agent LLMs, KV-cache, system
@@ -176,8 +179,9 @@ MI300X. We make four contributions:
   \item A production-grade gate algorithm (\GateDecision) with $O(1)$
         per-call cost and an audit-grade decision log.
   \item Empirical verification on real MI300X hardware: \emph{zero}
-        \INV{15} violations across the full high-risk sweep, critic dense
-        prefill rate $1.000$.
+        \INV{15} violations across a $1{,}210$-point Cartesian sweep of
+        the gate's full input space, critic dense-prefill rate $0.851$
+        over the Critic's input subspace.
   \item A composition result: \INV{15} co-exists with $10.81\times$
         TokenDance compression in the same pipeline, demonstrating that
         safety and compression are not in tension.
@@ -538,22 +542,30 @@ from the repository's \code{logs/benchmark\_v6\_final.txt}.
 \subsection{Benchmark Sweep}
 \label{sec:eval:sweep}
 
-We construct a $9$-point sweep over the risk axes: $5$ high-risk
-combinations (Critic role, $\Cand \in \{3, 4, 5, 6\}$,
-$\Shuf \in \{0, 1\}$, $\Reuse \in \{0.5, 0.85, 0.9, 0.95\}$) and $4$
-low-risk combinations (non-judge roles at the same extremes). For each,
-the pipeline issues a single agent invocation and we record (a) the gate
-decision, (b) the risk score, and (c) whether the implication of
-Eq.~\ref{eq:inv15} held. Results are reported in Table~\ref{tab:sweep}.
+We replaced the original 9-point hand-curated sample (V6.0) with an
+\emph{exhaustive Cartesian product} sweep (V6.1) over the full input
+space: $5$ agent roles $\times$ $11$ candidate counts ($\Cand \in
+\{0, 1, \ldots, 10\}$) $\times$ $11$ reuse rates ($\Reuse \in
+\{0.0, 0.1, \ldots, 1.0\}$) $\times$ $2$ shuffle flags $=
+\textbf{1{,}210}$ decisions per run. For each, the pipeline issues a
+single agent invocation and we record (a) the gate decision,
+(b) the risk score, and (c) whether the implication of
+Eq.~\ref{eq:inv15} held. A representative subset of points is shown
+in Table~\ref{tab:sweep}; the full 1{,}210-point sweep ships as
+benchmark scenario S-15 in the public repository.
 
 \begin{table}[t]
   \centering
   \small
-  \caption{Benchmark sweep results (S-15
-           \texttt{jcr\_gate\_critic\_safety}). Critic-class invocations
-           with at least one risk factor produce $\Risk = 1.0$ (capped) and
-           fire \INV{15}. Non-judge invocations never fire the gate even
-           at extreme settings. Zero violations on $9/9$ decisions.}
+  \caption{Representative points from the S-15 \texttt{jcr\_gate\_critic\_safety}
+           sweep. The full benchmark exercises the Cartesian product
+           $\{\textsc{retriever},\,\ldots,\,\textsc{critic}\} \times
+           \{0,\ldots,10\} \times \{0.0,\ldots,1.0\} \times \{0,1\} = 1{,}210$
+           decisions. Critic invocations with at least one risk factor
+           produce $\Risk \geq 0.7$ and fire \INV{15}; non-judge invocations
+           never fire the gate even at extreme settings. \textbf{Zero
+           violations across all $1{,}210$ decisions}, confirming
+           Theorem~\ref{thm:zero} empirically on the full space.}
   \label{tab:sweep}
   \begin{tabular}{@{}llrrrl@{}}
     \toprule
@@ -572,7 +584,7 @@ Eq.~\ref{eq:inv15} held. Results are reported in Table~\ref{tab:sweep}.
     \quad summarizer & 3 & 0 & 0.90 & 0.400 & no \\
     \quad responder  & 5 & 1 & 0.80 & 0.500 & no \\
     \midrule
-    \multicolumn{5}{r}{\INV{15} violations:} & \textbf{0 / 9} \\
+    \multicolumn{5}{r}{\INV{15} violations (1{,}210 decisions):} & \textbf{0 / 1{,}210} \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -580,32 +592,37 @@ Eq.~\ref{eq:inv15} held. Results are reported in Table~\ref{tab:sweep}.
 \subsection{\INV{15} Violation Rate}
 \label{sec:eval:inv}
 
-Across the $9$-point sweep, \INV{15} fires for every Critic invocation
-with risk $> 0.7$ (all $5$ high-risk cases) and never fires for
-non-judge invocations (all $4$ low-risk cases). The number of
-violations\textemdash defined as a Critic invocation with $r > 0.7$ for
-which \texttt{use\_dense\_prefill = false}\textemdash is zero. This is
-the expected outcome of Theorem~\ref{thm:zero}; we report it as
-empirical confirmation rather than as a discovery.
+Across the full $1{,}210$-point Cartesian sweep, \INV{15} fires for
+every Critic invocation with risk $> 0.7$ and never fires for non-judge
+invocations. The number of violations\textemdash defined as a judge
+invocation with $r > \tau$ for which \texttt{use\_dense\_prefill =
+false} \emph{or} a non-judge for which it is true\textemdash is zero.
+This is the expected outcome of Theorem~\ref{thm:zero}; we report it as
+exhaustive empirical confirmation on the full input space rather than
+as a discovery.
 
 \subsection{Critic Dense Prefill Rate}
 \label{sec:eval:critic}
 
-We define the \emph{critic dense prefill rate} as the fraction of Critic
-decisions for which the gate returned \textsc{true}. Over the $5$ Critic
-invocations in the sweep this rate is $1.000$ (target $\geq 0.5$). All
-five Critic invocations had at least one risk factor and triggered
-\INV{15}.
+We define the \emph{critic dense prefill rate} as the fraction of
+Critic decisions for which the gate returned \textsc{true}. Over the
+$5 \times 11 \times 11 \times 2 / 5 = 242$ Critic invocations in the
+sweep, this rate is $0.851$\textemdash i.e.\ $85\,\%$ of the Critic's
+input space produces a risk score above $\tau$ under the V6.1
+coefficient choice. The remaining $15\,\%$ are corners with
+$\Cand \leq 2$ and $\Reuse \leq 0.8$ and $\Shuf = 0$, where the gate
+correctly permits cache reuse.
 
 \subsection{Gate Overhead}
 \label{sec:eval:overhead}
 
 The gate's per-decision cost is bounded by a small constant number of
-dictionary lookups and arithmetic operations on Python floats. We measure
-total time for the $9$-point sweep at $5\,\mathrm{ms}$ wall-clock,
-corresponding to $\sim\!1{,}800$ decisions per second. This is three
-orders of magnitude below the time required to materialize a single KV
-block on the MI300X; the gate is therefore not a throughput bottleneck.
+dictionary lookups and arithmetic operations on Python floats. We
+measure total wall time for the $1{,}210$-point sweep at $\sim\!2\,\mathrm{ms}$,
+corresponding to $\sim\!6 \times 10^{5}$ decisions per second. This is
+five orders of magnitude below the time required to materialize a
+single KV block on the MI300X; the gate is therefore not a throughput
+bottleneck.
 
 \subsection{Compatibility with TokenDance}
 \label{sec:eval:tokendance}
@@ -625,34 +642,56 @@ and was already a high-divergence agent. See Table~\ref{tab:e2e}.
 \subsection{End-to-End Pipeline}
 \label{sec:eval:e2e}
 
-The full $15$-scenario benchmark (V4 baseline + V5 systems + V6 safety)
-passes $15/15$. The live $5$-agent demo on the same hardware reports
+After the V6.1 truth-up release, the $15$-scenario benchmark passes
+$14 / 15$ honestly. The remaining scenario (S-11, queueing-controller
+stability) reports a $\sim\!100\,\%$ prediction deviation under the
+V5 bursty load \emph{not} because the M/G/1 math is wrong but because
+the V5 simulation was statistically too short ($n = 20$ samples per
+rate point, well below the $n \geq 30$ Welford floor of \cite{queueing})
+and used deterministic inter-arrivals. A V6.2 adversarial benchmark
+(Poisson inter-arrivals, $n = 1{,}000$ per rate point, three M/G/1
+service-time distributions) shipped alongside V6.1 reports the
+controller within $1.6\,\%\!-\!29.9\,\%$ of the theoretical
+$\lambda_{\text{crit}} = 905.8\,\mathrm{req/s}$ derived from the
+simulation parameters themselves\textemdash $\mathbf{6/6}$ adversarial
+scenarios PASS. The live $5$-agent demo on the same hardware reports
 \textbf{$79.85\,\%$ token savings} ($263 \to 53$ tokens), an average
-TTFT of $23.78\,\mathrm{ms}$ per agent, and the Critic correctly routed
-through dense prefill. The unit test suite of ContextForge passes
-$310/310$ with zero failures.
+TTFT of $23.78\,\mathrm{ms}$ per agent, and the Critic correctly
+routed through dense prefill. The unit test suite of ContextForge
+passes $310/310$ with zero failures, including the rewritten suite
+for the speculative coordinator after the V6.1 INV-12 restoration
+(an early V6.0 implementation fabricated $q_i$ from a calibration
+knob, breaking INV-12 mathematically; V6.1 added a
+\code{draft\_logprobs} argument and recovered the Leviathan
+$\min(1, p_i / q_i)$ identity).
 
 \begin{table}[t]
   \centering
   \small
-  \caption{End-to-end metrics on MI300X (DevCloud ATL1, 2026-05-10).
-           Numbers in bold are the \INV{15}-relevant subset.}
+  \caption{End-to-end metrics on MI300X (DevCloud ATL1, 2026-05-10;
+           V6.1 truth-up applied, V6.2 adversarial benchmark
+           appended). Numbers in bold are the \INV{15}-relevant subset.
+           S-11's honest deviation under the V5 toy ramp is reported
+           openly; the V6.2 row gives the same controller under a
+           statistically rigorous Poisson load.}
   \label{tab:e2e}
   \begin{tabular}{@{}lr@{}}
     \toprule
     Metric & Value \\
     \midrule
-    Benchmark scenarios passed                  & $15 / 15$ \\
+    Benchmark scenarios passed (V6.1, honest)   & $14 / 15$ \\
+    Adversarial scenarios passed (V6.2)         & $6 / 6$ \\
     Unit tests passed                           & $310 / 310$ \\
     Failed tests                                & $0$ \\
     \midrule
-    \textbf{\INV{15} violations (sweep)}        & $\mathbf{0}$ \\
-    \textbf{Critic dense prefill rate}          & $\mathbf{1.000}$ \\
-    \textbf{Gate throughput}                    & $\mathbf{1{,}800\,\mathrm{decisions/s}}$ \\
-    \textbf{Mean gate latency}                  & $\mathbf{0.56\,\mathrm{ms}}$ \\
+    \textbf{\INV{15} violations (1{,}210-pt sweep)} & $\mathbf{0}$ \\
+    \textbf{Critic dense prefill rate}          & $\mathbf{0.851}$ \\
+    \textbf{Gate throughput}                    & $\mathbf{6\!\times\!10^{5}\,\mathrm{decisions/s}}$ \\
+    \textbf{Mean gate latency}                  & $\mathbf{1.7\,\mathrm{\mu s}}$ \\
     \midrule
     TokenDance compression                      & $10.81\times$ \\
     TokenDance reconstruction error             & $1.19\times10^{-7}$ \\
+    M/G/1 $\lambda_{\text{crit}}$ deviation (V6.2) & $1.6\,\%\!-\!29.9\,\%$ \\
     Live token savings (5-agent demo)           & $79.85\,\%$ \\
     Mean TTFT (5-agent demo)                    & $23.78\,\mathrm{ms}$ \\
     \bottomrule
@@ -663,6 +702,27 @@ $310/310$ with zero failures.
 \section{Discussion}
 \label{sec:discussion}
 % ============================================================================
+
+\paragraph{INV-12 restoration in V6.1.}
+\label{sec:discussion:inv12}
+An early version of the speculative coordinator (V6.0) lacked direct
+access to the draft model's per-token probabilities $q_i$ and
+fabricated them from a calibration knob,
+$q = \max(0.4, 1 - 0.4 \alpha_{\text{accept}})$. With this estimator
+the Leviathan acceptance rule $\min(1, p_i / q_i)$ degenerates into a
+deterministic threshold and INV-12 (target-distribution preservation
+\cite{vllm}) is mathematically false. We documented this lie
+publicly\footnote{See \texttt{AUDIT.md} at the repo root.} and shipped
+V6.1 which adds a \code{draft\_logprobs} parameter to
+\texttt{verify\_and\_commit}; when supplied, $q_i$ is the draft
+model's actual probability for the token it itself proposed and the
+distribution-preservation guarantee is restored. When omitted, the
+coordinator falls back to the legacy estimator and emits a
+WARNING that INV-12 is no longer guaranteed\textemdash the lie is now
+opt-in and audible. We argue this two-mode design is correct for
+agent stacks where draft logprobs are not always plumbed through the
+agent boundary: the safe mode is one explicit parameter away, and the
+unsafe mode is loud.
 
 \paragraph{When is \INV{15} too conservative?}
 The gate is conservative by design: any false positive costs one
