@@ -1,0 +1,68 @@
+# Sync the Apohara ContextForge HF Space from this GitHub repo.
+#
+# Trigger: every push to main that touches `hf_spaces/**`, the parent
+# `demo/app.py`, the parent `apohara_context_forge/**`, or this
+# workflow itself. The job assembles a flat tree (the contents of
+# `hf_spaces/` plus the parent code it needs) and force-pushes it to
+# the HF Space's git remote.
+#
+# Required GitHub secret: `HF_TOKEN` — a HuggingFace user token with
+#                                       write access to the Space.
+# Required GitHub repository variable: `HF_SPACE` (e.g. SuarezPM/apohara-contextforge).
+
+name: sync-hfspaces
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "hf_spaces/**"
+      - "demo/app.py"
+      - "apohara_context_forge/**"
+      - ".github/workflows/sync-hfspaces.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: push to HuggingFace Space
+    runs-on: ubuntu-latest
+    if: ${{ vars.HF_SPACE != '' }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Assemble Space payload
+        run: |
+          mkdir -p /tmp/space
+          # Flatten: copy hf_spaces contents to root, then the parent
+          # repo code under a stable layout so hf_spaces/app.py can
+          # `from demo.app import app`.
+          cp -r hf_spaces/* /tmp/space/
+          cp -r demo                  /tmp/space/demo
+          cp -r apohara_context_forge /tmp/space/apohara_context_forge
+          cp -r agents                /tmp/space/agents 2>/dev/null || true
+          cp    AUDIT.md CHANGELOG.md LICENSE /tmp/space/ 2>/dev/null || true
+          ls -la /tmp/space/
+
+      - name: Configure git identity
+        run: |
+          git config --global user.email "noreply@anthropic.com"
+          git config --global user.name  "ContextForge HF Sync"
+
+      - name: Push to HuggingFace Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          set -euo pipefail
+          cd /tmp/space
+          git init -q -b main
+          git remote add hf "https://oauth2:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}"
+          git add -A
+          git commit -q -m "sync from ${GITHUB_REPOSITORY}@${GITHUB_SHA::7}"
+          git push -q --force hf main
