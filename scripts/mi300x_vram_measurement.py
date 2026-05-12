@@ -49,6 +49,24 @@ BATCH = 1
 DTYPE = torch.float16
 
 
+def _detect_backend() -> tuple[str, str]:
+    """Return (torch_device_string, honest_backend_label).
+
+    PyTorch ROCm reuses the `torch.cuda.*` API so `torch.cuda.is_available()`
+    is True on AMD too. For HONEST reporting (not NVIDIA-like), we surface
+    the real backend: HIP/ROCm + device name (e.g. 'AMD Instinct MI300X VF').
+    """
+    if not torch.cuda.is_available():
+        return ("cpu", "cpu")
+    is_rocm = bool(getattr(torch.version, "hip", None))
+    name = torch.cuda.get_device_name(0)
+    if is_rocm:
+        label = f"rocm-hip:{torch.version.hip}:{name}"
+    else:
+        label = f"cuda:{torch.version.cuda}:{name}"
+    return ("cuda", label)
+
+
 def measure(use_fwht: bool) -> dict:
     have_cuda = torch.cuda.is_available()
     if have_cuda:
@@ -56,7 +74,7 @@ def measure(use_fwht: bool) -> dict:
         torch.cuda.empty_cache()
 
     # Canonical layout: (batch, seq_len, num_heads, head_dim).
-    device = "cuda" if have_cuda else "cpu"
+    device, backend_label = _detect_backend()
     keys = torch.randn(BATCH, SEQ_LEN, NUM_HEADS, HEAD_DIM, dtype=DTYPE, device=device)
     values = torch.randn_like(keys)
     positions = torch.arange(SEQ_LEN, device=device).unsqueeze(0)
@@ -98,7 +116,8 @@ def measure(use_fwht: bool) -> dict:
 
     return {
         "use_fwht": use_fwht,
-        "device": device,
+        "torch_device": device,
+        "hardware": backend_label,
         "seq_len": SEQ_LEN,
         "num_heads": NUM_HEADS,
         "head_dim": HEAD_DIM,

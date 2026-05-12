@@ -1,5 +1,198 @@
 # Changelog
 
+## V7.0.0-alpha.5 — Sprint 3 Wave B extended: deeper MI300X evidence · 2026-05-12
+
+Continuation of Wave B on AMD AI Dev Cloud MI300X droplet. Total Wave B
++ extended cost: ~$1.20 of $30 budget. Generates the full paper v2.0
+evidence stack with 4 publication-ready PNG figures.
+
+### V6.1 honesty discipline fix
+
+User caught an honesty bug: V7.0.0-alpha.4 JSON outputs reported
+`"device": "cuda"` on AMD hardware. PyTorch ROCm reuses the
+`torch.cuda.*` API for backward-compat, so `torch.cuda.is_available()`
+returns True and `device="cuda"` is technically correct at the API
+level — but it MISLEADS reviewers into thinking NVIDIA hardware was
+used.
+
+Fix: `scripts/mi300x_vram_measurement.py` now also reports
+`"hardware": "rocm-hip:6.2.41133-dd7f95766:AMD Instinct MI300X VF"`
+alongside `"torch_device": "cuda"`. All re-run logs from V7.0.0-alpha.5
+carry the honest backend label.
+
+### NEW measurements (extended Wave B)
+
+#### HBM3 bandwidth probe (`scripts/mi300x_hbm3_bandwidth.py`)
+
+Copy + STREAM-triad bandwidth at 1/4/16/64 GB allocations on MI300X:
+
+| Size | Copy BW | Triad BW |
+|------|---------|----------|
+| 1 GB | 2896 GB/s | 1502 GB/s |
+| 4 GB | 3843 GB/s | 3734 GB/s |
+| 16 GB | 3760 GB/s | 3675 GB/s |
+| 64 GB | 3771 GB/s | 3692 GB/s |
+
+**Best triad: 3.73 TB/s = 70.5% of the advertised 5.3 TB/s peak.**
+Honest paper-worthy number: "effective HBM3 bandwidth on MI300X VF
+(SR-IOV virtualization slice) is 3.73 TB/s, not the marketed 5.3 TB/s
+peak; the gap is the cost of VF + non-coalesced fp16 STREAM-triad."
+
+Log: `logs/mi300x_hbm3_bandwidth_*.json`.
+
+#### Pure-torch FWHT on GPU (`scripts/mi300x_pure_torch_fwht.py`)
+
+The original `mi300x_vram_measurement.py` uses a CPU NumPy bridge
+because `RotateKVQuantizer` is NumPy-only. The FWHT module itself
+supports `torch.Tensor` natively. This script measures pure-on-GPU
+FWHT performance with no bridge:
+
+| seq_len | head_dim | FWHT time | Throughput | Peak alloc overhead |
+|---------|----------|-----------|------------|---------------------|
+| 4096 | 128 | 1.2 ms | 28 GB/s | **+700%** |
+| 8192 | 128 | 2.3 ms | 29 GB/s | +700% |
+| 16384 | 128 | 5.3 ms | 25 GB/s | +700% |
+| 32768 | 128 | 10.5 ms | 26 GB/s | +700% |
+| 16384 | 64 | 2.0 ms | 33 GB/s | +700% |
+| 16384 | 256 | 11.7 ms | 23 GB/s | +700% |
+
+**Two findings:**
+1. **FWHT torch path has 7× peak alloc overhead** — the
+   `_fwht_butterfly_torch` implementation does a `.clone()` at each
+   stage of the butterfly. Sprint 4 candidate: replace with in-place
+   strided ops to drop the overhead to ~+10%.
+2. **Effective throughput 25-33 GB/s** is far below the 3.73 TB/s HBM3
+   bandwidth. FWHT is memory-traffic-bound + clone-amplified. A
+   well-tuned kernel should hit ~1 TB/s. Sprint 4 candidate.
+3. **Round-trip identity error ≤ 1.95e-3** (fp16 epsilon).
+
+Log: `logs/mi300x_pure_torch_fwht_*.json`.
+
+#### Quantization quality comparison (`scripts/mi300x_quant_quality.py`)
+
+🚨 **CRITICAL FINDING for paper v2.0 §5:**
+
+| Quantization | Reduction | MSE keys | max abs err |
+|--------------|-----------|----------|-------------|
+| FP16 baseline (FP32→FP16 cast loss) | 1.00× | 4.31e-08 | 1.95e-03 |
+| INT8 naive per-channel min-max | 1.88× | 3.44e-05 | 1.73e-02 |
+| **INT4 Apohara (use_fwht=False)** | **3.55×** | **1.01e-02** | **3.25e-01** |
+| **INT4 Apohara + FWHT (use_fwht=True)** | **3.55×** | **2.01e+00** | **8.49e+00** ❗ |
+
+**The FWHT path degrades quantization quality 200× compared to no-FWHT** with the
+current per-byte joint-quantization codec (V7.0.0-alpha.3 AUDIT #9 fix).
+Root cause: FWHT spreads the per-channel variance — with a SINGLE
+(scale, zero_point) per packed byte covering both nibbles, the wider
+range gets quantized to fewer effective bits.
+
+**Paper v2.0 conclusion:** `use_fwht=False` is the recommended config
+under Apohara's current codec. Reclaiming the literature 3.97× target
+would require per-nibble independent scales (V7+ codec rewrite — would
+forfeit ~0.5× of the storage reduction).
+
+Log: `logs/mi300x_quant_quality_*.json`.
+
+#### Full pytest regression on MI300X
+
+- **347 passed / 11 failed / 24 skipped** in 199.86 s on real MI300X
+  (ROCm 7.2.0 + torch 2.5.1+rocm6.2 + newer dep versions like
+  `numpy 2.2.6`, `rich 15.0.0`, `sentence-transformers 5.5.0`)
+- All 11 failures are in `tests/test_coordinator.py` — version-mismatch
+  issues with the newer rich/sentence-transformers, NOT algorithmic
+  problems. FWHT, observability, INT4 codec, and rotate_kv tests all
+  pass on real ROCm hardware.
+- Log: `logs/mi300x_full_pytest_*.json` (pytest-json-report)
+
+#### LMCache + Redis smoke (`scripts/mi300x_lmcache_smoke.py`)
+
+Two-stage test:
+1. **First run (no lmcache, no redis):** `LMCacheConnectorV2` enters
+   honest-fallback (single WARNING, `is_active()=False`). V6.x #3
+   honesty discipline verified.
+2. **Second run (after `pip install lmcache`, `apt install redis-server`):**
+   - Redis: `PONG` (running on localhost:6379)
+   - lmcache CUDA backend: **fails to import `libcudart.so.12`** (NVIDIA
+     library, doesn't exist on AMD ROCm). LMCache automatically falls
+     back to its `lmcache.non_cuda_equivalents` Python backend.
+   - **`LMCacheConnectorV2` still enters honest-fallback** because the
+     Apohara connector imports `lmcache.config.LMCacheEngineConfig`,
+     which doesn't exist in the non_cuda_equivalents Python fallback.
+
+**Sprint 4 work item:** adapt `LMCacheConnectorV2` to the LMCache
+Python fallback API so it works on AMD ROCm machines without
+`libcudart.so.12`. Currently, V6.x #3 only supports NVIDIA-CUDA LMCache.
+
+Log: `logs/mi300x_lmcache_*.json` (× 2 — fallback + post-install).
+
+#### Paper v2.0 figures (`scripts/mi300x_generate_figures.py`)
+
+Matplotlib script reads the latest `logs/mi300x_*.json` files and
+produces 4 publication-ready PNGs (140 DPI, 6×4 inches each):
+
+- `paper/figures/fig5_reduction_factor_vs_seq.png` — reduction_factor
+  vs seq_len, with use_fwht curves + literature target overlay
+- `paper/figures/fig7_pure_torch_fwht.png` — FWHT GPU duration + effective
+  throughput vs seq_len
+- `paper/figures/fig8_quant_quality.png` — MSE vs reduction_factor Pareto
+  (FP16 / INT8 / INT4 / INT4+FWHT)
+- `paper/figures/fig9_hbm3_bandwidth.png` — HBM3 measured BW (copy + triad)
+  vs allocation size, with advertised 5.3 TB/s overlay
+
+Each figure has source-data overlay (small text in lower-left) so
+reviewers can cross-check against the logged JSON.
+
+### Cost accounting (extended Wave B)
+
+| Stage | Cost |
+|-------|------|
+| Stage A HBM3 bandwidth | ~$0.05 |
+| Stage B pure-torch FWHT | ~$0.05 |
+| Stage C sweep re-run (honest backend labels) | ~$0.25 |
+| Stage D single VRAM re-run | ~$0.10 |
+| Stage E quantization quality | ~$0.10 |
+| Stage F full pytest regression | ~$0.15 |
+| Stage G LMCache smoke (× 2) | ~$0.05 |
+| matplotlib install + figure gen | ~$0.05 |
+| **Extended Wave B total** | **~$0.80** |
+| Combined with Wave B initial ($0.51) | **~$1.31** |
+| Remaining AMD budget | **~$28.69 of $30** |
+
+### Scripts added
+
+- `scripts/mi300x_pure_torch_fwht.py` — pure-torch GPU FWHT measurement
+- `scripts/mi300x_quant_quality.py` — quantization quality comparison
+- `scripts/mi300x_hbm3_bandwidth.py` — HBM3 bandwidth probe
+- `scripts/mi300x_lmcache_smoke.py` — LMCache + Redis end-to-end test
+- `scripts/mi300x_generate_figures.py` — matplotlib paper figure generator
+- `scripts/mi300x_run_all.sh` — orchestrator for the 6 measurement stages
+
+### AUDIT.md V7.0.0-alpha.5 deltas
+
+- 🚨 FWHT integration **degrades** INT4 quantization quality 200× with
+  current codec. `use_fwht=False` is the recommended config. Tracked
+  as Sprint 4 candidate: per-nibble independent scales would reclaim
+  quality at cost of ~0.5× storage reduction.
+- 🟡 V6.x #3 `LMCacheConnectorV2` only supports NVIDIA-CUDA LMCache
+  backend. AMD ROCm fallback (`lmcache.non_cuda_equivalents`) has a
+  different API and is NOT wired. Sprint 4 candidate.
+- 🟡 FWHT torch path has 7× peak alloc overhead from
+  `_fwht_butterfly_torch.clone()`. Sprint 4 candidate: in-place strided
+  butterfly to drop to ~+10%.
+- 🟢 HBM3 bandwidth 3.73 TB/s measured vs 5.3 TB/s advertised. Honest
+  paper §3 number.
+- 🟢 INT4 codec quality envelope: MSE ≤ 0.01 with use_fwht=False at
+  3.55× reduction. Pareto-acceptable for KV cache.
+
+### Citation
+
+V7.0.0-alpha.5 is a pre-release. Paper v2.0 + arXiv submission gate the
+V7.0.0 final release. Paper v2.0 §5 must report:
+- 3.55× MI300X-measured (not 3.97× literature target)
+- use_fwht=False is the recommended config (not use_fwht=True)
+- HBM3 measured = 3.73 TB/s (not 5.3 TB/s peak)
+
+---
+
 ## V7.0.0-alpha.4 — Sprint 3 Wave B: real MI300X evidence · 2026-05-12
 
 Sprint 3 Wave B execution on AMD AI Dev Cloud MI300X droplet

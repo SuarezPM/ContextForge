@@ -293,6 +293,18 @@ reader knows where the codebase carries its own weight.
   - `govulncheck ./operator/...` not yet run in CI. `golang.org/x/net@v0.19.0` may have newer patches; recommend `go get golang.org/x/net@latest && go mod tidy` before V7.0.0 final.
 - **Status:** **🟢 RESOLVED** (5/5 items closed; image pinning at versioned-tag is alpha-acceptable per security-reviewer; production hardening tracked above as known follow-ups for V7.0.0).
 
+### V7.0.0-alpha.5 — Sprint 3 Wave B extended deltas (2026-05-12, real MI300X)
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| 🚨 **FWHT degrades INT4 quality 200×** under current codec. Measured MSE: use_fwht=False → 1.01e-02; use_fwht=True → 2.01e+00. Paper v2.0 conclusion: use_fwht=False is the recommended config. | High | Sprint 4 candidate: per-nibble independent scales codec rewrite would reclaim FWHT benefit at cost of ~0.5× storage. |
+| 🟡 V6.x #3 `LMCacheConnectorV2` only supports NVIDIA-CUDA LMCache. AMD ROCm fallback (lmcache.non_cuda_equivalents) has a different API. Currently enters honest-fallback on MI300X even with lmcache + redis-server installed. | Medium | Sprint 4 candidate: adapt connector to non-CUDA backend API. |
+| 🟡 FWHT torch path has +700% peak GPU alloc overhead from `.clone()` at each butterfly stage. Throughput 25-33 GB/s vs 3.73 TB/s HBM3 measured. | Medium | Sprint 4 candidate: in-place strided butterfly to drop overhead to ~+10%. |
+| 🟢 HBM3 effective bandwidth measured at **3.73 TB/s = 70.5% of advertised 5.3 TB/s peak** on MI300X VF (SR-IOV slice). Honest paper §3 number. | Info | Promoted in paper v2.0 (replaces "5.3 TB/s peak"). |
+| 🟢 Full pytest regression on MI300X+ROCm: **347/358 pass** (11 failures in test_coordinator.py are version-mismatch with newer rich/sentence-transformers/numpy 2.2.6, NOT algorithmic). FWHT, observability, INT4 codec, rotate_kv all pass on real ROCm. | Info | V6.1 honesty: substrate works on real AMD hardware. |
+| 🟢 INT4 codec quality at 3.55× reduction: MSE = 1.01e-02 (use_fwht=False), max abs err 0.33. Pareto-acceptable for KV cache. | Info | Paper v2.0 §5 Pareto table. |
+| 🟢 Hardware label honesty: JSON logs now report `rocm-hip:6.2.41133:AMD Instinct MI300X VF`, not just `cuda`. V6.1 discipline applied. | Info | V7.0.0-alpha.5 fix from user catch. |
+
 ### V7.0.0-alpha.4 — Sprint 3 Wave B deltas (2026-05-12, real MI300X)
 
 | Claim | Source | Status post-Wave B |
