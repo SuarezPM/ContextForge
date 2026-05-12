@@ -445,9 +445,9 @@ System invariants enforced:
 | V6.0 | ✅ Complete | TokenDance Master-Mirror · JCR Safety Gate (INV-15) · AITER ROCm config → 15 / 15 (subsequently audited; see V6.1) |
 | **V6.1** | ✅ **Complete** | **Truth-up release · [`AUDIT.md`](AUDIT.md) + [`CHANGELOG.md`](CHANGELOG.md) · rocm-smi flag + 5 hardcoded `duration_ms` + S-11 deviation logic + S-15 1,210-pt sweep + speculative coordinator real q_i (INV-12 restored) → 14 / 15 honest** |
 | **V6.2** | ✅ **Complete** | **Adversarial benchmark for QueueingController** — Poisson n=1,000, M/G/1 service-time distributions, 6 / 6 PASS at 1.6–29.9 % deviation vs theoretical λ_critical |
-| **V6.x #1** | ✅ **Complete** | **[`apohara-vllm-plugin` 0.1.0](pypi/apohara-vllm-plugin/) — standalone PyPI package, `vllm.general_plugins` entry-point, honest hooks (DI-ready), wheel built and entry-point smoke-tested in clean venv. Pending: manual `vllm-plugin-v0.1.0` tag to trigger the [release workflow](.github/workflows/release-plugin.yml).** |
-| V6.x #2 | 🚧 Next | Public HuggingFace Spaces benchmark sandbox |
-| V6.x #3 | 📋 Planned | Multi-node distributed KV via LMCache (depends on V6.x #1 upstream traction) |
+| **V6.x #1** | ✅ **Complete** | **[`apohara-vllm-plugin` 0.1.0](pypi/apohara-vllm-plugin/) — standalone PyPI package, `vllm.general_plugins` entry-point, honest hooks (DI-ready), wheel built + smoke-tested in clean venv. Pending only the manual `vllm-plugin-v0.1.0` tag to trigger the [release workflow](.github/workflows/release-plugin.yml).** |
+| **V6.x #2** | ✅ **Complete** | **HuggingFace Spaces public benchmark sandbox** — `hf_spaces/` shim with YAML frontmatter + scoped requirements + fallback-degraded mode, [sync workflow](.github/workflows/sync-hfspaces.yml) on every push to main. See [HFSPACES.md](HFSPACES.md) for the 5-minute setup. |
+| **V6.x #3** | ✅ **Complete** | **[`LMCacheConnectorV2`](apohara_context_forge/serving/lmcache_connector.py) — real multi-node KV-cache bridge** (replaces V4-era stub). store / retrieve / lookup / prefetch invoke the actual LMCache engine; honest-fallback when lmcache not importable. 16/16 tests PASS on Python 3.14. See [LMCACHE.md](LMCACHE.md) for the multi-node deployment story. |
 | V7+ | 📋 Planned | K8s operator · plugin marketplace SDK · enterprise SLA + audit-grade INV-15 telemetry export |
 
 ---
