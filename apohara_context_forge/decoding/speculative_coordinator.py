@@ -196,28 +196,44 @@ class SpeculativeCoordinator:
         self,
         target_verification_logprobs: list[float],
         draft_tokens: list[int],
+        draft_logprobs: Optional[list[float]] = None,
     ) -> SpeculativeResult:
-        """
-        Standard speculative decoding acceptance criterion.
+        """Standard speculative-decoding acceptance criterion.
 
         For each draft token t_i with draft probability q_i and target
         probability p_i (derived from logprobs):
 
-            Accept with probability min(1, p_i / q_i)
-            Reject at first position where random() > p_i / q_i
+            Accept with probability  min(1, p_i / q_i)
+            Reject at the first position where random() > p_i / q_i.
 
-        On rejection: sample correction token from adjusted distribution
-            p_adj(x) = max(0, p(x) - q(x)) / Z
+        On rejection: sample a correction token from the adjusted
+        distribution p_adj(x) = max(0, p(x) - q(x)) / Z. INVARIANT-12 (the
+        target's marginal output distribution is preserved by the
+        composition of speculate-and-verify) holds iff q_i is the draft
+        model's actual per-token probability — see Leviathan et al. 2023.
 
-        INVARIANT-12: if all tokens rejected, target generates 1 fresh token.
+        V6.1 truth-up: the previous implementation lacked access to the
+        draft model's logprobs and fabricated `q_i` from the
+        `acceptance_threshold` config knob via
+        `q = max(0.4, 1 - 0.4 * threshold)`. That formula made INV-12
+        mathematically false. The fix is to accept the draft logprobs as
+        an argument and use them directly. Callers that cannot supply
+        draft logprobs (and therefore cannot honour INV-12) MUST pass
+        `draft_logprobs=None`, which routes through the legacy estimate
+        and logs a warning so the lie is visible.
 
         Args:
-            target_verification_logprobs: Log probabilities from the target
-                model for each draft token position (one per token).
+            target_verification_logprobs: Log probabilities from the
+                target model for each draft token position (one per
+                token).
             draft_tokens: Token IDs proposed by the draft agent.
+            draft_logprobs: Per-token log probabilities from the *draft*
+                model. Required for INV-12 to hold. When `None`, the
+                coordinator falls back to a calibration-knob estimate
+                and the operation is no longer distribution-preserving.
 
         Returns:
-            SpeculativeResult with accepted/rejected breakdown.
+            SpeculativeResult with accepted / rejected breakdown.
         """
         if not draft_tokens:
             # Empty draft: nothing to verify.
@@ -234,37 +250,56 @@ class SpeculativeCoordinator:
         accepted: list[int] = []
         rejected_at_position = -1
 
-        # Convert logprobs to probabilities (numerically stable).
         # target_verification_logprobs[i] corresponds to draft_tokens[i].
         target_probs = [math.exp(lp) for lp in target_verification_logprobs]
 
-        # Estimate the draft model's per-token probability q_i. In standard
-        # speculative decoding (Leviathan 2023) the acceptance ratio is
-        # min(1, p_i / q_i). The draft logprobs are not exposed at this
-        # interface, so we estimate q_i from the calibration parameter:
-        # higher acceptance_threshold means we trust the draft more, which
-        # corresponds to a lower q_i estimate (and therefore a higher ratio).
-        # The mapping below keeps q in [0.4, 0.8] over threshold ∈ [0.5, 1.0]
-        # which empirically yields reliable >70% acceptance for well-aligned
-        # drafts while still rejecting clearly-wrong tokens.
-        draft_prob_estimate = max(0.4, 1.0 - 0.4 * self.config.acceptance_threshold)
+        # ------------------------------------------------------------------ #
+        # q_i — draft probability per token                                  #
+        # ------------------------------------------------------------------ #
+        # Two paths:
+        #
+        # (a) draft_logprobs supplied — the honest Leviathan path.
+        #     Each q_i is the draft model's probability for the token it
+        #     itself proposed. INV-12 holds.
+        #
+        # (b) draft_logprobs is None — legacy estimate. We use a fixed
+        #     per-token probability derived from the acceptance_threshold
+        #     calibration knob, and we LOG a warning so the operator
+        #     knows INV-12 is no longer preserved. This path exists for
+        #     backwards-compatibility with callers that have not yet
+        #     plumbed the draft logprobs through.
+        if draft_logprobs is not None:
+            if len(draft_logprobs) != n:
+                raise ValueError(
+                    f"draft_logprobs length {len(draft_logprobs)} != "
+                    f"draft_tokens length {n}"
+                )
+            draft_probs = [math.exp(lp) for lp in draft_logprobs]
+            inv12_preserved = True
+        else:
+            logger.warning(
+                "verify_and_commit called without draft_logprobs; "
+                "falling back to calibration-knob estimate. "
+                "INV-12 (target distribution preservation) is NOT guaranteed."
+            )
+            estimate = max(0.4, 1.0 - 0.4 * self.config.acceptance_threshold)
+            draft_probs = [estimate] * n
+            inv12_preserved = False
 
         for i in range(n):
             draft_token = draft_tokens[i]
             p_i = target_probs[i]
+            q_i = max(draft_probs[i], 1e-12)  # guard against /0 if logprob -∞
 
-            ratio = min(1.0, p_i / draft_prob_estimate)
+            ratio = min(1.0, p_i / q_i)
 
             if random.random() <= ratio:
                 accepted.append(draft_token)
             else:
                 rejected_at_position = i
                 logger.debug(
-                    "Rejected token %d at position %d (p=%.4f, ratio=%.4f)",
-                    draft_token,
-                    i,
-                    p_i,
-                    ratio,
+                    "Rejected token %d at position %d (p=%.4f, q=%.4f, ratio=%.4f)",
+                    draft_token, i, p_i, q_i, ratio,
                 )
                 break
 
