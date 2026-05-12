@@ -1,0 +1,90 @@
+{
+  "timestamp": "2026-05-12T13:43:58.079562Z",
+  "benchmark_version": "v6.2-adversarial",
+  "scenarios": [
+    {
+      "name": "adv_exponential_light",
+      "lambda_target": 10.0,
+      "lambda_observed": 10.0,
+      "lambda_predicted": 888.830397,
+      "lambda_theoretical": 905.7971014492755,
+      "deviation_vs_theoretical_pct": 1.8731241712000195,
+      "deviation_vs_observed_pct": 8788.303969999999,
+      "service_dist": "exponential",
+      "n_samples": 1000,
+      "utilization_rho": 0.481583,
+      "is_stable": true,
+      "duration_ms": 21.190508996369317
+    },
+    {
+      "name": "adv_exponential_moderate",
+      "lambda_target": 200.0,
+      "lambda_observed": 200.0,
+      "lambda_predicted": 743.680246,
+      "lambda_theoretical": 905.7971014492755,
+      "deviation_vs_theoretical_pct": 17.89770084160001,
+      "deviation_vs_observed_pct": 271.840123,
+      "service_dist": "exponential",
+      "n_samples": 1000,
+      "utilization_rho": 0.904485,
+      "is_stable": true,
+      "duration_ms": 24.048282000876497
+    },
+    {
+      "name": "adv_lognormal_light",
+      "lambda_target": 10.0,
+      "lambda_observed": 10.0,
+      "lambda_predicted": 837.598085,
+      "lambda_theoretical": 905.7971014492755,
+      "deviation_vs_theoretical_pct": 7.5291714160000165,
+      "deviation_vs_observed_pct": 8275.98085,
+      "service_dist": "lognormal",
+      "n_samples": 1000,
+      "utilization_rho": 0.488531,
+      "is_stable": true,
+      "duration_ms": 26.998716995876748
+    },
+    {
+      "name": "adv_lognormal_moderate",
+      "lambda_target": 200.0,
+      "lambda_observed": 200.0,
+      "lambda_predicted": 634.886906,
+      "lambda_theoretical": 905.7971014492755,
+      "deviation_vs_theoretical_pct": 29.908485577600015,
+      "deviation_vs_observed_pct": 217.44345299999998,
+      "service_dist": "lognormal",
+      "n_samples": 1000,
+      "utilization_rho": 0.952473,
+      "is_stable": true,
+      "duration_ms": 41.06126200349536
+    },
+    {
+      "name": "adv_constant_light",
+      "lambda_target": 10.0,
+      "lambda_observed": 10.0,
+      "lambda_predicted": 891.304348,
+      "lambda_theoretical": 905.7971014492755,
+      "deviation_vs_theoretical_pct": 1.599999980800013,
+      "deviation_vs_observed_pct": 8813.04348,
+      "service_dist": "constant",
+      "n_samples": 1000,
+      "utilization_rho": 0.480955,
+      "is_stable": true,
+      "duration_ms": 20.452868004213087
+    },
+    {
+      "name": "adv_constant_moderate",
+      "lambda_target": 200.0,
+      "lambda_observed": 200.0,
+      "lambda_predicted": 702.898551,
+      "lambda_theoretical": 905.7971014492755,
+      "deviation_vs_theoretical_pct": 22.39999996960001,
+      "deviation_vs_observed_pct": 251.4492755,
+      "service_dist": "constant",
+      "n_samples": 1000,
+      "utilization_rho": 0.95475,
+      "is_stable": true,
+      "duration_ms": 23.94495499902405
+    }
+  ]
+}
