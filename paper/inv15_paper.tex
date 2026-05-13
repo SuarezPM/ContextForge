@@ -227,10 +227,17 @@ typically the system prompt, the user query, and any retrieved documents
 prefix tensors independently. vLLM APC deduplicates within a single
 inference engine via hash-keyed PagedAttention blocks. LMCache extends this
 across processes and nodes via a content-addressable store
-\cite{lmcache}. KVCOMM contributes \emph{cross-context offset hints}: a
-SimHash signature is computed per block, near-duplicate blocks are reused
-with a per-token RoPE offset correction, eliminating drift at the attention
-layer.
+\cite{lmcache}. DroidSpeak \cite{droidspeak} pushes the boundary further by
+demonstrating that prefix KV caches can be reused even \emph{across
+different LLM architectures}, opening cross-model sharing in heterogeneous
+agentic systems. KVCOMM \cite{kvcomm} contributes \emph{cross-context
+offset hints}: a SimHash signature is computed per block, near-duplicate
+blocks are reused with a per-token RoPE offset correction, eliminating
+drift at the attention layer. KVFlow \cite{kvflow} attacks the orthogonal
+problem of \emph{eviction}: by abstracting the agent execution schedule as
+an Agent Step Graph, it preserves KV entries that are about to be reused
+and prefetches them ahead of time, reporting up to $2.19\times$ speedup on
+concurrent multi-agent workflows.
 
 TokenDance \cite{tokendance} represents the current state of the art for
 \emph{committee} inference (multiple agents reasoning over the same
@@ -244,7 +251,10 @@ reconstruction error below $10^{-4}$.
 \subsection{The JCR Failure Mode}
 \label{sec:bg:jcr}
 
-\cite{jcrfailure} identify a failure mode unique to \emph{judge} agents.
+The agent-as-a-judge paradigm \cite{agentjudge}, in which agentic systems
+evaluate other agentic systems, has become standard practice for
+benchmarking and self-improving pipelines. \cite{jcrfailure} identify a
+failure mode unique to \emph{judge} agents in this regime.
 A judge evaluates a set of candidates $\{c_1, \ldots, c_k\}$ and emits a
 ranking, score, or verdict. Modern judge prompts present candidates in a
 serialized order, e.g.:
@@ -295,16 +305,25 @@ Critic\textemdash through a formal invariant.
 
 All experiments in this paper run on AMD Instinct MI300X virtual functions
 (VF) accessed through AMD DevCloud ATL1. The MI300X is a unified CPU+GPU
-architecture (CDNA3, gfx942) with $192\,\mathrm{GB}$ HBM3 memory. The
-software stack is ROCm 7.2.0 with the HIP runtime
+architecture (CDNA3, gfx942) with $192\,\mathrm{GB}$ HBM3 memory; its
+compute, memory, and interconnect characteristics for LLM inference are
+analyzed comprehensively in \cite{mi300xperf}. The software stack is
+ROCm 7.2.0 with the HIP runtime
 (\texttt{rocm-hip:6.2.41133-dd7f95766}). We use the AITER kernel library
-\cite{aiter} for fused MoE and attention kernels.
+\cite{aiter} for fused MoE and attention kernels; the architecture-aware
+benchmarking study of \cite{archawareamd} on the closely related MI325X
+quantifies the throughput sensitivity of AITER routing decisions across
+MoE vs.\ dense attention kernels.
 
 The MI300X's memory capacity makes it uniquely suited to long-context
 workloads. Apohara's KV-cache compression specifically targets workloads where
 MI300X-class hardware enables 64K+ context lengths --- workloads infeasible on
 consumer GPUs, where FP16 KV cache for a 235B MoE at 64K context would exceed
-available VRAM.
+available VRAM. An alternative strategy when memory budgets are even
+smaller is per-agent KV cache persistence to disk, as in
+\cite{persistq4kv} for edge devices; Apohara takes the complementary path
+of shared-cluster INT4 KV cache backed by Redis-resident LMCache, as
+detailed in Section~\ref{sec:impl}.
 
 \subsection{Measured HBM3 Bandwidth}
 \label{sec:hardware:bandwidth}
@@ -960,11 +979,17 @@ future work.
 
 Apohara's INT4 compression codec packs two 4-bit nibbles per byte with a
 single shared (scale, zero\_point) pair per packed byte\textemdash a
-\emph{per-byte joint-quantization} scheme. This design, documented in the
+\emph{per-byte joint-quantization} scheme. The first few tokens of each
+sequence (the \emph{attention sinks}) are preserved at FP16 fidelity, a
+design choice grounded in recent work on attention-sink-aware
+quantization \cite{kvsink}, which shows that sink tokens carry
+disproportionate cross-layer activation mass and that their precision is
+critical for downstream quality. This design, documented in the
 V7.0.0-alpha.3 \#9 fix in \texttt{AUDIT.md}, favors implementation
 simplicity and predictable packing overhead. The measured $3.55\times$
 reduction is a direct consequence: the theoretical maximum for INT4 is
-$4\times$, and the per-byte scale overhead accounts for the remaining gap.
+$4\times$, and the per-byte scale overhead plus sink-token FP16 carve-out
+account for the remaining gap.
 
 \subsection{FWHT Runtime on MI300X}
 \label{sec:fwht:runtime}
