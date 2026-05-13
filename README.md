@@ -27,6 +27,17 @@
   <a href="AUDIT.md"><img src="https://img.shields.io/badge/AUDIT.md-public-FF6B00.svg?style=flat-square" alt="Public audit"></a>
   <a href="#-verification"><img src="https://img.shields.io/badge/tests-310%20passed%20%C2%B7%200%20failed-27AE60.svg?style=flat-square" alt="310 tests passing"></a>
   <a href="https://youtu.be/swEcn-6pAmA"><img src="https://img.shields.io/badge/%E2%96%B6%EF%B8%8F-watch%20demo%20on%20YouTube-FF0000.svg?style=flat-square" alt="Watch the demo on YouTube"></a>
+  <a href="https://huggingface.co/spaces/SuarezPM/apohara-contextforge"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20HuggingFace-Space-FFB000.svg?style=flat-square" alt="Live demo on HuggingFace Spaces"></a>
+</p>
+
+<!-- TechEx 2026 submission callout -->
+<p align="center">
+  <strong>🦞 TechEx 2026 — Track 1 (Agent Security &amp; AI Governance) submission</strong><br>
+  <em>Defense-in-depth governance stack: <a href="https://github.com/veeainc/lobstertrap">Veea Lobster Trap</a> (perimeter)
+  + ContextForge INV-15 (formal invariant). Read the
+  <a href="docs/lobstertrap-integration.md">integration design</a> ·
+  <a href="configs/lobstertrap_policy.yaml">policy YAML</a> ·
+  <a href="tests/test_lobstertrap_integration.py">live integration tests</a> (4/4 PASS).</em>
 </p>
 
 <!-- Row 3 — stack -->
