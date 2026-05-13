@@ -26,13 +26,15 @@ from apohara_context_forge.storage.token_dance import TokenDanceStorage
 from apohara_context_forge.token_counter import TokenCounter
 
 
-# Resolve benchmark JSON across the two known locations the runner may emit to.
+# Resolve benchmark JSON across the known locations the runner may emit to.
+# Paths are repo-relative so HF Spaces deploy and CI find the same files.
 def _load_benchmark_results() -> tuple[dict, str]:
     here = os.path.dirname(__file__)
+    repo_root = os.path.dirname(here)
     candidates = [
         os.path.join(here, "benchmark_v5_results.json"),
         os.path.join(here, "benchmark_results.json"),
-        "/home/linconx/Apohara-ContextForge/demo/benchmark_v5_results.json",
+        os.path.join(repo_root, "logs", "benchmark_v5_results.json"),
     ]
     for path in candidates:
         if os.path.exists(path):
@@ -510,6 +512,22 @@ def create_benchmark_tab():
     )
 
 
+_V7_HEADLINE = """
+## V7.0.0-rc.2 — Measured on AMD MI300X
+
+**Headline:** **3.55× INT4 KV reduction** constant across 4K-262K
+context (64× scale span, paper v2.0.1 §5).
+**HBM3 bandwidth:** 3.73 TB/s effective (70.5% of advertised 5.3 TB/s
+peak, paper §3). **INV-15 safety:** 0 / 1,210 violations on the
+exhaustive sweep.
+
+- 📄 Paper v2.0.1 (12 refs) — [Zenodo DOI 10.5281/zenodo.20114594](https://doi.org/10.5281/zenodo.20114594)
+- 🐙 Repo: [github.com/SuarezPM/Apohara_Context_Forge](https://github.com/SuarezPM/Apohara_Context_Forge)
+- 🔒 License: Apache-2.0 · 🔬 Honesty log: [AUDIT.md](https://github.com/SuarezPM/Apohara_Context_Forge/blob/main/AUDIT.md)
+- 🚧 V8 codec (per-nibble independent scales) in flight: [docs/v8-codec-design.md](https://github.com/SuarezPM/Apohara_Context_Forge/blob/main/docs/v8-codec-design.md)
+"""
+
+
 def _v6_snapshot() -> str:
     """Run a quick TokenDance + JCR + AITER snapshot for the dashboard."""
     rng = np.random.default_rng(0)
@@ -613,6 +631,7 @@ def create_architecture_tab():
 | JCR safety gate activations | tracked per run |
 """
 
+    gr.Markdown(_V7_HEADLINE)
     gr.Markdown(ARCHITECTURE_DIAGRAM)
     gr.Markdown(_v6_snapshot())
     gr.Markdown(references)

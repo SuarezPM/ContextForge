@@ -351,6 +351,26 @@ class LMCacheConnectorV2:
     # Telemetry                                                          #
     # ------------------------------------------------------------------ #
 
+    @property
+    def backend(self) -> str:
+        """Engine import strategy actually used at construction time.
+
+        One of:
+
+        - ``"cuda"`` — legacy ``lmcache.experimental.cache_engine`` path
+          (lmcache < 0.4.x, CUDA wheel).
+        - ``"non_cuda"`` — current ``lmcache.v1.cache_engine`` path
+          which falls back to ``lmcache.non_cuda_equivalents`` on
+          machines without ``libcudart.so.12`` (AMD ROCm / CPU).
+        - ``"fallback"`` — neither lmcache import strategy worked;
+          the connector runs in honest-fallback mode.
+
+        Exposed for the Grafana dashboard + Sprint 5 deployment
+        readiness checks: a multi-node MI300X cluster expects
+        ``"non_cuda"`` (the v1 path), never ``"cuda"``.
+        """
+        return self._backend
+
     def get_stats(self) -> dict:
         return {
             "active": self._active,

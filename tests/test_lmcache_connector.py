@@ -77,6 +77,42 @@ class _FakeEngine:
 # Honest-fallback path                                                       #
 # ---------------------------------------------------------------------------
 
+class TestBackendDetection:
+    """Verify the ``backend`` property reports the import strategy that
+    was actually used. This is the Sprint 5 deployment-readiness check:
+    a multi-node MI300X cluster expects ``"non_cuda"`` (the v1 path),
+    never ``"cuda"``.
+    """
+
+    def test_backend_reports_fallback_when_lmcache_missing(self):
+        """If neither lmcache import strategy works, backend == 'fallback'."""
+        conn = LMCacheConnectorV2()
+        if conn.is_active():
+            pytest.skip("lmcache is installed; this test covers the no-import case")
+        assert conn.backend == "fallback"
+        # And the stats dict surfaces the same value.
+        assert conn.get_stats()["backend"] == "fallback"
+
+    def test_backend_is_cuda_or_non_cuda_when_lmcache_present(self):
+        """If lmcache is installed, backend is one of the wired values."""
+        conn = LMCacheConnectorV2()
+        if not conn.is_active():
+            pytest.skip("lmcache not installed; this test requires wired engine")
+        assert conn.backend in {"cuda", "non_cuda"}
+
+    def test_backend_is_fallback_for_injected_engine(self):
+        """When the engine is injected directly, no import was attempted
+        so backend remains ``"fallback"`` — but ``is_active()`` is True
+        because the connector has a real engine to talk to."""
+        engine = _FakeEngine()
+        conn = LMCacheConnectorV2(engine=engine)
+        assert conn.is_active() is True
+        # Backend is 'fallback' because _try_build_engine() was skipped.
+        # This is honest: the connector did not detect any import path,
+        # the caller supplied the engine.
+        assert conn.backend == "fallback"
+
+
 class TestNoEngine:
     """When no engine is wired and ``lmcache`` is not importable
     (the dev-laptop / HF-Space case), every method returns the
