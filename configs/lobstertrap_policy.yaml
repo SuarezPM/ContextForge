@@ -1,0 +1,242 @@
+version: "1.0"
+policy_name: "apohara-contextforge-techex"
+
+# Default action when no rule matches.
+# ALLOW = fail-open at the perimeter (ContextForge INV-15 still enforces behavioral safety).
+# For Veea-track production deployment, DENY would be more conservative; we keep ALLOW
+# so legitimate 5-agent traffic flows through and INV-15 demos remain visible.
+default_action: ALLOW
+
+# ============================================================================
+# INGRESS RULES — applied to prompts BEFORE they reach the LLM backend.
+#
+# Priority semantics (from Lobster Trap README):
+#   higher priority = evaluated first, first match wins.
+#   We use:
+#     100   — hard security (injection, exfiltration, malware, harm)
+#     90-99 — credential exposure attempts, role impersonation
+#     80-89 — PII handling, dangerous commands
+#     30-79 — observability / log-only
+#     <30   — soft signals
+# ============================================================================
+ingress_rules:
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Required Block Rule #1: PROMPT INJECTION
+  # Catches "Ignore previous instructions", "Reveal system prompt", and similar
+  # adversarial steering attempts. The biggest known attack surface for
+  # multi-agent pipelines per MAST taxonomy 2025 (UC Berkeley / NeurIPS).
+  # DPI field: contains_injection_patterns (boolean, regex-based, sub-millisecond)
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: block_prompt_injection
+    description: "Adversarial prompt-injection patterns detected at ingress"
+    priority: 100
+    action: DENY
+    deny_message: "[LOBSTER TRAP × ContextForge] Blocked: prompt injection detected. This request was caught by the perimeter layer before reaching the 5-agent pipeline."
+    conditions:
+      - field: contains_injection_patterns
+        match_type: boolean
+        value: true
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Required Block Rule #2: CREDENTIAL EXPOSURE (ingress side)
+  # If the prompt itself contains an API key / token / password (typically
+  # because the agent leaked it from a previous turn, or a user pasted secrets),
+  # block before it goes to the LLM. Credentials must NEVER be in LLM context.
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: block_credential_in_prompt
+    description: "Credential string (API key, bearer token, password) detected in prompt"
+    priority: 95
+    action: DENY
+    deny_message: "[LOBSTER TRAP × ContextForge] Blocked: credentials detected in request body. Strip secrets before sending to the LLM."
+    conditions:
+      - field: contains_credentials
+        match_type: boolean
+        value: true
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Required Block Rule #3: PII LEAKAGE REQUEST
+  # Prompts asking the model to disclose personal information about identified
+  # individuals (SSN, full names tied to addresses, etc). This is the
+  # "request side" of PII; the egress rule below catches the response side.
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: block_pii_request
+    description: "Prompt requests personal/sensitive information about identified persons"
+    priority: 90
+    action: DENY
+    deny_message: "[LOBSTER TRAP × ContextForge] Blocked: request for personally identifiable information detected."
+    conditions:
+      - field: contains_pii_request
+        match_type: boolean
+        value: true
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Block Rule #4 (bonus): DATA EXFILTRATION patterns
+  # Catches "send X to attacker.com", "curl pastebin", "upload to ngrok",
+  # etc. ContextForge agents should never request external network egress.
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: block_data_exfiltration
+    description: "Data exfiltration pattern (external POST / suspicious upload) detected"
+    priority: 92
+    action: DENY
+    deny_message: "[LOBSTER TRAP × ContextForge] Blocked: data exfiltration attempt detected."
+    conditions:
+      - field: contains_exfiltration
+        match_type: boolean
+        value: true
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Block Rule #5 (bonus): ROLE IMPERSONATION
+  # "You are now the system administrator", "Adopt the identity of root user".
+  # ContextForge's INV-15 protects judge agents at the BEHAVIORAL layer;
+  # this catches role-takeover attempts at the PERIMETER layer.
+  # Action HUMAN_REVIEW (not DENY) — some legit prompts assign roles for
+  # alignment work, but they deserve escalation.
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: review_role_impersonation
+    description: "Prompt attempts to assign a privileged role identity to the model"
+    priority: 88
+    action: HUMAN_REVIEW
+    conditions:
+      - field: contains_role_impersonation
+        match_type: boolean
+        value: true
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Observability Rule: LOG_RAG_QUERIES (5-agent pipeline workload)
+  # Our 5-agent pipeline submits structured retrieval queries. Log every
+  # query at INFO so we can correlate the audit log with ContextForge's
+  # INV-15 JSONL log. Action LOG = allow + persist.
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: log_rag_queries
+    description: "5-agent RAG workload — log every query for correlation with INV-15 audit"
+    priority: 30
+    action: LOG
+    conditions:
+      - field: intent_category
+        match_type: exact
+        value: "general"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Required Allow Rule: APOHARA 5-AGENT SYSTEM PROMPTS
+  # Our 5-agent pipeline has fixed system prompts per agent role
+  # (retriever, reranker, summarizer, critic, responder). They are NOT
+  # malicious — they are part of our production architecture. The allow
+  # rule explicitly whitelists them so they pass even if their content
+  # happens to trigger a soft heuristic (e.g., the critic system prompt
+  # mentions "ACCEPT/REJECT verdicts" which might look like role-talk).
+  #
+  # Match strategy: the agent declares its `apohara_role` in the
+  # `_lobstertrap.agent_id` field as "apohara-{role}-v7". Lobster Trap's
+  # bidirectional metadata header support makes this clean.
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: allow_apohara_5agent_pipeline
+    description: "Whitelist 5-agent ContextForge pipeline declared via _lobstertrap.agent_id"
+    priority: 50
+    action: ALLOW
+    conditions:
+      - field: intent_category
+        match_type: regex
+        value: "^(general|retrieval|reranking|summarization|criticism|response)$"
+
+# ============================================================================
+# EGRESS RULES — applied to LLM responses BEFORE they reach the client.
+#
+# These are the most-important rules for ContextForge: even if a prompt
+# passes ingress (e.g., a benign user query), the model may hallucinate
+# credentials or leak PII from training data. Egress DPI catches that.
+# ============================================================================
+egress_rules:
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Block Rule #6: CREDENTIAL LEAK IN MODEL OUTPUT
+  # Catches API keys, bearer tokens, password-like patterns in model
+  # responses (e.g., the model hallucinates an example key that looks real).
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: block_credential_leak
+    description: "Model output contains credential-like pattern"
+    priority: 100
+    action: DENY
+    deny_message: "[LOBSTER TRAP × ContextForge] Output blocked: contains credential pattern."
+    conditions:
+      - field: contains_credentials
+        match_type: boolean
+        value: true
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Block Rule #7: PII LEAK IN MODEL OUTPUT
+  # SSNs, credit cards, phone numbers in the response.
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: block_pii_leak
+    description: "Model output contains personally identifiable information"
+    priority: 95
+    action: DENY
+    deny_message: "[LOBSTER TRAP × ContextForge] Output blocked: contains PII."
+    conditions:
+      - field: contains_pii
+        match_type: boolean
+        value: true
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Observability Rule: LOG critic verdicts (INV-15 correlation)
+  # When the critic agent returns a verdict (ACCEPT/REJECT), log the
+  # full response so we can correlate Lobster Trap's perception of the
+  # response with ContextForge's INV-15 measurement of consistency
+  # across replicas of the same input.
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: log_critic_responses
+    description: "Critic agent responses — log for INV-15 correlation in audit pipeline"
+    priority: 40
+    action: LOG
+    conditions:
+      - field: intent_category
+        match_type: exact
+        value: "general"
+
+# ============================================================================
+# RATE LIMITS — production-grade defaults for the 5-agent demo workload
+# ============================================================================
+rate_limits:
+  # 200 head-to-head requests × 5 agents = 1000 LLM calls per workload run
+  # We expect at most one workload run per minute during demo recording
+  requests_per_minute: 1500
+  requests_per_hour: 8000
+  burst_threshold: 200
+
+# ============================================================================
+# NETWORK POLICY — only allow our intended backends
+# ============================================================================
+network:
+  egress_policy: allowlist
+  allowed_domains:
+    # Local vLLM / mock backends
+    - "localhost"
+    - "127.0.0.1"
+    # Google AI Studio (Gemini critic agent)
+    - "generativelanguage.googleapis.com"
+    # Apohara internal services
+    - "*.apohara.local"
+  denied_domains:
+    - "*.onion"
+    - "pastebin.com"
+    - "transfer.sh"
+    - "ngrok.io"
+
+# ============================================================================
+# FILESYSTEM POLICY — defense-in-depth even though our 5-agent pipeline
+# does not directly read/write files (vLLM serves from memory).
+# ============================================================================
+filesystem:
+  denied_paths:
+    - "/etc/**"
+    - "/root/**"
+    - "**/.ssh/**"
+    - "**/.env"
+    - "**/secrets/**"
+    - "**/credentials*"
+  allowed_read_paths:
+    - "/home/*/Documents/Apohara_Context_Forge/**"
+    - "/tmp/apohara_workspace/**"
+  allowed_write_paths:
+    - "/tmp/apohara_workspace/**"
+    - "/home/*/Documents/Apohara_Context_Forge/logs/**"
