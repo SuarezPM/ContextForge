@@ -61,3 +61,23 @@ paper/*.toc
 # at runtime / during tests. Production deployments should mount this to
 # persistent storage; the in-repo path is transient.
 .apohara/
+
+# --- AI agent tooling (dev-machine-specific, NOT for public repo) --------
+# These dirs are configuration for AI coding assistants (Claude Code,
+# Codex CLI, ecc-tools bot, etc.) that the maintainers use locally.
+# They have zero value to repo cloners and may leak local preferences.
+.agents/
+.claude/
+.codex/
+.cursor/
+.aider*
+.continue/
+
+# --- Internal planning + release prep (mirrored to ~/Documentos/Apohara_PRIVATE/) ---
+# Maintainer planning docs, submission drafts, tag annotations live
+# outside the public repo to keep the surface professional.
+.omc/
+.release/
+
+# --- VS Code workspace files ---
+*.code-workspace

@@ -1,2 +1,0 @@
-[console_scripts]
-apohara = apohara_context_forge.main:main
