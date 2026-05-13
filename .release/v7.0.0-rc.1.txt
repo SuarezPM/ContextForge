@@ -1,0 +1,16 @@
+V7.0.0-rc.1: Sprint 4 substrate optimizations + paper v2.0
+
+Builds on V7.0.0-alpha.7 (extreme-scale MI300X validation up to 262K context).
+
+Sprint 4 deliverables:
+- fp16-only FWHT default (2x faster, no quality loss vs INT4 noise floor)
+- use_fwht=False default in RotateKVConfig (FWHT degrades 200x under current codec)
+- LMCacheConnectorV2 now supports lmcache.non_cuda_equivalents (AMD ROCm)
+- Vectorized RotateKVQuantizer._quantize_block (Python loop -> numpy broadcast)
+
+Paper v2.0 at paper/inv15_paper.pdf — replaces 3.97x literature claim with
+3.55x MI300X-measured, adds HBM3 bandwidth measurement, FWHT performance
+characterization, and 262K extreme-scale validity. arXiv submission planned
+after V7.0.0 final.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>

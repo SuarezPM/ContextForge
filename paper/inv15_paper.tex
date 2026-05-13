@@ -66,8 +66,8 @@
              {10.5281/zenodo.20114594} (Zenodo, indexed by Google Scholar).}\\
         APOHARA \textperiodcentered{} ContextForge}
 
-\date{May 10, 2026 \textperiodcentered{} rev.\ May 12, 2026
-      (V6.1 truth-up + V6.2 adversarial) \textperiodcentered{}
+\date{May 12, 2026 \textperiodcentered{} V2.0 with MI300X measurements
+      \textperiodcentered{}
       \href{https://doi.org/10.5281/zenodo.20114594}%
            {DOI: 10.5281/zenodo.20114594}}
 
@@ -104,7 +104,14 @@
     flags), a critic dense-prefill rate of $0.851$ over the Critic's
     input space, and full compatibility with $10.81\times$ TokenDance
     compression\textemdash with a mean gate latency of $1.7\,\mathrm{\mu s}$
-    per decision. To our knowledge, this is the first production
+    per decision. The Apohara codec achieves
+    \textbf{3.55$\times$ VRAM reduction measured on AMD Instinct MI300X
+    (192\,GB, ROCm 7.2.0), constant across context lengths 4K--262K}.
+    FWHT integration with Apohara's per-byte joint-quantization codec
+    degrades INT4 reconstruction quality by 200$\times$; we report
+    \texttt{use\_fwht=False} as the recommended configuration and discuss
+    a per-nibble independent scales codec as future work.
+    To our knowledge, this is the first production
     implementation of a formal safety invariant for cross-agent KV-cache
     reuse. We argue \INV{15} should be a standard preflight check in
     any system that shares KV state across judge-class agents.
@@ -189,10 +196,13 @@ MI300X. We make four contributions:
 
 The remainder of this paper is organized as follows.
 Section~\ref{sec:background} reviews cross-agent KV sharing and the JCR
-failure mode. Section~\ref{sec:invariant} introduces \INV{15} and its risk
-function. Section~\ref{sec:impl} describes the ContextForge implementation.
-Section~\ref{sec:eval} reports benchmark results on MI300X. We discuss
-extensions and limitations in Section~\ref{sec:discussion} and conclude in
+failure mode. Section~\ref{sec:hardware} characterizes the AMD Instinct MI300X
+hardware platform. Section~\ref{sec:invariant} introduces \INV{15} and its
+risk function. Section~\ref{sec:impl} describes the ContextForge
+implementation. Section~\ref{sec:eval} reports benchmark results on MI300X,
+including measured VRAM reduction factors and quantization quality.
+Section~\ref{sec:fwht} characterizes FWHT performance on MI300X.
+We discuss limitations in Section~\ref{sec:limitations} and conclude in
 Section~\ref{sec:conclusion}.
 
 % ============================================================================
@@ -274,6 +284,55 @@ pipeline will silently corrupt the Critic's verdict whenever the candidate
 layout changes between calls. The contribution of this paper is to resolve
 that tension by gating the Critic\textemdash and only the
 Critic\textemdash through a formal invariant.
+
+% ============================================================================
+\section{Hardware Context: AMD Instinct MI300X}
+\label{sec:hardware}
+% ============================================================================
+
+\subsection{Platform Specifications}
+\label{sec:hardware:specs}
+
+All experiments in this paper run on AMD Instinct MI300X virtual functions
+(VF) accessed through AMD DevCloud ATL1. The MI300X is a unified CPU+GPU
+architecture (CDNA3, gfx942) with $192\,\mathrm{GB}$ HBM3 memory. The
+software stack is ROCm 7.2.0 with the HIP runtime
+(\texttt{rocm-hip:6.2.41133-dd7f95766}). We use the AITER kernel library
+\cite{aiter} for fused MoE and attention kernels.
+
+The MI300X's memory capacity makes it uniquely suited to long-context
+workloads. Apohara's KV-cache compression specifically targets workloads where
+MI300X-class hardware enables 64K+ context lengths --- workloads infeasible on
+consumer GPUs, where FP16 KV cache for a 235B MoE at 64K context would exceed
+available VRAM.
+
+\subsection{Measured HBM3 Bandwidth}
+\label{sec:hardware:bandwidth}
+
+We measure HBM3 bandwidth using a STREAM-triad fp16 benchmark across four
+buffer sizes (1\,GB, 4\,GB, 16\,GB, 64\,GB), with five iterations each.
+The best measured triad bandwidth is $\mathbf{3.73\,\mathrm{TB/s}}$
+($3{,}734\,\mathrm{GB/s}$), corresponding to $\mathbf{70.5\,\%}$ of the
+advertised $5.3\,\mathrm{TB/s}$ peak.
+
+The efficiency gap has two sources. First, the DevCloud MI300X instances run
+as virtual functions (SR-IOV slices): each VF shares the physical die with
+other tenants, and memory controller arbitration reduces effective bandwidth.
+Second, the STREAM-triad kernel performs three memory operations per iteration
+(read $A$, read $B$, write $C$), introducing more write traffic than a pure
+copy benchmark; the best copy bandwidth we measure is
+$3{,}843\,\mathrm{GB/s}$ ($72.5\,\%$ of peak).
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.85\textwidth]{figures/fig9_hbm3_bandwidth.png}
+  \caption{Measured HBM3 bandwidth on MI300X VF across buffer sizes
+           (STREAM-triad fp16 and copy), compared to the $5.3\,\mathrm{TB/s}$
+           advertised peak. Best measured triad bandwidth:
+           $3.73\,\mathrm{TB/s}$ ($70.5\,\%$ efficiency). The gap reflects
+           SR-IOV virtualization overhead and triad write traffic.}
+  \label{fig:hbm3_bandwidth}
+\end{figure*}
 
 % ============================================================================
 \section{The JCR Safety Gate and \INV{15}}
@@ -639,6 +698,114 @@ $1.19 \times 10^{-7}$ (target $\leq 1 \times 10^{-4}$). Enabling
 Critic's KV cache is a small fraction of the total committee footprint
 and was already a high-divergence agent. See Table~\ref{tab:e2e}.
 
+\subsection{Reduction-Factor Constancy Across Scale}
+\label{sec:eval:reduction}
+
+We measure the Apohara INT4 codec's VRAM reduction factor across seven
+sequence lengths from 4K to 262K tokens on real MI300X hardware
+(\texttt{use\_fwht=False}; hardware: \texttt{rocm-hip:6.2.41133-dd7f95766:AMD
+Instinct MI300X VF}). Table~\ref{tab:reduction} reports the results.
+
+\begin{table}[t]
+  \centering
+  \small
+  \caption{INT4 VRAM reduction factor (\texttt{use\_fwht=False}) across
+           sequence lengths on MI300X. The factor is constant at
+           $3.55\times$ across the full 4K--262K range, confirming that
+           the codec's compression rate is length-invariant.}
+  \label{tab:reduction}
+  \begin{tabular}{@{}rr@{}}
+    \toprule
+    seq\_len & reduction\_factor \\
+    \midrule
+    4,096   & $3.54\times$ \\
+    8,192   & $3.55\times$ \\
+    16,384  & $3.55\times$ \\
+    32,768  & $3.55\times$ \\
+    65,536  & $3.55\times$ \\
+    131,072 & $3.56\times$ \\
+    262,144 & $3.56\times$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{figures/fig5_reduction_factor_vs_seq.png}
+  \caption{INT4 reduction factor vs.\ sequence length on MI300X
+           (\texttt{use\_fwht=False}). The $3.55\times$ factor is stable
+           across the full 4K--262K range; the slight upward drift at 131K
+           and 262K is within $0.006\times$ of the median value.}
+  \label{fig:reduction_factor}
+\end{figure}
+
+The measured $3.55\times$ is lower than the $3.97\times$ figure cited in
+the literature. The gap arises from Apohara's per-byte joint quantization
+codec (one (scale, zero\_point) pair per packed byte covering two nibbles),
+which trades reconstruction fidelity for packing simplicity. A per-nibble
+independent-scales codec would asymptotically approach the theoretical
+$4\times$ limit; we identify this as future work in
+Section~\ref{sec:limitations}.
+
+\subsection{Quantization Quality vs.\ Compression Pareto}
+\label{sec:eval:quant}
+
+We measure MSE and maximum absolute reconstruction error for four codec
+configurations on a shape $[1, 16384, 32, 128]$ KV tensor, using the same
+MI300X hardware. Results are in Table~\ref{tab:quant}.
+
+\begin{table*}[t]
+  \centering
+  \small
+  \caption{Quantization quality vs.\ compression Pareto on MI300X
+           (shape $[1, 16384, 32, 128]$, FP16 KV tensors). The INT4
+           \texttt{use\_fwht=True} configuration achieves identical
+           compression ratio to \texttt{use\_fwht=False} but degrades
+           MSE by $\approx\!200\times$, ruling it out for production
+           use. INT8 naive offers $1.88\times$ compression at low MSE.}
+  \label{tab:quant}
+  \begin{tabular}{@{}lrrrl@{}}
+    \toprule
+    Configuration & packed\_bytes & reduction\_factor & MSE (keys) & Notes \\
+    \midrule
+    FP16 baseline (reference)
+        & 268,435,456 & $1.00\times$ & $4.3\!\times\!10^{-8}$
+        & Round-trip identity \\
+    INT8 naive (per-channel min-max)
+        & 142,606,336 & $1.88\times$ & $3.4\!\times\!10^{-5}$
+        & 866\,ms encode \\
+    INT4 \texttt{use\_fwht=False}
+        & 75,563,008  & $3.55\times$ & $1.0\!\times\!10^{-2}$
+        & \textbf{recommended config} \\
+    INT4 \texttt{use\_fwht=True}
+        & 75,563,008  & $3.55\times$ & $\mathbf{2.0\!\times\!10^{0}}$
+        & $200\times$ worse than \texttt{False} \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{figures/fig8_quant_quality.png}
+  \caption{Quantization quality (MSE) vs.\ compression ratio Pareto on
+           MI300X. The INT4 \texttt{use\_fwht=True} configuration sits
+           far off the Pareto frontier: same compression as
+           \texttt{use\_fwht=False} but $\approx\!200\times$ higher MSE.
+           The large error arises from FWHT spreading per-byte scale noise
+           across all dimensions before quantization.}
+  \label{fig:quant_quality}
+\end{figure}
+
+The $200\times$ MSE degradation under \texttt{use\_fwht=True} is an honest
+finding that drives the \texttt{use\_fwht=False} default change in
+V7.0.0-rc.1. The root cause is architectural: Apohara's codec assigns one
+(scale, zero\_point) pair per packed byte, covering two 4-bit nibbles
+jointly. FWHT spreads activation energy across all dimensions before
+quantization, making the joint per-byte scale a poor approximation for any
+individual nibble's range. The result is quantization error that is
+$200\times$ larger in MSE than the non-FWHT path despite identical
+compression ratio.
+
 \subsection{End-to-End Pipeline}
 \label{sec:eval:e2e}
 
@@ -783,17 +950,120 @@ where the asymmetry of the loss weights $\lambda_{\mathrm{FP}} \ll
 \lambda_{\mathrm{FN}}$ reflects the asymmetric cost. We leave this to
 future work.
 
-\paragraph{Limitations.}
-Our risk score is a closed-form heuristic, not a learned model. It does
-not capture interactions among the four features (e.g., shuffled layout
-may matter less for $\Cand = 3$ than for $\Cand = 6$). It also does not
-distinguish between \emph{candidate} reuse (the failure mode of
+% ============================================================================
+\section{FWHT Performance Characterization}
+\label{sec:fwht}
+% ============================================================================
+
+\subsection{Current Codec Design}
+\label{sec:fwht:design}
+
+Apohara's INT4 compression codec packs two 4-bit nibbles per byte with a
+single shared (scale, zero\_point) pair per packed byte\textemdash a
+\emph{per-byte joint-quantization} scheme. This design, documented in the
+V7.0.0-alpha.3 \#9 fix in \texttt{AUDIT.md}, favors implementation
+simplicity and predictable packing overhead. The measured $3.55\times$
+reduction is a direct consequence: the theoretical maximum for INT4 is
+$4\times$, and the per-byte scale overhead accounts for the remaining gap.
+
+\subsection{FWHT Runtime on MI300X}
+\label{sec:fwht:runtime}
+
+We benchmark pure-PyTorch FWHT transforms on MI300X across eight
+(seq\_len, num\_heads, head\_dim) configurations. Results are reported in
+Table~\ref{tab:fwht_runtime}.
+
+\begin{table}[t]
+  \centering
+  \small
+  \caption{Pure-torch FWHT runtime on MI300X across tensor configurations.
+           All runs use \texttt{batch=1}. FWHT requires $8\times$ temporary
+           memory during the transform (fp32 upcast of the full tensor).
+           fp16 in-place reduces this to $4.5\times$ overhead at
+           1.4--2.1$\times$ speedup.}
+  \label{tab:fwht_runtime}
+  \begin{tabular}{@{}lrr@{}}
+    \toprule
+    Config (seq, heads, dim) & FWHT duration (ms) & Throughput (GB/s) \\
+    \midrule
+    4K, 32h, 128d  &  1.2 & 28.2 \\
+    8K, 32h, 128d  &  2.3 & 28.7 \\
+    16K, 32h,  64d &  2.0 & 33.3 \\
+    16K, 32h, 128d &  5.3 & 25.2 \\
+    16K, 16h, 128d &  2.3 & 29.3 \\
+    16K, 32h, 256d & 11.7 & 22.9 \\
+    16K, 64h, 128d & 10.4 & 25.9 \\
+    32K, 32h, 128d & 10.5 & 25.6 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{figures/fig7_pure_torch_fwht.png}
+  \caption{Pure-torch FWHT throughput on MI300X across tensor sizes.
+           FWHT runtime scales linearly with tensor volume;
+           throughput is bounded by HBM3 bandwidth (cf.\
+           Section~\ref{sec:hardware:bandwidth}).}
+  \label{fig:fwht_perf}
+\end{figure}
+
+\subsection{FP16 In-Place vs.\ FP32 Upcast}
+\label{sec:fwht:fp16}
+
+The canonical FWHT implementation upcasts to FP32 before the butterfly
+operations, requiring $8\times$ peak memory overhead. We evaluate a
+fp16-in-place variant that keeps all butterfly arithmetic in FP16. Across
+18 configurations, the fp16 path achieves a $1.4$--$2.1\times$ speedup
+with peak memory overhead reduced from $8$--$12\times$ to
+$3.5$--$5\times$ relative to the baseline tensor.
+
+Precision loss from fp16 in-place is negligible in the INT4 operating
+regime: maximum absolute error is $\leq 0.0078$ (fp16 ULP), and MSE is
+$\approx 4.4 \times 10^{-7}$, which is well below the INT4 quantization
+noise floor ($\sim 10^{-2}$ from Table~\ref{tab:quant}). We therefore
+adopt fp16 FWHT as the default when FWHT is enabled, and note that the
+precision argument cannot rescue FWHT from the $200\times$ MSE
+degradation: that degradation is structural (per-byte scale mismatch after
+FWHT scrambling), not a floating-point precision issue.
+
+% ============================================================================
+\section{Limitations}
+\label{sec:limitations}
+% ============================================================================
+
+\paragraph{INT4 codec achieves $3.55\times$, not the $3.97\times$ literature target.}
+The gap between measured $3.55\times$ and the $3.97\times$ figure cited
+in prior work \cite{rotatekv} arises from Apohara's per-byte
+joint-quantization design: a single (scale, zero\_point) pair covers two
+nibbles jointly. A per-nibble independent-scales codec would improve
+reconstruction fidelity and approach the $4\times$ theoretical limit.
+This is explicitly identified as future codec work for V8+.
+
+\paragraph{LMCacheConnectorV2 requires CUDA backend (V6.x limitation).}
+The \code{LMCacheConnectorV2} class currently requires a CUDA backend
+for KV-cache transport. AMD ROCm fallback support is in-progress work
+for V7.0.0-rc.1 (W2 in the V7 release pipeline). Until this lands,
+multi-node KV sharing via LMCache on ROCm-only deployments falls back
+to the CPU path with reduced throughput.
+
+\paragraph{V6.2 adversarial benchmark is CPU simulation.}
+The V6.2 adversarial benchmark exercises the queueing controller under
+Poisson inter-arrivals on CPU, and does not exercise MI300X. Real
+adversarial KV-cache workloads (concurrent fills, eviction pressure,
+contended HBM3 bandwidth) on GPU remain unvalidated at the benchmark
+level. GPU adversarial benchmarks are scoped to V8+.
+
+\paragraph{Risk score is a closed-form heuristic, not a learned model.}
+The \INV{15} risk function (Eq.~\ref{eq:risk}) does not capture
+interactions among the four features (e.g., shuffled layout may matter
+less for $\Cand = 3$ than for $\Cand = 6$). It also does not distinguish
+between \emph{candidate} reuse (the JCR failure mode of
 \cite{jcrfailure}) and \emph{system-prompt} reuse, which is generally
 safe. A more refined gate would separate these dimensions; we leave that
-to future work. Finally, our benchmark is single-node single-GPU; the
-multi-node extension via LMCache \cite{lmcache} will require additional
-gate-state replication for which the audit log already provides the
-groundwork.
+to future work. Our benchmark is single-node single-GPU; the multi-node
+extension via LMCache \cite{lmcache} will require additional gate-state
+replication for which the audit log already provides the groundwork.
 
 % ============================================================================
 \section{Conclusion}
@@ -805,7 +1075,7 @@ multi-agent LLM pipelines, and the JCR Safety Gate that enforces it. The
 invariant is closed-form, deterministically computable in $O(1)$, and
 provably violation-free by construction. We implemented the gate as part
 of ContextForge, ran it on AMD Instinct MI300X with vLLM V1, and observed
-zero violations and a $1.000$ critic dense prefill rate across a full
+zero violations and a $0.851$ critic dense prefill rate across a full
 high-risk sweep, while preserving $10.81\times$ TokenDance compression
 for the non-judge agents. To our knowledge this is the first production
 implementation of a formal safety contract for cross-agent KV-cache reuse.
@@ -814,6 +1084,14 @@ layer\textemdash whether targeted at TokenDance-style sharing, KVCOMM
 anchor matching, or LMCache distributed caching\textemdash should include
 a preflight gate of this form. Safe KV reuse is not at odds with
 aggressive compression; it is a prerequisite for it.
+
+Apohara V7.0.0 demonstrates that honest, well-instrumented measurement of
+KV-cache reduction on real MI300X hardware reveals trade-offs (literature
+$3.97\times$ $\to$ measured $3.55\times$, FWHT quality degradation) that
+motivate future codec work. Measured HBM3 bandwidth ($3.73\,\mathrm{TB/s}$,
+$70.5\,\%$ of peak) and the constancy of the reduction factor across
+4K--262K context lengths establish a reliable empirical baseline for
+future optimization.
 
 \paragraph{Reproducibility.}
 The complete implementation, benchmark scenarios, and DevCloud-ATL1 logs
@@ -826,5 +1104,15 @@ scenario is S-15 in \code{demo/benchmark\_v5.py}.
 % ----------------------------------------------------------------------------
 \bibliography{references}
 % ----------------------------------------------------------------------------
+
+% arXiv submission instructions (V7.0.0 final):
+% 1. Build: tectonic paper/inv15_paper.tex
+% 2. Create arXiv account at https://arxiv.org/user/register if needed
+% 3. Submit at https://arxiv.org/submit/
+%    - Subject class: cs.PF (Performance) primary, cs.LG (Machine Learning) secondary
+%    - Comments field: "V2.0 with MI300X-measured numbers. Code at github.com/SuarezPM/Apohara_Context_Forge"
+%    - License: CC BY 4.0 (matches MIT for code)
+% 4. Pre-screen may need endorsement for cs.PF -- first-time submitter
+% 5. After submission, add arXiv ID to README badge
 
 \end{document}

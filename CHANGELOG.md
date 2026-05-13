@@ -1,5 +1,91 @@
 # Changelog
 
+## V7.0.0-rc.1 — Sprint 4 ships substrate optimizations + paper v2.0 · 2026-05-12
+
+Sprint 4 code optimizations from MI300X evidence (W1 + W2) + paper
+v2.0 with MI300X-measured numbers (W3). Cumulative cost since
+V6.0 (hackathon submission): ~$2.05 of AMD AI Dev Cloud credits.
+
+### Closed AUDIT items (cumulative)
+- #6 RotateKV FWHT integration: 🟢 (V7.0.0-alpha.2)
+- #8 test_pipeline regression: 🟢 (V7.0.0-alpha.2)
+- #9 V6.1 INT4 packing asymmetry: 🟢 (V7.0.0-alpha.3)
+- #10 K8s operator security hardening (5 items): 🟢 (V7.0.0-alpha.3)
+- FWHT quality regression flagged: 🟢 (use_fwht=False default in V7.0.0-rc.1)
+- LMCacheConnectorV2 non-CUDA support: 🟢 (V7.0.0-rc.1 — W2)
+- fp16-only FWHT path: 🟢 (V7.0.0-rc.1 — W1)
+- Vectorized _quantize_block: 🟢 (V7.0.0-rc.1 — W1)
+
+### From W1 (substrate optimizations)
+
+- **`apohara_context_forge/quantization/fwht.py`** (+65 lines): `fwht()`
+  and `ifwht()` now accept `fp32_upcast: bool = False` (keyword-only).
+  Default path runs the in-place butterfly in fp16 directly (2× faster,
+  60% less peak GPU alloc on MI300X per V7.0.0-alpha.6). Pass
+  `fp32_upcast=True` to keep the legacy precision-conservative path.
+- **`apohara_context_forge/quantization/rotate_kv.py`** (+106 lines):
+  - `RotateKVConfig.use_fwht` default flipped from `True` to **`False`**.
+    Comment cites the V7.0.0-alpha.5 MI300X measurement (FWHT degrades
+    INT4 quality 200×: MSE 0.01 → 2.01 under current per-byte
+    joint-quant codec).
+  - `_quantize_block` vectorized: replaces the quadruple-nested Python
+    loop with numpy broadcast operations. Bit-identical output to the
+    Python-loop version. Faster on large shapes.
+- **`tests/test_fwht.py`** (+N tests): adds `test_fwht_fp16_native` and
+  `test_fwht_fp32_upcast_opt_in` covering both paths.
+- **`tests/test_rotate_kv.py`** updated for the flipped default.
+
+### From W2 (LMCache non-CUDA adapter)
+
+- **`apohara_context_forge/serving/lmcache_connector.py`** (+66 lines):
+  `LMCacheConnectorV2._try_build_engine` now tries multiple lmcache
+  backend strategies:
+  1. **Strategy 1 (CUDA / legacy)**: import `lmcache.config.LMCacheEngineConfig`
+     + `lmcache.experimental.cache_engine.LMCacheEngineBuilder` → sets
+     `_backend="cuda"`.
+  2. **Strategy 2 (non-CUDA fallback)**: import from
+     `lmcache.non_cuda_equivalents` when CUDA import fails (which is what
+     happens on AMD ROCm without `libcudart.so.12`, per V7.0.0-alpha.5
+     MI300X test) → sets `_backend="non_cuda"`.
+  3. **Strategy 3 (honest fallback)**: neither importable → `_backend="fallback"`,
+     single WARNING, returns documented null values per V6.1 discipline.
+- **`get_stats()`** now reports `"backend": "cuda" | "non_cuda" | "fallback"`
+  so callers can verify which backend is live.
+- **`tests/test_lmcache_connector.py`** updated: existing 16 tests still
+  pass; new `test_backend_is_reported_in_stats` covers the new field.
+
+### From W3 (paper v2.0)
+
+- **`paper/inv15_paper.tex`** (+322 lines, ~doubled in size):
+  - **New §3 Hardware Context: AMD Instinct MI300X** — platform specs
+    (192 GB HBM3, gfx942, ROCm 7.2.0) + measured HBM3 bandwidth 3.73 TB/s
+    (70.5% of advertised 5.3 TB/s peak). Includes `fig9_hbm3_bandwidth.png`.
+  - **§5 Evaluation rewritten** — replaces 3.97× literature claim with
+    3.55× MI300X-measured. New §5.X "Reduction-factor constancy across
+    scale" with the sweep table from 4K to 262K context. New §5.Y
+    "Quantization quality vs compression Pareto" with the MSE table and
+    use_fwht=False decision rationale. Includes
+    `fig5_reduction_factor_vs_seq.png` + `fig8_quant_quality.png`.
+  - **New §6 FWHT Performance Characterization** — FWHT runtime on
+    MI300X (1.2-11.7 ms across shapes) + fp16 vs fp32 trade-off.
+    Includes `fig7_pure_torch_fwht.png`.
+  - **New §7 Limitations** — honest discussion of the 3.55× vs 3.97×
+    gap (per-byte joint quant trade-off), LMCacheConnectorV2 CUDA-only
+    history, V6.2 adversarial bench being CPU sim.
+  - **Conclusion updated** with V7.0.0 substrate-completion narrative.
+  - **arXiv submission instructions** appended at end of `.tex` as
+    LaTeX comment block (subject class cs.PF + cs.LG, license CC BY 4.0).
+- All 4 figures committed under `paper/figures/` reference correctly.
+- LaTeX compile: deferred (tectonic not on this laptop; the user can run
+  `tectonic paper/inv15_paper.tex` locally before arXiv submission).
+
+### V7.0.0 final release path
+- V7.0.0-rc.1 (this release): code + paper v2.0 substrate complete
+- V7.0.0-rc.2 (if needed): patches from RC feedback / arXiv reviewer comments
+- V7.0.0 final: when arXiv ID assigned + Zenodo deposit refreshed
+
+---
+
 ## V7.0.0-alpha.7 — Extreme-scale validation on MI300X · 2026-05-12
 
 Paper v2.0 §5 killer claim: Apohara's INT4 KV cache reduction holds

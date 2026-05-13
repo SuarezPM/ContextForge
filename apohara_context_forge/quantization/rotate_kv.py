@@ -30,7 +30,9 @@ class RotateKVConfig:
     bits: int = 4                # 2 | 4 | 8
     group_size: int = 64         # block-wise quantization block size (rows)
     sink_tokens: int = 4         # protect first N tokens at FP16
-    use_fwht: bool = True        # Fast Walsh-Hadamard Transform for outlier rotation
+    # V7.0.0-alpha.5 MI300X measurement: FWHT degrades INT4 quality 200x under
+    # per-byte joint-quant codec (MSE keys: 0.01 off vs 2.01 on). Default off.
+    use_fwht: bool = False       # Fast Walsh-Hadamard Transform for outlier rotation
     grouped_heads: int = 2       # heads per rotation group (Pre-RoPE grouped-head)
 
 
@@ -212,56 +214,80 @@ class RotateKVQuantizer:
         cfg = self._config
         batch, seq, num_heads, head_dim = states.shape
 
-        # For INT4, we pack 2 values per byte
-        # Store as uint8 with 2 values per entry
         n_blocks = seq // cfg.group_size
         if seq % cfg.group_size != 0:
             n_blocks += 1
 
-        # Packed shape: (n_blocks, group_size, num_heads, head_dim // 2)
         packed_head_dim = head_dim // 2
+        max_range = 15.0 if cfg.bits == 4 else 255.0
 
         keys_int4 = np.zeros((n_blocks, cfg.group_size, num_heads, packed_head_dim), dtype=np.uint8)
         scales = np.zeros((n_blocks, num_heads, packed_head_dim), dtype=np.float32)
         zero_points = np.zeros((n_blocks, num_heads, packed_head_dim), dtype=np.float32)
 
+        padded_seq = n_blocks * cfg.group_size
+        valid_mask = np.zeros(padded_seq, dtype=bool)
+        valid_mask[:seq] = True
+
+        # Preserve pre-existing "last batch wins" semantics from the V6.1
+        # Python loop (the packed array has no batch axis; each iteration
+        # overwrites the prior batch's quantization).
         for b in range(batch):
-            for h in range(num_heads):
-                for d in range(packed_head_dim):
-                    d_lo = 2 * d
-                    d_hi = 2 * d + 1
-                    for blk in range(n_blocks):
-                        start = blk * cfg.group_size
-                        end = min(start + cfg.group_size, seq)
-                        block_lo = states[b, start:end, h, d_lo]
-                        block_hi = states[b, start:end, h, d_hi]
+            buf = np.zeros((padded_seq, num_heads, head_dim), dtype=states.dtype)
+            buf[:seq] = states[b]
 
-                        if len(block_lo) == 0:
-                            continue
+            # Reshape to (n_blocks, group_size, num_heads, packed_head_dim, 2)
+            # so the last axis carries the (d_lo, d_hi) pair sharing scale/zp.
+            blocks = buf.reshape(n_blocks, cfg.group_size, num_heads, packed_head_dim, 2)
+            valid_blocks = valid_mask.reshape(n_blocks, cfg.group_size)
 
-                        # Joint asymmetric quantization over the (d_lo, d_hi) pair so
-                        # a single scale/zero_point governs both nibbles of the byte.
-                        min_val = float(min(np.min(block_lo), np.min(block_hi)))
-                        max_val = float(max(np.max(block_lo), np.max(block_hi)))
+            # Joint min/max over (group_size, pair) → (n_blocks, num_heads, packed_head_dim).
+            # Use valid_mask to ignore padded rows in the last partial block.
+            valid_4d = valid_blocks[:, :, None, None, None]  # broadcast to blocks shape
+            masked_for_min = np.where(valid_4d, blocks, np.inf)
+            masked_for_max = np.where(valid_4d, blocks, -np.inf)
+            min_val = np.min(masked_for_min, axis=(1, 4)).astype(np.float64)
+            max_val = np.max(masked_for_max, axis=(1, 4)).astype(np.float64)
 
-                        if cfg.bits == 4:
-                            max_range = 15.0
-                        else:
-                            max_range = 255.0
+            # Match V6.1 sentinel: empty block (no valid rows) -> scale=0, zp=0.
+            empty = ~valid_blocks.any(axis=1)  # (n_blocks,)
 
-                        scale = (max_val - min_val) / max_range if max_val > min_val else 1.0
-                        zero_point = -round(min_val / scale) if scale != 0 else 0
+            range_ = max_val - min_val
+            # V6.1 sets scale=1.0 when max==min (degenerate flat block); otherwise
+            # scale=range/max_range. Empty blocks are zeroed afterwards.
+            scale = np.where(range_ > 0, range_ / max_range, 1.0)
+            # V6.1 used built-in round() -> banker's rounding; mirror via np.rint
+            # which is half-to-even on numpy doubles.
+            zp = np.where(scale != 0, -np.rint(min_val / scale), 0.0)
 
-                        # Quantize both head_dim slots with the shared (scale, zp).
-                        q_lo = np.clip(np.round(block_lo / scale + zero_point), 0, max_range).astype(np.uint8)
-                        q_hi = np.clip(np.round(block_hi / scale + zero_point), 0, max_range).astype(np.uint8)
+            scale_f32 = scale.astype(np.float32)
+            zp_f32 = zp.astype(np.float32)
+            scale_f32[empty] = 0.0
+            zp_f32[empty] = 0.0
 
-                        # Pack: lower nibble = 2*d slot, upper nibble = 2*d+1 slot.
-                        for i in range(len(q_lo)):
-                            keys_int4[blk, i, h, d] = (q_lo[i] & 0xF) | ((q_hi[i] & 0xF) << 4)
+            # Quantize: shape (n_blocks, group_size, num_heads, packed_head_dim, 2).
+            # Broadcast scale/zp over group_size + pair axes.
+            scale_b = scale_f32[:, None, :, :, None]
+            zp_b = zp_f32[:, None, :, :, None]
+            # Guard div-by-zero on empty blocks where scale==0.
+            safe_scale = np.where(scale_b == 0, 1.0, scale_b)
+            q = np.clip(
+                np.round(blocks / safe_scale + zp_b),
+                0,
+                max_range,
+            ).astype(np.uint8)
 
-                        scales[blk, h, d] = scale
-                        zero_points[blk, h, d] = zero_point
+            q_lo = q[..., 0]
+            q_hi = q[..., 1]
+            packed = (q_lo & 0xF) | ((q_hi & 0xF) << 4)
+
+            # Zero out padded rows in the last partial block to match V6.1
+            # (which skipped writes entirely past `end = min(start+gs, seq)`).
+            packed = packed * valid_blocks[:, :, None, None].astype(np.uint8)
+
+            keys_int4[:] = packed
+            scales[:] = scale_f32
+            zero_points[:] = zp_f32
 
         return keys_int4, scales, zero_points
     

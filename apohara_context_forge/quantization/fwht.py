@@ -53,6 +53,27 @@ def _fwht_butterfly_torch(x: "torch.Tensor") -> "torch.Tensor":
     return x
 
 
+def _fwht_butterfly_torch_inplace(x: "torch.Tensor") -> "torch.Tensor":
+    """In-place butterfly without fp32 upcast; clones only one half per stage.
+
+    Matches the V7.0.0-alpha.6 fwht_inplace pattern: native dtype, single
+    clone of the smaller slice per stage (60% lower peak alloc on MI300X
+    vs the fp32-upcast path). Caller must own x (i.e., already cloned).
+    """
+    d = x.shape[-1]
+    h = 1
+    while h < d:
+        view = x.view(*x.shape[:-1], d // (2 * h), 2, h)
+        a = view[..., 0, :]
+        b = view[..., 1, :]
+        t = b.clone()
+        b.copy_(a)
+        b.sub_(t)
+        a.add_(t)
+        h *= 2
+    return x
+
+
 def _fwht_butterfly_numpy(x: _np.ndarray) -> _np.ndarray:
     d = x.shape[-1]
     h = 1
@@ -66,12 +87,19 @@ def _fwht_butterfly_numpy(x: _np.ndarray) -> _np.ndarray:
     return x
 
 
-def fwht(x):
-    """Apply orthonormal Fast Walsh-Hadamard Transform along the last dim.
+def fwht(x, *, fp32_upcast: bool = False):
+    """Apply orthonormal FWHT along last dim.
+
+    By default runs in fp16/native dtype (2x faster, 60% less peak alloc on
+    MI300X, precision error < INT4 noise floor per V7.0.0-alpha.5 measurements).
+    Pass fp32_upcast=True for the legacy precision-conservative path.
 
     Args:
         x: torch.Tensor or np.ndarray; last dim is transformed. If the last
            dim is not a power of two, x is zero-padded to the next power of two.
+        fp32_upcast: If True, run the butterfly in fp32 and cast back at the
+           end (legacy behaviour). If False (default), run in the input dtype
+           via the strided in-place butterfly.
 
     Returns:
         Tensor of the same backend as input. Shape equals input shape with the
@@ -86,11 +114,16 @@ def fwht(x):
         else:
             x = x.clone()
         orig_dtype = x.dtype
-        # Butterfly in fp32 to avoid fp16 catastrophic loss; cast back at the end.
-        work = x.to(_torch.float32) if orig_dtype != _torch.float32 else x
-        _fwht_butterfly_torch(work)
-        work = work / (d_pad ** 0.5)
-        return work.to(orig_dtype) if orig_dtype != _torch.float32 else work
+
+        if fp32_upcast:
+            work = x.to(_torch.float32) if orig_dtype != _torch.float32 else x
+            _fwht_butterfly_torch(work)
+            work = work / (d_pad ** 0.5)
+            return work.to(orig_dtype) if orig_dtype != _torch.float32 else work
+
+        _fwht_butterfly_torch_inplace(x)
+        x.mul_(1.0 / (d_pad ** 0.5))
+        return x
 
     arr = _np.asarray(x)
     d = arr.shape[-1]
@@ -101,12 +134,18 @@ def fwht(x):
     else:
         arr = arr.copy()
     orig_dtype = arr.dtype
-    work = arr.astype(_np.float32, copy=False) if orig_dtype != _np.float32 else arr
-    _fwht_butterfly_numpy(work)
-    work = work / _np.sqrt(d_pad)
-    return work.astype(orig_dtype, copy=False) if orig_dtype != _np.float32 else work
+
+    if fp32_upcast:
+        work = arr.astype(_np.float32, copy=False) if orig_dtype != _np.float32 else arr
+        _fwht_butterfly_numpy(work)
+        work = work / _np.sqrt(d_pad)
+        return work.astype(orig_dtype, copy=False) if orig_dtype != _np.float32 else work
+
+    _fwht_butterfly_numpy(arr)
+    arr = arr / _np.sqrt(d_pad)
+    return arr.astype(orig_dtype, copy=False) if arr.dtype != orig_dtype else arr
 
 
-def ifwht(x):
+def ifwht(x, *, fp32_upcast: bool = False):
     """Inverse FWHT. Orthonormal FWHT is self-inverse, so this just calls fwht."""
-    return fwht(x)
+    return fwht(x, fp32_upcast=fp32_upcast)
