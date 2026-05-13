@@ -80,6 +80,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--vllm-endpoint", default="http://localhost:8000")
     p.add_argument("--mock", action="store_true",
                    help="Skip vLLM, generate synthetic responses")
+    p.add_argument("--lobstertrap-endpoint", default=None,
+                   help="If set (e.g. http://localhost:8080), route through Lobster "
+                        "Trap proxy. The head-to-head ratio reflects defense-in-depth "
+                        "(perimeter LT + behavioral INV-15) when both are enabled.")
+    p.add_argument("--critic-provider", default=None,
+                   help="Override the critic agent's model (e.g. 'gemini-3-pro').")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--out", type=Path, required=True,
                    help="Output JSON (logs/mi300x_h2h_<mode>_<ts>.json)")
@@ -107,6 +113,8 @@ def main() -> int:
         mode=backend_mode,
         vllm_endpoint=args.vllm_endpoint,
         seed=args.seed,
+        lobstertrap_endpoint=args.lobstertrap_endpoint,
+        critic_provider_override=args.critic_provider,
     )
     payload["timestamp_unix"] = int(time.time())
     payload["script"] = "sprint5_head_to_head"

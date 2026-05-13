@@ -179,12 +179,30 @@ def run_request_vllm(
     user_query: str,
     context: str,
     timeout_s: float = 30.0,
+    lobstertrap_endpoint: Optional[str] = None,
+    critic_provider_override: Optional[str] = None,
 ) -> dict:
     """Pipeline one request through 5 agents against a real vLLM server.
 
     Returns a per-request record with latency + critic verdict.
     Skipped on systems where ``httpx`` is unavailable; the caller
     falls back to ``run_request_mock`` automatically.
+
+    Optional integrations:
+
+    * ``lobstertrap_endpoint`` — if set (e.g. ``http://localhost:8080``),
+      all agent requests are routed through Lobster Trap proxy instead
+      of directly to the backend. Each request includes
+      ``_lobstertrap.{declared_intent, agent_id, declared_paths=null}``
+      so the proxy can compute intent-mismatch flags. The LT response
+      header ``_lobstertrap`` is captured into the returned record's
+      ``lobstertrap_decisions`` list.
+    * ``critic_provider_override`` — if set (e.g. ``"gemini-3-pro"``),
+      the critic agent's request is sent to a different model name.
+      The endpoint is still the same (we assume Gemini AI Studio is
+      OpenAI-compatible via a gateway, or we use mock semantics in
+      tests). Production deployments would route the critic to a
+      separate base URL — that's a Day 4 enhancement.
     """
     try:
         import httpx  # noqa: PLC0415
@@ -193,23 +211,46 @@ def run_request_vllm(
             f"run_request_vllm requires httpx ({exc}); install or use --mock"
         ) from None
 
+    # If LT is in the loop, send to LT and let LT forward to ``endpoint``.
+    # Lobster Trap is configured at startup with --backend pointing at
+    # ``endpoint``; the agent client only needs the LT URL.
+    proxy_url = lobstertrap_endpoint if lobstertrap_endpoint else endpoint
+
     t0 = time.perf_counter()
     critic_verdict = "UNKNOWN"
     total_tokens = 0
+    lobstertrap_decisions: list[dict] = []
 
     with httpx.Client(timeout=timeout_s) as client:
         chain_input = f"User query: {user_query}\nContext: {context}"
         for agent in agents:
+            # Resolve which model to use for this agent. Default = the
+            # workload's ``model`` arg. Critic can be overridden.
+            agent_model = model
+            if agent.role == "critic" and critic_provider_override:
+                agent_model = critic_provider_override
+
+            request_body: dict = {
+                "model": agent_model,
+                "messages": [
+                    {"role": "system", "content": agent.system_prompt},
+                    {"role": "user", "content": chain_input},
+                ],
+                "max_tokens": 256,
+            }
+            # If routing via Lobster Trap, declare our intent so the
+            # proxy can flag intent-mismatch automatically (one of the
+            # killer features of the bidirectional metadata protocol).
+            if lobstertrap_endpoint:
+                request_body["_lobstertrap"] = {
+                    "declared_intent": _intent_for_role(agent.apohara_role),
+                    "agent_id": f"apohara-{agent.apohara_role}-v7",
+                    "declared_paths": None,
+                }
+
             resp = client.post(
-                f"{endpoint}/v1/chat/completions",
-                json={
-                    "model": model,
-                    "messages": [
-                        {"role": "system", "content": agent.system_prompt},
-                        {"role": "user", "content": chain_input},
-                    ],
-                    "max_tokens": 256,
-                },
+                f"{proxy_url}/v1/chat/completions",
+                json=request_body,
             )
             resp.raise_for_status()
             data = resp.json()
@@ -221,12 +262,36 @@ def run_request_vllm(
                     "ACCEPT" if "ACCEPT" in choice.upper() else "REJECT"
                 )
 
+            # Capture Lobster Trap audit decision if present.
+            lt_field = data.get("_lobstertrap")
+            if lt_field:
+                lobstertrap_decisions.append({
+                    "agent_role": agent.role,
+                    "verdict": lt_field.get("verdict"),
+                    "ingress_action": lt_field.get("ingress", {}).get("action"),
+                    "egress_action": lt_field.get("egress", {}).get("action"),
+                    "mismatches": lt_field.get("ingress", {}).get("mismatches", []),
+                })
+
     elapsed_ms = (time.perf_counter() - t0) * 1000.0
     return {
         "latency_ms": elapsed_ms,
         "total_tokens": total_tokens,
         "critic_verdict": critic_verdict,
+        "lobstertrap_decisions": lobstertrap_decisions,
     }
+
+
+def _intent_for_role(apohara_role: str) -> str:
+    """Map our apohara_role labels to Lobster Trap intent_category strings.
+
+    LT's DPI classifies intents into: code_execution, file_io, network,
+    system, communication, credential_access, data_access, general.
+    For our 5-agent RAG pipeline all roles map to "general" because we
+    only do text generation; this lets the allow_apohara_5agent_pipeline
+    rule fire on a deterministic match.
+    """
+    return "general"
 
 
 def run_request_mock(
@@ -237,6 +302,8 @@ def run_request_mock(
     rng: random.Random,
     inv15_enabled: bool,
     critic_flip_rate: float = 0.20,
+    critic_provider_override: Optional[str] = None,
+    lobstertrap_simulated: bool = False,
 ) -> dict:
     """Pipeline one request without a real model.
 
@@ -275,13 +342,38 @@ def run_request_mock(
     else:
         critic_verdict = base_verdict
 
+    # Gemini critic biases verdict distribution slightly so the demo
+    # shows the critic-provider knob is meaningful end-to-end.
+    if critic_provider_override and critic_provider_override.startswith("gemini"):
+        # Gemini critic biases toward ACCEPT (75% vs 70% baseline) when
+        # base verdict is in the "marginal" zone. Keeps INV-15 semantics
+        # intact: with INV-15 ON, the verdict is still deterministic per
+        # (query, context) pair across replicas.
+        if base_hash >= 700 and base_hash < 750:
+            critic_verdict = "ACCEPT"
+
     # Synthesized token count (Llama-3-8B average ~256 per agent)
     total_tokens = sum(rng.randint(120, 320) for _ in agents)
+
+    # Simulated Lobster Trap decision (mock path). For mock we assume all
+    # 5 agents declare general intent and LT allows them. Real LT
+    # decisions surface via run_request_vllm.lobstertrap_decisions.
+    lobstertrap_decisions: list[dict] = []
+    if lobstertrap_simulated:
+        for agent in agents:
+            lobstertrap_decisions.append({
+                "agent_role": agent.role,
+                "verdict": "ALLOW",
+                "ingress_action": "ALLOW",
+                "egress_action": "ALLOW",
+                "mismatches": [],
+            })
 
     return {
         "latency_ms": total_latency_ms,
         "total_tokens": total_tokens,
         "critic_verdict": critic_verdict,
+        "lobstertrap_decisions": lobstertrap_decisions,
     }
 
 
@@ -297,6 +389,8 @@ def run_workload(
     mode: str,
     vllm_endpoint: Optional[str] = None,
     seed: int = 0,
+    lobstertrap_endpoint: Optional[str] = None,
+    critic_provider_override: Optional[str] = None,
 ) -> dict:
     """Run N pipeline requests and aggregate metrics.
 
@@ -347,6 +441,8 @@ def run_workload(
                 agents=config.agents,
                 user_query=user_query,
                 context=context,
+                lobstertrap_endpoint=lobstertrap_endpoint,
+                critic_provider_override=critic_provider_override,
             )
         else:
             result = run_request_mock(
@@ -355,6 +451,8 @@ def run_workload(
                 context=context,
                 rng=rng,
                 inv15_enabled=config.inv15_enabled,
+                critic_provider_override=critic_provider_override,
+                lobstertrap_simulated=lobstertrap_endpoint is not None,
             )
 
         records.append({
@@ -366,6 +464,7 @@ def run_workload(
             "total_tokens": result["total_tokens"],
             "critic_verdict": result["critic_verdict"],
             "inv15_decisions": per_agent_inv15,
+            "lobstertrap_decisions": result.get("lobstertrap_decisions", []),
         })
         pair_verdicts.setdefault(pair_id, []).append(result["critic_verdict"])
 
@@ -374,6 +473,12 @@ def run_workload(
     latencies = [r["latency_ms"] for r in records]
     tokens = [r["total_tokens"] for r in records]
     inv15_fires = sum(1 for d in inv15_decisions_log if d["inv15_fired"])
+    lt_block_total = sum(
+        1
+        for r in records
+        for d in r.get("lobstertrap_decisions", [])
+        if d.get("ingress_action") == "DENY" or d.get("egress_action") == "DENY"
+    )
 
     summary = {
         "n_requests": n_requests,
@@ -394,6 +499,9 @@ def run_workload(
         "inv15_fires_total": inv15_fires,
         "inv15_fire_rate": inv15_fires / max(len(inv15_decisions_log), 1),
         "inv15_enabled": config.inv15_enabled,
+        "lobstertrap_enabled": lobstertrap_endpoint is not None,
+        "lobstertrap_blocks_total": lt_block_total,
+        "critic_provider": critic_provider_override or "default",
     }
     return {
         "summary": summary,
@@ -404,5 +512,7 @@ def run_workload(
             "inv15_threshold_tau": config.inv15_threshold_tau,
             "n_requests": n_requests,
             "agent_roles": [a.role for a in config.agents],
+            "lobstertrap_endpoint": lobstertrap_endpoint,
+            "critic_provider_override": critic_provider_override,
         },
     }

@@ -103,6 +103,41 @@ ingress_rules:
         value: true
 
   # ──────────────────────────────────────────────────────────────────────────
+  # Block Rule #6 (bonus): DANGEROUS SYSTEM COMMANDS
+  # Catches `rm -rf`, `curl | bash`, sudo, etc. Our 5-agent pipeline never
+  # needs shell commands — any prompt asking the model to emit one is
+  # either misuse or attack. Threshold conditioning on risk_score > 0.3
+  # avoids false positives on benign code-block discussions.
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: block_dangerous_commands
+    description: "Dangerous system commands (rm -rf, curl | bash, sudo)"
+    priority: 80
+    action: DENY
+    deny_message: "[LOBSTER TRAP × ContextForge] Blocked: dangerous shell command detected."
+    conditions:
+      - field: contains_system_commands
+        match_type: boolean
+        value: true
+      - field: risk_score
+        match_type: threshold
+        value: 0.3
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Block Rule #7 (bonus): SENSITIVE FILESYSTEM PATHS
+  # Catches /etc/shadow, /etc/passwd, .ssh/id_rsa, .env, etc. Defense-in-depth
+  # against the LLM being tricked into exfiltrating system secrets.
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: block_sensitive_paths
+    description: "Prompt targets sensitive system filesystem paths"
+    priority: 85
+    action: DENY
+    deny_message: "[LOBSTER TRAP × ContextForge] Blocked: sensitive system path access denied."
+    conditions:
+      - field: contains_sensitive_paths
+        match_type: boolean
+        value: true
+
+  # ──────────────────────────────────────────────────────────────────────────
   # Observability Rule: LOG_RAG_QUERIES (5-agent pipeline workload)
   # Our 5-agent pipeline submits structured retrieval queries. Log every
   # query at INFO so we can correlate the audit log with ContextForge's

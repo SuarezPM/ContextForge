@@ -89,6 +89,17 @@ workload:
   candidate_count_per_request: 10   # typical RAG: top-10 candidates per agent
   layout_shuffled: false             # conservative; flip to true if testing aggressive reuse
 
+# Lobster Trap perimeter proxy config (TechEx Day 2 integration)
+# When `enabled: true` or `--lobstertrap-endpoint` CLI flag is set, all
+# agent requests route through Lobster Trap before reaching the LLM.
+# Policy file: configs/lobstertrap_policy.yaml.
+# Binary built from github.com/veeainc/lobstertrap (MIT, Go 1.22+).
+lobster_trap:
+  enabled: false                   # Set true OR pass --lobstertrap-endpoint to override
+  endpoint: "http://localhost:8080"
+  policy_path: "configs/lobstertrap_policy.yaml"
+  declare_agent_intents: true      # send _lobstertrap.declared_intent per agent
+
 # LMCache backend config (uses CodecV8Quantizer + LMCacheConnectorV2)
 lmcache:
   enabled: true

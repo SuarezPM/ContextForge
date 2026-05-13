@@ -65,6 +65,14 @@ def parse_args() -> argparse.Namespace:
                    help="vLLM HTTP endpoint (ignored if --mock)")
     p.add_argument("--mock", action="store_true",
                    help="Skip vLLM, generate synthetic responses")
+    p.add_argument("--lobstertrap-endpoint", default=None,
+                   help="If set (e.g. http://localhost:8080), route all 5-agent "
+                        "requests through Lobster Trap proxy. Each request includes "
+                        "_lobstertrap declared-intent metadata for mismatch detection.")
+    p.add_argument("--critic-provider", default=None,
+                   help="Override the critic agent's model (e.g. 'gemini-3-pro'). "
+                        "Useful for the TechEx Gemini Award angle: demonstrate "
+                        "INV-15 protects cross-vendor judge agents.")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--out", type=Path, required=True,
                    help="Output JSON (logs/mi300x_vllm_e2e_<ts>.json)")
@@ -90,6 +98,8 @@ def main() -> int:
         mode=mode,
         vllm_endpoint=args.vllm_endpoint,
         seed=args.seed,
+        lobstertrap_endpoint=args.lobstertrap_endpoint,
+        critic_provider_override=args.critic_provider,
     )
     payload["timestamp_unix"] = int(time.time())
     payload["script"] = "sprint5_5agent_workload"
