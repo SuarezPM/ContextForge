@@ -30,7 +30,7 @@ codec. Measured HBM3 effective bandwidth: 3.73 TB/s (70.5% of advertised
 5.3 TB/s peak under SR-IOV). We additionally characterize FWHT runtime,
 the FP16 vs FP32 upcast trade-off, and quantization quality degradation
 under naive FWHT integration. All measurements, scripts, logs, and the
-honesty discipline that maintains them are open at MIT license.
+honesty discipline that maintains them are open at Apache-2.0 license.
 ```
 
 ### Subject categories
@@ -58,8 +58,8 @@ CC BY 4.0 (Creative Commons Attribution 4.0 International)
 Paper v2.0.1 of the V7.0.0-rc.2 Apohara ContextForge release.
 
 Code, measurements, scripts, and the AUDIT.md honesty log are
-open-source MIT at https://github.com/SuarezPM/Apohara_Context_Forge
-(tag v7.0.0-rc.1).
+open-source Apache-2.0 at https://github.com/SuarezPM/Apohara_Context_Forge
+(tag v7.0.0-rc.2).
 
 Replication artifacts:
 - Real MI300X measurement logs: logs/mi300x_*.json (13 JSON files)
