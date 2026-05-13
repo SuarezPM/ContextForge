@@ -13,6 +13,9 @@ class TestRotateKVQuantizer:
         assert config.bits == 4
         assert config.group_size == 64
         assert config.sink_tokens == 4
+        # V7.0.0-alpha.5 MI300X measurement: FWHT degrades INT4 quality 200x
+        # under per-byte joint-quant codec, so off-by-default is the safe pick.
+        assert config.use_fwht is False
 
     def test_quantized_kv_block_has_pre_rope_metadata(self):
         """QuantizedKVBlock stores pre_rope flag in metadata."""

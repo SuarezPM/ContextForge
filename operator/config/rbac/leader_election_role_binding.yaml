@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: apohara-contextforge-leader-election-rolebinding
+  namespace: system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: apohara-contextforge-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: apohara-contextforge-controller-manager
+  namespace: system

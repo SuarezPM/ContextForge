@@ -213,11 +213,18 @@ class TestStats:
         conn = LMCacheConnectorV2()
         stats = conn.get_stats()
         for key in (
-            "active", "instance_id", "chunk_size", "local_device",
+            "active", "backend", "instance_id", "chunk_size", "local_device",
             "remote_url", "stores", "retrieves_hit", "retrieves_miss",
             "lookups", "build_error",
         ):
             assert key in stats, f"missing stat: {key}"
+
+    def test_backend_is_reported_in_stats(self):
+        conn = LMCacheConnectorV2()
+        stats = conn.get_stats()
+        assert stats["backend"] in {"cuda", "non_cuda", "fallback"}, (
+            f"unexpected backend value: {stats['backend']!r}"
+        )
 
     def test_repr_includes_active_and_counts(self):
         conn = LMCacheConnectorV2()

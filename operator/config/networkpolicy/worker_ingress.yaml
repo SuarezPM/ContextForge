@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: worker-ingress
+spec:
+  podSelector:
+    matchLabels:
+      apohara.dev/role: worker
+  policyTypes:
+  - Ingress
+  ingress:
+  # Worker pods expose port 8000 (/health probe + the vLLM API). By default
+  # restrict ingress to same-namespace traffic; cluster admins can amend this
+  # to allow specific gateway namespaces / labels per deployment.
+  - from:
+    - podSelector: {}
+    ports:
+    - port: 8000
+      protocol: TCP

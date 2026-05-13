@@ -151,25 +151,24 @@ reader knows where the codebase carries its own weight.
   one: "cache lookup latency vs. encoder-call latency = O(µs) vs O(ms)
   on the same hardware". Drop the "5×" claim unless we measure it.
 
-### 6. 🟠→🟡 RotateKV: FWHT rotation now exists as a standalone module (not yet integrated)
+### 6. 🟠→🟡→🟢 RotateKV: FWHT rotation fully wired in V7.0.0-alpha.2
 
 - **Claim** *(README, paper §2 mechanism #5)*: "Pre-RoPE INT4 grouped-head
   rotation, 3.97× VRAM reduction".
 - **Original V6.0 reality** *(`apohara_context_forge/quantization/rotate_kv.py:215-247`)*:
-  The `use_fwht` flag is read in `__init__` but the Fast Walsh-Hadamard
-  Transform step **never executes** — only channel reordering and
-  asymmetric block-wise quantization are present.
-- **V7.0.0-alpha.1 update** *(`apohara_context_forge/quantization/fwht.py`, 112 LOC)*:
-  Real orthonormal FWHT now exists as a standalone module — in-place
-  butterfly recursion in O(d log d), 8/8 tests passing (round-trip
-  identity, Hadamard orthogonality, batched inputs, dtype preservation,
-  zero-padding for non-power-of-two dims). The module itself is **🟢
-  PRODUCTION**. The remaining 🟡 status is because
-  `RotateKVQuantizer.quantize_pre_rope()` still does NOT call this
-  module — that integration is Sprint 2 (V7.0.0-alpha.2). After
-  Sprint 2 lands the wire-up, this item will be 🟢.
-- **Severity:** Low (now). The pre-rotation quantization itself is
-  unchanged; this delta is purely about closing the substrate honestly.
+  `use_fwht` flag read but never applied — only channel reordering + INT4 quant.
+- **V7.0.0-alpha.1 (Sprint 1):** Real orthonormal FWHT shipped as standalone
+  module at `apohara_context_forge/quantization/fwht.py` (112 LOC, 8/8 tests).
+  Module itself **🟢**, but `quantize_pre_rope()` still didn't call it → 🟡.
+- **V7.0.0-alpha.2 (Sprint 2):** Wire-up landed at
+  `apohara_context_forge/quantization/rotate_kv.py:24` (import) +
+  lines 162-166 (conditional `fwht(key_states)` + `fwht(value_states)` when
+  `cfg.use_fwht=True`, applied after channel reordering and before sink
+  separation). INV-10 (pre_rope=True) preserved — verified by
+  `tests/test_rotate_kv_fwht_integration.py::test_fwht_preserves_inv10`.
+  All 18 tests across the FWHT + RotateKV stack pass (8 FWHT + 5 integration
+  + 5 RotateKV).
+- **Status:** **🟢 PRODUCTION** — FWHT really executes when configured.
 
 ### 7. 🟠 S-15 JCR gate: cherry-picked sweep cases
 
@@ -188,24 +187,177 @@ reader knows where the codebase carries its own weight.
   the *closed-form check* that the gate matches the spec on all points.
   Frame as "exhaustive contract check" rather than "empirical violation rate".
 
-### 8. 🟠 `tests/test_pipeline.py` — pre-existing failures on branch HEAD
+### 8. 🟠→🟢 `tests/test_pipeline.py` — pre-existing regression FIXED in V7.0.0-alpha.2
 
-- **Discovered:** 2026-05-12 during V7.0.0-alpha.1 Sprint 1 verification
-- **Symptom:** `TestDemoAgents::test_pipeline_run` and
-  `TestPipeline::test_pipeline_metrics_tracking` both fail with
-  `assert pipeline.metrics["total_tokens_before"] > 0` returning 0.
-- **Provenance check:** Sprint 1 introduced exactly ONE prod-code
-  change (a 15-line late-import wire-up in `safety/jcr_gate.py:159`).
-  Verified by `git stash`-ing that file and re-running the test —
-  failure persists with our change reverted. Therefore the regression
-  is **pre-existing on branch HEAD**, not introduced by Sprint 1.
-- **Severity:** Medium. The pipeline metrics tracking is what the
-  Gradio demo uses to display "tokens saved" — if it reads 0, the demo
-  shows 0 savings even when the registry is working.
-- **Tracked for:** Sprint 2 (V7.0.0-alpha.2). Likely cause: the demo's
-  `Pipeline` class stopped wiring `TokenCounter` into the per-agent
-  metrics tally somewhere between V6.1 and V6.x #3. Will reproduce on
-  V6.1.0 tag to isolate the regressing commit.
+- **Discovered:** 2026-05-12 (V7.0.0-alpha.1 verification)
+- **Root cause:** Commit `466cc3d` ("fix: test_mcp_server 12 failures
+  resolved") introduced `_passthrough_decision` in
+  `apohara_context_forge/mcp/server.py` which hardcodes `original_tokens=0`
+  in the 503-fallback response when the coordinator is unavailable.
+  `test_mcp_server.py:307` LOCKS IN this server contract — so the server
+  cannot be changed. The fix belongs in the CLIENT.
+- **V7.0.0-alpha.2 fix:** `agents/base_agent.py:46-50` — when
+  `call_contextforge_optimize` receives `original_tokens=0` on a
+  non-empty context (the coordinator_unavailable passthrough),
+  fall back to local `len(context.split())` count. Server contract
+  preserved (12 mcp tests still pass); client metrics restored.
+- **Verification:** `tests/test_pipeline.py` 6/6 PASS (was 4/6).
+  Full regression: 359 passed / 25 skipped / 0 failed.
+- **Status:** **🟢 RESOLVED.**
+
+### 9. 🟠→🟢 V6.1 INT4 packing/unpacking asymmetry RESOLVED in V7.0.0-alpha.3 (Sprint 3 Wave A)
+
+- **Discovered:** Sprint 2 by worker-fwht-wire (Track 2) during
+  round-trip validation of FWHT integration
+- **Symptom:** Round-trip `quantize_pre_rope → dequantize_pre_rope` of a
+  random KV tensor shows ~6.3 max absolute error — far above the
+  theoretical INT4 step bound. Reproduced with `use_fwht=False` too,
+  proving the bug is **pre-existing in V6.1**, not introduced by FWHT.
+- **Reality** *(`apohara_context_forge/quantization/rotate_kv.py:222-229` and `:287-294`)*:
+  `_quantize_block` packs two nibbles into `keys_int4[blk, i, h, d] |= (val << 4)`
+  using the SAME `i` index (write side). `_dequantize_block` unpacks both
+  `val1` and `val2` from a SINGLE byte at `packed_int4[blk, i, h, d]`
+  (read side). The two routines are **asymmetric** — write puts each
+  nibble in a different byte position; read expects them in the same
+  byte. Hence the codec round-trip is broken.
+- **Severity:** Medium. The 3.97× VRAM reduction claim is unaffected
+  (compression IS happening), but the *fidelity* of dequantization
+  is much worse than INT4 theory says it should be. The integration
+  test `tests/test_rotate_kv_fwht_integration.py::test_fwht_roundtrip_through_pipeline`
+  uses a 3× slack tolerance against this baseline.
+- **Sprint 3 Wave A fix:** `_quantize_block` rewritten to pack along
+  head_dim (not seq) to match the read side's invariant. Single
+  `(scale, zero_point)` per packed byte governs both nibbles. Pre-fix
+  max round-trip error: ~6.3; post-fix: 0.0332 (well under 0.07 INT4
+  envelope). New `tests/test_rotate_kv_int4_codec.py` (4 tests, all
+  PASS) locks in the fix; `tests/test_rotate_kv_fwht_integration.py`
+  tolerance tightened from 3× to 1.5× baseline (catches any future
+  regression).
+- **Status:** **🟢 RESOLVED.**
+
+### 10. 🟠→🟢 K8s operator security hardening RESOLVED in V7.0.0-alpha.3 (Sprint 3 Wave A)
+
+- **Surfaced by:** Sprint 2 Phase 4 security-reviewer
+- **Concerns** (operator/controllers/apoharacontextforgecluster_controller.go):
+  - **No SecurityContext** on worker or Redis pods (`runAsNonRoot`,
+    `readOnlyRootFilesystem`, drop ALL capabilities are all unset).
+    Pods would run as root with all Linux capabilities → node-level
+    compromise potential under RCE.
+  - **No dedicated ServiceAccount + RBAC manifests** (deferred per
+    `operator/config/manager/kustomization.yaml:6` comment).
+  - **Redis sidecar runs unauthenticated** (no `--requirepass`); any
+    namespace pod can read/write the shared KV cache.
+  - **No NetworkPolicy** isolating worker pods or Redis.
+  - **Default image is `:latest`** (mutable tag — supply-chain risk).
+- **Mitigation in V7.0.0-alpha.2:** `operator/README.md` carries a
+  prominent ⚠️ NOT PRODUCTION READY warning listing these 5 items as
+  Sprint 3 prerequisites. The operator binary is **not** built or
+  deployed in Sprint 2 — only the reconcile logic + unit tests +
+  integration-test skeleton are shipped. None of these issues are
+  exploitable in the current Sprint 2 state because the operator is
+  not running anywhere.
+- **Sprint 3 Wave A delivery:**
+  - **SecurityContext** ✅ — both Redis + worker pods get full hardening:
+    PodSecurityContext (runAsNonRoot, runAsUser, FSGroup-on-Redis,
+    SeccompProfileTypeRuntimeDefault) + per-container SecurityContext
+    (AllowPrivilegeEscalation=false, ReadOnlyRootFilesystem=true,
+    Capabilities.Drop=ALL). EmptyDir volumes mounted at /data (Redis) and
+    /tmp (worker) for the readonly rootfs. 4 new controller tests assert
+    each field.
+  - **ServiceAccount + namespaced RBAC** ✅ — `operator/config/rbac/`
+    ships SA + namespaced Role (no ClusterRole, no wildcards) + RoleBinding +
+    leader-election Role/RoleBinding. Phase 4.5 tightened secrets verbs to
+    `get;list;watch;create` only (no update/patch/delete since controller
+    never writes after first Create).
+  - **Redis authentication** ✅ — `reconcileRedisAuthSecret` uses
+    `crypto/rand` to generate a 32-char alphanumeric password, stored
+    as Secret `<cluster>-redis-auth` with OwnerReference. Redis pod
+    consumes via `--requirepass $(REDIS_PASSWORD)` + SecretKeyRef env;
+    worker pods get the same SecretKeyRef. Idempotent (no rotation per
+    reconcile). 2 new controller tests cover creation + stability.
+  - **NetworkPolicy** ✅ — `operator/config/networkpolicy/` ships 4
+    manifests: `default_deny_all` (deny ingress+egress by default),
+    `worker_to_redis` (allow worker → Redis on 6379 + DNS), `worker_ingress`
+    (allow same-namespace → worker:8000), `redis_ingress` (allow
+    worker → Redis:6379). Admin-applied; not auto-managed by operator.
+  - **Image digest pinning** 🟡 — moved from `:latest` to `:v7.0.0-alpha.3`
+    versioned tag + explicit `ImagePullPolicy: IfNotPresent` on both Redis
+    and worker containers. Sample CR carries a `# TODO: pin to @sha256:...`
+    comment. Full digest pinning is deferred to V7.0.0 final release when
+    the production image is published.
+  - **Phase 4.5 additional hardening:** `AutomountServiceAccountToken: false`
+    on both Redis + worker pods (neither needs K8s API access); leader-election
+    Role `delete` verbs removed (controller never deletes leases/configmaps).
+- **Tracked open items (not Sprint 3 blockers):**
+  - kubebuilder RBAC marker `+kubebuilder:rbac:groups=contextforge.apohara.dev,...,verbs=get;list;watch;create;update;patch;delete` (controller.go:51-56) would regenerate a ClusterRole if `make manifests` is run. The hand-written namespaced role.yaml is currently the source of truth. Sprint 4: align markers with intent.
+  - `govulncheck ./operator/...` not yet run in CI. `golang.org/x/net@v0.19.0` may have newer patches; recommend `go get golang.org/x/net@latest && go mod tidy` before V7.0.0 final.
+- **Status:** **🟢 RESOLVED** (5/5 items closed; image pinning at versioned-tag is alpha-acceptable per security-reviewer; production hardening tracked above as known follow-ups for V7.0.0).
+
+### V7.0.0-alpha.5 — Sprint 3 Wave B extended deltas (2026-05-12, real MI300X)
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| 🚨 **FWHT degrades INT4 quality 200×** under current codec. Measured MSE: use_fwht=False → 1.01e-02; use_fwht=True → 2.01e+00. Paper v2.0 conclusion: use_fwht=False is the recommended config. | High | Sprint 4 candidate: per-nibble independent scales codec rewrite would reclaim FWHT benefit at cost of ~0.5× storage. |
+| 🟡 V6.x #3 `LMCacheConnectorV2` only supports NVIDIA-CUDA LMCache. AMD ROCm fallback (lmcache.non_cuda_equivalents) has a different API. Currently enters honest-fallback on MI300X even with lmcache + redis-server installed. | Medium | Sprint 4 candidate: adapt connector to non-CUDA backend API. |
+| 🟡 FWHT torch path has +700% peak GPU alloc overhead from `.clone()` at each butterfly stage. Throughput 25-33 GB/s vs 3.73 TB/s HBM3 measured. | Medium | Sprint 4 candidate: in-place strided butterfly to drop overhead to ~+10%. |
+| 🟢 HBM3 effective bandwidth measured at **3.73 TB/s = 70.5% of advertised 5.3 TB/s peak** on MI300X VF (SR-IOV slice). Honest paper §3 number. | Info | Promoted in paper v2.0 (replaces "5.3 TB/s peak"). |
+| 🟢 Full pytest regression on MI300X+ROCm: **347/358 pass** (11 failures in test_coordinator.py are version-mismatch with newer rich/sentence-transformers/numpy 2.2.6, NOT algorithmic). FWHT, observability, INT4 codec, rotate_kv all pass on real ROCm. | Info | V6.1 honesty: substrate works on real AMD hardware. |
+| 🟢 INT4 codec quality at 3.55× reduction: MSE = 1.01e-02 (use_fwht=False), max abs err 0.33. Pareto-acceptable for KV cache. | Info | Paper v2.0 §5 Pareto table. |
+| 🟢 Hardware label honesty: JSON logs now report `rocm-hip:6.2.41133:AMD Instinct MI300X VF`, not just `cuda`. V6.1 discipline applied. | Info | V7.0.0-alpha.5 fix from user catch. |
+
+### V7.0.0-alpha.4 — Sprint 3 Wave B deltas (2026-05-12, real MI300X)
+
+| Claim | Source | Status post-Wave B |
+|-------|--------|--------------------|
+| **RotateKV pre-RoPE INT4 → 3.97× VRAM reduction** (paper §2 mech #5) | Literature target (RotateKV, IJCAI 2025) | **🟡 NOT measured by Apohara on MI300X.** Real measurement on AMD Instinct MI300X VF (192 GB, gfx942, ROCm 7.2.0, torch 2.5.1+rocm6.2) across 8 shape configs (4K-32K seq × 16-64 heads × 64-256 head_dim): `reduction_factor = 3.55×` essentially constant. Paper v2.0 MUST report 3.55× measured, not 3.97× literature target. |
+| **FWHT integration runs on real MI300X** | V7.0.0-alpha.2 + V7.0.0-alpha.3 wire-up | **🟢** — 9/9 tests pass on MI300X in 1.33 s. Log `logs/mi300x_fwht_*.json`. |
+| **`reduction_factor` scales with sequence length** | Paper assumption | **🟢 CONFIRMED** — constant 3.55× from seq=4K to seq=32K. Per-block scale/zero_point + sink-fp16 overhead amortizes well. |
+| **`reduction_factor` scales with head_dim and num_heads** | Paper assumption | **🟢 CONFIRMED** — same 3.55× across head_dim=64/128/256 and num_heads=16/32/64. |
+| **V6.2 adversarial bench needs MI300X** | Sprint 3 Wave B plan | **🟢→ honest skip.** `demo/benchmark_v62_adversarial.py` is pure NumPy simulation (no torch, no GPU). MI300X execution would have produced identical numbers to laptop. Saved $6 of $30 budget for future sprints. |
+
+The 0.42× gap between literature target (3.97×) and Apohara's measured
+3.55× is the cost of single (scale, zero_point) per packed byte (V7.0.0-alpha.3
+AUDIT #9 fix) instead of per-nibble independent scales. The choice was forced
+by the read-side byte layout (see #9). Reclaiming the 0.42× would require a
+codec rewrite (per-nibble scales, ~2× metadata overhead) — paper v2.0 reports
+the trade-off honestly rather than chasing the literature number.
+
+### V7.0.0-alpha.3 — Sprint 3 Wave A deltas (2026-05-12)
+
+| Track | Change | State |
+|-------|--------|-------|
+| 1 | `apohara_context_forge/quantization/rotate_kv.py` `_quantize_block` rewritten (pack along head_dim) | #9 🟠 → 🟢 |
+| 2 | `operator/controllers/apoharacontextforgecluster_controller.go` Pod + container SecurityContext + image versioned-tag + ImagePullPolicy + AutomountServiceAccountToken=false | #10 SecurityContext + image-pin → 🟢 / 🟡 (digest pin V7.0.0 final) |
+| 3 | `operator/config/rbac/` — SA + namespaced Role + RoleBinding + leader-election RBAC (secrets verbs tightened in Phase 4.5) | #10 RBAC → 🟢 |
+| 4 | `operator/controllers/...` Redis auth Secret via crypto/rand + `operator/config/networkpolicy/` (4 policies: default-deny + worker-to-redis + worker-ingress + redis-ingress) + `scripts/mi300x_*` for Wave B | #10 Redis-auth → 🟢, #10 NetworkPolicy → 🟢, Wave B prep ✓ |
+| Phase 4.5 fixes | mi300x_vram_measurement.py rewritten with honest CPU-NumPy bridge protocol; CRD Phase enum trimmed to actually-emitted values; malformed `manager/kustomization.yaml` fixed | V6.1 discipline honored |
+
+**Honest measurement protocol for Wave B's `scripts/mi300x_vram_measurement.py`:**
+The current `RotateKVQuantizer` is NumPy-only (no torch fast path).
+The script now allocates the baseline KV cache as `torch.float16` on
+CUDA (real MI300X allocation footprint = `baseline_fp16_bytes`),
+copies to NumPy on CPU for the quantize call (canonical
+`(batch, seq_len, num_heads, head_dim)` layout), measures
+packed-storage footprint = `keys_int4.nbytes + values_int4.nbytes +
+scales.nbytes + zero_points.nbytes` = the bytes you'd write to
+Redis/LMCache. The `reduction_factor` is honest because both
+numerator and denominator are real. A separate `peak_gpu_alloc_bytes`
+captures CUDA peak during the round-trip (includes the device↔host
+copy — disclosed in the docstring rather than hidden). A future
+sprint can add a torch fast path to RotateKVQuantizer and re-measure
+on-GPU peak without the copy; the CPU bridge protocol is the V6.1
+discipline applied to compute as well as claims.
+
+### V7.0.0-alpha.2 — Sprint 2 deltas (2026-05-12)
+
+| Change | State delta |
+|--------|-------------|
+| `apohara_context_forge/quantization/rotate_kv.py` — FWHT wired into `quantize_pre_rope()` | #6 🟡 → 🟢 |
+| `agents/base_agent.py` — token-count client fallback for `original_tokens=0` server passthrough | #8 🟠 → 🟢 |
+| `apohara_context_forge/observability/otlp_exporter.py` + recorders OTLP fan-out + `dashboards/inv15.json` | 🟢 (new) — Track 3 |
+| `operator/controllers/apoharacontextforgecluster_controller.go` 40→453 LOC real reconciler + 4 tests | 🟡 (real logic, not deployed) — Track 4 |
+| (security-reviewer Phase 4) | NEW: #9 INT4 packing bug (pre-existing) + #10 K8s operator hardening (Sprint 3) |
+| Inline security fixes Phase 4.5 (`raise_for_status()` in base_agent.py, OTLP `insecure=False` default, path canonicalization for `APOHARA_OBSERVABILITY_DIR`) | Security baseline hardened |
 
 ### V7.0.0-alpha.1 — Sprint 1 deltas added (2026-05-12)
 

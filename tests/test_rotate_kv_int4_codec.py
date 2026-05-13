@@ -1,0 +1,119 @@
+"""Tests for the INT4 pack/unpack codec in RotateKVQuantizer — AUDIT #9.
+
+Sprint 2 audit found the write side (`_quantize_block`) and the read side
+(`_dequantize_block`) disagreed on the packing layout: the read side reads
+both nibbles of a byte as adjacent head_dim slots (2*d, 2*d+1), but the
+write side only ever wrote one head_dim slot per byte and packed adjacent
+nibbles along the seq axis instead. Round-trip error was ~6.3 max abs
+against an INT4 envelope of ~0.07 for [0,1] inputs.
+
+These tests pin the corrected codec: each byte at packed[blk, i, h, d]
+encodes head_dim positions (2*d, 2*d+1) with a shared (scale, zero_point).
+"""
+import numpy as np
+import pytest
+
+from apohara_context_forge.quantization.fwht import fwht
+from apohara_context_forge.quantization.rotate_kv import (
+    RotateKVConfig,
+    RotateKVQuantizer,
+)
+
+
+def test_quantize_dequantize_roundtrip_identity():
+    """quantize -> dequantize round-trip stays within the INT4 step envelope.
+
+    Inputs in [0, 1] so the joint per-pair scale is bounded by 1/15, giving
+    a per-slot max error <= half-step ~ 1/30 ~ 0.033 plus float epsilon.
+    Tolerance 0.07 leaves a small safety margin without masking regressions.
+    """
+    rng = np.random.default_rng(0)
+    k = rng.random((1, 64, 4, 32), dtype=np.float64).astype(np.float32)
+    v = rng.random((1, 64, 4, 32), dtype=np.float64).astype(np.float32)
+    pos = np.arange(64, dtype=np.float32)
+
+    cfg = RotateKVConfig(bits=4, group_size=64, sink_tokens=0, use_fwht=False)
+    qz = RotateKVQuantizer(cfg)
+    qb, _ = qz.quantize_pre_rope(k.copy(), v.copy(), pos.copy())
+    k_deq, v_deq = qz.dequantize(qb)
+
+    assert k_deq.shape == k.shape
+    assert v_deq.shape == v.shape
+    assert np.abs(k_deq - k).max() <= 0.07
+    assert np.abs(v_deq - v).max() <= 0.07
+
+
+def test_quantize_dequantize_roundtrip_with_fwht():
+    """Round-trip with use_fwht=True stays within an expanded but bounded envelope.
+
+    FWHT preserves L2 energy but expands the per-channel range by up to
+    sqrt(head_dim) for adversarial inputs, so a slightly looser tolerance
+    is needed — but it must remain MUCH tighter than the 3x slack the
+    pre-fix codec required.
+    """
+    rng = np.random.default_rng(1)
+    k = rng.random((1, 64, 4, 32), dtype=np.float64).astype(np.float32)
+    v = rng.random((1, 64, 4, 32), dtype=np.float64).astype(np.float32)
+    pos = np.arange(64, dtype=np.float32)
+
+    cfg = RotateKVConfig(bits=4, group_size=64, sink_tokens=0, use_fwht=True)
+    qz = RotateKVQuantizer(cfg)
+    qb, _ = qz.quantize_pre_rope(k.copy(), v.copy(), pos.copy())
+    k_deq, v_deq = qz.dequantize(qb)
+
+    fwht_k = fwht(k)
+    fwht_v = fwht(v)
+    assert k_deq.shape == fwht_k.shape
+    assert np.abs(k_deq - fwht_k).max() <= 0.20
+    assert np.abs(v_deq - fwht_v).max() <= 0.20
+
+
+def test_packed_array_shape():
+    """packed_int4 has shape (n_blocks, group_size, num_heads, head_dim // 2).
+
+    The head_dim axis is HALVED (two nibbles per byte). Pre-fix layout
+    accidentally allocated head_dim slots that the read side never touched.
+    """
+    rng = np.random.default_rng(2)
+    k = rng.random((1, 64, 8, 64), dtype=np.float64).astype(np.float32)
+    v = rng.random((1, 64, 8, 64), dtype=np.float64).astype(np.float32)
+    pos = np.arange(64, dtype=np.float32)
+
+    cfg = RotateKVConfig(bits=4, group_size=64, sink_tokens=0, use_fwht=False)
+    qz = RotateKVQuantizer(cfg)
+    qb, _ = qz.quantize_pre_rope(k.copy(), v.copy(), pos.copy())
+
+    # (n_blocks=1, group_size=64, num_heads=8, packed_head_dim=32)
+    assert qb.keys_int4.shape == (1, 64, 8, 32)
+    assert qb.values_int4.shape == (1, 64, 8, 32)
+    # head_dim axis is exactly head_dim // 2
+    assert qb.keys_int4.shape[3] == 64 // 2
+
+
+def test_packed_array_byte_values():
+    """Each byte holds two distinct nibbles for the (2*d, 2*d+1) head_dim pair.
+
+    Construct an input where the joint quantization gives a known (lower, upper)
+    pair so the byte value is predictable. d=0 sees (0.0, 0.5) -> (0, 15) -> 0xF0.
+    d=1 sees (1.0, 0.25) -> (15, 0) -> 0x0F.
+    """
+    cfg = RotateKVConfig(bits=4, group_size=4, sink_tokens=0, use_fwht=False)
+    qz = RotateKVQuantizer(cfg)
+
+    # Repeat the same head_dim vector across all seq positions so every byte
+    # encodes the same (lower, upper) pair regardless of seq index.
+    row = np.array([0.0, 0.5, 1.0, 0.25], dtype=np.float32)
+    k = np.broadcast_to(row, (1, 4, 1, 4)).astype(np.float32).copy()
+    v = k.copy()
+    pos = np.arange(4, dtype=np.float32)
+
+    qb, _ = qz.quantize_pre_rope(k, v, pos)
+
+    # Every byte at d=0 packs (0.0, 0.5) -> lower=0, upper=15 -> 0xF0 = 240.
+    # Every byte at d=1 packs (1.0, 0.25) -> lower=15, upper=0 -> 0x0F = 15.
+    assert np.all(qb.keys_int4[0, :, 0, 0] == 0xF0)
+    assert np.all(qb.keys_int4[0, :, 0, 1] == 0x0F)
+
+    # Confirm both nibbles are recoverable (read side is the inverse).
+    k_deq, _ = qz.dequantize(qb)
+    np.testing.assert_allclose(k_deq[0, :, 0, :], np.broadcast_to(row, (4, 4)), atol=0.07)

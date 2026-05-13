@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Sprint 1 YAML validation script.
-# Parses all YAML files under operator/ and charts/ with Python's yaml.safe_load.
+# YAML validation script (Sprint 1 base; Sprint 3: extended to cover config/rbac/).
+# Parses all YAML files under operator/ (including config/rbac/) and charts/
+# with Python's yaml.safe_load.
 # Exits 0 if all are valid; exits 1 on first parse error.
 
 set -euo pipefail
@@ -32,7 +33,7 @@ except yaml.YAMLError as e:
     fi
 }
 
-echo "=== Apohara ContextForge — Sprint 1 YAML validation ==="
+echo "=== Apohara ContextForge — YAML validation (Sprint 1–3) ==="
 echo ""
 
 echo "--- operator/ YAML files ---"

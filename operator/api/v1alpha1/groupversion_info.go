@@ -12,20 +12,19 @@ var GroupVersion = schema.GroupVersion{
 	Version: "v1alpha1",
 }
 
-// SchemeBuilder registers the types in this package.
-var SchemeBuilder = &runtime.SchemeBuilder{}
+// SchemeBuilder registers the types in this package using the controller-runtime
+// helper, which accepts func(*runtime.Scheme) error registration callbacks.
+var SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
 
 // AddToScheme adds all types in this package to the provided scheme.
 var AddToScheme = SchemeBuilder.AddToScheme
 
-func init() {
-	SchemeBuilder.Register(
+// addKnownTypes registers the API types with their GroupVersion in the scheme.
+func addKnownTypes(s *runtime.Scheme) error {
+	s.AddKnownTypes(GroupVersion,
 		&ApohraContextForgeCluster{},
 		&ApohraContextForgeClusterList{},
 	)
-	metav1.AddToGroupVersion(scheme, GroupVersion)
+	metav1.AddToGroupVersion(s, GroupVersion)
+	return nil
 }
-
-// scheme is the runtime.Scheme that holds type registrations.
-// In production this is wired from main.go via ctrl.NewScheme().
-var scheme = runtime.NewScheme()

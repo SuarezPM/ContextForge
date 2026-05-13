@@ -17,8 +17,11 @@
   <a href="paper/inv15_paper.pdf"><img src="https://img.shields.io/badge/paper-PDF-EC1C24?style=flat-square&logo=adobe-acrobat-reader&logoColor=white" alt="Read the paper"></a>
 </p>
 
-<!-- Row 2 — validation status -->
+<!-- Row 2 — release + validation status -->
 <p align="center">
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-V7.0.0--rc.1-ED1C24.svg?style=flat-square" alt="Version V7.0.0-rc.1"></a>
+  <a href="#-benchmark-results"><img src="https://img.shields.io/badge/AMD%20MI300X%20192%20GB-hardware%20validated-ED1C24.svg?style=flat-square&logo=amd&logoColor=white" alt="Hardware-validated on AMD Instinct MI300X (192 GB)"></a>
+  <a href="paper/inv15_paper.pdf"><img src="https://img.shields.io/badge/paper-v2.0%20MI300X%20measured-9B59B6.svg?style=flat-square" alt="Paper v2.0 — MI300X measured numbers"></a>
   <a href="#-benchmark-results"><img src="https://img.shields.io/badge/V6.1%20benchmark-14%2F15%20honest-27AE60.svg?style=flat-square" alt="V6.1 14/15 honest PASS"></a>
   <a href="#-benchmark-results"><img src="https://img.shields.io/badge/V6.2%20adversarial-6%2F6%20PASS-27AE60.svg?style=flat-square" alt="V6.2 adversarial 6/6"></a>
   <a href="AUDIT.md"><img src="https://img.shields.io/badge/AUDIT.md-public-FF6B00.svg?style=flat-square" alt="Public audit"></a>
@@ -448,6 +451,8 @@ System invariants enforced:
 | **V6.x #1** | ✅ **Complete** | **[`apohara-vllm-plugin` 0.1.0](pypi/apohara-vllm-plugin/) — standalone PyPI package, `vllm.general_plugins` entry-point, honest hooks (DI-ready), wheel built + smoke-tested in clean venv. Pending only the manual `vllm-plugin-v0.1.0` tag to trigger the [release workflow](.github/workflows/release-plugin.yml).** |
 | **V6.x #2** | ✅ **Complete** | **HuggingFace Spaces public benchmark sandbox** — `hf_spaces/` shim with YAML frontmatter + scoped requirements + fallback-degraded mode, [sync workflow](.github/workflows/sync-hfspaces.yml) on every push to main. See [HFSPACES.md](HFSPACES.md) for the 5-minute setup. |
 | **V6.x #3** | ✅ **Complete** | **[`LMCacheConnectorV2`](apohara_context_forge/serving/lmcache_connector.py) — real multi-node KV-cache bridge** (replaces V4-era stub). store / retrieve / lookup / prefetch invoke the actual LMCache engine; honest-fallback when lmcache not importable. 16/16 tests PASS on Python 3.14. See [LMCACHE.md](LMCACHE.md) for the multi-node deployment story. |
+| **V7.0.0-rc.1** | 🚀 **Release candidate** | **Sprint 4 substrate optimizations + [paper v2.0](paper/inv15_paper.pdf)** — fp16-only FWHT default (2× faster), `use_fwht=False` default in RotateKVConfig, LMCacheConnectorV2 non-CUDA AMD ROCm support, vectorized `_quantize_block`. Paper v2.0 replaces 3.97× literature claim with 3.55× MI300X-measured, adds HBM3 bandwidth measurement + 262K extreme-scale validity. **Hardware-validated on AMD Instinct MI300X (192 GB).** |
+| V7.0.0 | 📋 Planned | arXiv submission (paper v2.0 ready) + Zenodo deposit refresh after arXiv ID assigned |
 | V7+ | 📋 Planned | K8s operator · plugin marketplace SDK · enterprise SLA + audit-grade INV-15 telemetry export |
 
 ---

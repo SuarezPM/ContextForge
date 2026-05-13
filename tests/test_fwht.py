@@ -78,3 +78,58 @@ def test_fwht_zero_input():
     x = torch.zeros(8, dtype=torch.float32)
     y = fwht(x)
     assert torch.allclose(y, torch.zeros(8, dtype=torch.float32))
+
+
+def test_fwht_fp16_native():
+    """Default fwht() on fp16 input runs in fp16 — no fp32 intermediate.
+
+    V7.0.0-alpha.5/.6 measurement on MI300X: fp16-only butterfly is 2x faster
+    and 60% lower peak alloc than the fp32-upcast path. This test pins the
+    fp16-native execution so a future regression can't silently re-introduce
+    the upcast.
+    """
+    torch.manual_seed(3)
+    x = torch.randn(64, dtype=torch.float16)
+
+    # Patched .to() asserts no fp16->fp32 promotion during the butterfly.
+    orig_to = torch.Tensor.to
+    upcasts = []
+
+    def tracking_to(self, *args, **kwargs):
+        out = orig_to(self, *args, **kwargs)
+        if self.dtype == torch.float16 and out.dtype == torch.float32:
+            upcasts.append(True)
+        return out
+
+    torch.Tensor.to = tracking_to
+    try:
+        y = fwht(x)
+    finally:
+        torch.Tensor.to = orig_to
+
+    assert y.dtype == torch.float16
+    assert y.shape == x.shape
+    assert upcasts == [], f"fp16-default path leaked {len(upcasts)} fp16->fp32 upcasts"
+
+
+def test_fwht_fp32_upcast_opt_in():
+    """fwht(x, fp32_upcast=True) preserves shape/dtype and matches legacy result."""
+    torch.manual_seed(4)
+    x = torch.randn(64, dtype=torch.float16)
+    y = fwht(x, fp32_upcast=True)
+    assert y.shape == x.shape
+    assert y.dtype == torch.float16
+    # The upcast path is the legacy V7.0.0-alpha.4 default; reproduce its
+    # output by hand and compare.
+    ref32 = x.to(torch.float32)
+    d = ref32.shape[-1]
+    h = 1
+    while h < d:
+        view = ref32.view(d // (2 * h), 2, h)
+        a = view[..., 0, :].clone()
+        b = view[..., 1, :].clone()
+        view[..., 0, :] = a + b
+        view[..., 1, :] = a - b
+        h *= 2
+    ref32 = (ref32 / (d ** 0.5)).to(torch.float16)
+    assert torch.equal(y, ref32)

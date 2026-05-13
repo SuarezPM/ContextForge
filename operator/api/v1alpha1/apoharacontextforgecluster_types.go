@@ -27,7 +27,8 @@ type ApohraContextForgeClusterSpec struct {
 	GpuType string `json:"gpuType,omitempty"`
 
 	// Image is the container image for the apohara-vllm-plugin workers.
-	// +kubebuilder:default="ghcr.io/suarezpm/apohara-contextforge:latest"
+	// Production deployments MUST pin to a digest (e.g., @sha256:...) instead of a mutable tag.
+	// +kubebuilder:default="ghcr.io/suarezpm/apohara-contextforge:v7.0.0-alpha.3"
 	// +optional
 	Image string `json:"image,omitempty"`
 }
@@ -37,9 +38,18 @@ type ApohraContextForgeClusterStatus struct {
 	// ReadyWorkers is the count of worker pods currently in Ready state.
 	ReadyWorkers int32 `json:"readyWorkers,omitempty"`
 
-	// Phase summarises the overall cluster lifecycle state.
-	// +kubebuilder:validation:Enum=Pending;Provisioning;Ready;Degraded;Failed
+	// Phase summarises the overall cluster lifecycle state. Values emitted by
+	// computePhase() in controllers/: Pending (0 ready), Degraded (1..n-1 ready),
+	// Ready (all n ready). Provisioning/Failed are reserved for future use and
+	// are not emitted by the current reconciler — they are NOT in the validated
+	// enum to honour the V6.1 honesty discipline (claims must match runtime).
+	// +kubebuilder:validation:Enum=Pending;Degraded;Ready
 	Phase string `json:"phase,omitempty"`
+
+	// RedisSecretName is the name of the auto-provisioned Redis password Secret,
+	// or empty if the user supplied their own LMCacheRedisUrl.
+	// +optional
+	RedisSecretName string `json:"redisSecretName,omitempty"`
 
 	// Conditions holds standard Kubernetes condition objects.
 	// +optional

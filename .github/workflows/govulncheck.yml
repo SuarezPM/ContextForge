@@ -1,0 +1,38 @@
+name: govulncheck
+
+on:
+  pull_request:
+    paths:
+      - 'operator/**'
+      - '.github/workflows/govulncheck.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'operator/**'
+  schedule:
+    # Run weekly so new CVEs land before they hit users.
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    name: govulncheck on operator/
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: operator/go.sum
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck
+        working-directory: operator
+        run: |
+          go mod download
+          govulncheck -test ./...

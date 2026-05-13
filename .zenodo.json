@@ -1,0 +1,31 @@
+{
+  "title": "Apohara ContextForge: KV-cache coordination for multi-agent LLM pipelines on AMD MI300X",
+  "version": "7.0.0-rc.1",
+  "creators": [
+    {
+      "name": "Suarez, Pablo M.",
+      "affiliation": "Universidad Nacional de Tucumán, Facultad de Ciencias Naturales",
+      "orcid": ""
+    }
+  ],
+  "description": "Apohara ContextForge V7.0.0-rc.1: real KV-cache reuse end-to-end. Hardware-validated on AMD Instinct MI300X (192 GB, ROCm 7.2.0). See AUDIT.md for honest measurement protocol and paper v2.0 at paper/inv15_paper.pdf.",
+  "keywords": [
+    "kv-cache",
+    "llm-inference",
+    "amd-mi300x",
+    "rocm",
+    "int4-quantization",
+    "rotatekv",
+    "fwht",
+    "jcr",
+    "judge-consistency"
+  ],
+  "license": "MIT",
+  "upload_type": "software",
+  "related_identifiers": [
+    {
+      "identifier": "10.5281/zenodo.20114594",
+      "relation": "isVersionOf"
+    }
+  ]
+}

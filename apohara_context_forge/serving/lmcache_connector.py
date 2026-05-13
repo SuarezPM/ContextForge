@@ -109,6 +109,7 @@ class LMCacheConnectorV2:
         self._config = config or LMCacheConnectorConfig()
         self._engine = engine
         self._build_error: Optional[BaseException] = None
+        self._backend: str = "fallback"
 
         if self._engine is None:
             self._engine = self._try_build_engine()
@@ -128,16 +129,54 @@ class LMCacheConnectorV2:
     def _try_build_engine(self) -> Optional[Any]:
         """Best-effort LMCache engine construction. Returns the engine
         on success, ``None`` on import error or build error, with a
-        single WARNING. Never raises."""
+        single WARNING. Never raises.
+
+        Tries two import strategies in order:
+        1. Legacy path: ``lmcache.config`` + ``lmcache.experimental.cache_engine``
+           (lmcache < 0.4.x, pre-v1 packaging).
+        2. v1 path: ``lmcache.v1.config`` + ``lmcache.v1.cache_engine``
+           (lmcache >= 0.4.x, current packaging, works on AMD ROCm without
+           ``libcudart.so.12`` because lmcache auto-falls back to
+           ``lmcache.non_cuda_equivalents`` for GPU tensor ops).
+        """
+        LMCacheEngineConfig = None
+        LMCacheEngineBuilder = None
+        detected_backend: str = "fallback"
+
+        # --- Strategy 1: legacy path (lmcache < 0.4.x) ---
         try:
-            # Late imports — see module docstring.
-            from lmcache.config import (  # type: ignore
-                LMCacheEngineConfig,
-            )
-            from lmcache.experimental.cache_engine import (  # type: ignore
+            from lmcache.config import LMCacheEngineConfig  # type: ignore  # noqa: PLC0415
+            from lmcache.experimental.cache_engine import (  # type: ignore  # noqa: PLC0415
                 LMCacheEngineBuilder,
             )
-        except Exception as exc:  # noqa: BLE001
+            detected_backend = "cuda"
+        except ImportError:
+            pass
+
+        # --- Strategy 2: v1 path (lmcache >= 0.4.x, CUDA or non-CUDA) ---
+        if LMCacheEngineConfig is None:
+            try:
+                from lmcache.v1.config import (  # type: ignore  # noqa: PLC0415
+                    LMCacheEngineConfig,
+                )
+                from lmcache.v1.cache_engine import (  # type: ignore  # noqa: PLC0415
+                    LMCacheEngineBuilder,
+                )
+                detected_backend = "non_cuda"
+            except ImportError:
+                pass
+
+        if LMCacheEngineConfig is None:
+            # Neither path worked — determine if lmcache is installed at all.
+            try:
+                import lmcache as _lmcache_probe  # noqa: PLC0415
+                del _lmcache_probe
+                exc: BaseException = ImportError(
+                    "lmcache installed but neither lmcache.config nor "
+                    "lmcache.v1.config could be imported"
+                )
+            except ImportError as _exc:
+                exc = _exc
             self._build_error = exc
             logger.warning(
                 "LMCacheConnectorV2: lmcache not importable (%s: %s); "
@@ -157,9 +196,11 @@ class LMCacheConnectorV2:
                 instance_id=self._config.instance_id,
                 config=lmcache_config,
             )
+            self._backend = detected_backend
             logger.info(
-                "LMCacheConnectorV2: engine built (instance_id=%s, "
-                "chunk_size=%s, local=%s, remote=%s)",
+                "LMCacheConnectorV2: engine built via %s backend "
+                "(instance_id=%s, chunk_size=%s, local=%s, remote=%s)",
+                detected_backend,
                 self._config.instance_id, self._config.chunk_size,
                 self._config.local_device,
                 self._config.remote_url or "<none>",
@@ -168,9 +209,9 @@ class LMCacheConnectorV2:
         except Exception as exc:  # noqa: BLE001
             self._build_error = exc
             logger.warning(
-                "LMCacheConnectorV2: lmcache importable but engine "
-                "build failed (%s: %s); falling back to no-op mode.",
-                type(exc).__name__, exc,
+                "LMCacheConnectorV2: lmcache importable (%s backend) but "
+                "engine build failed (%s: %s); falling back to no-op mode.",
+                detected_backend, type(exc).__name__, exc,
             )
             return None
 
@@ -313,6 +354,7 @@ class LMCacheConnectorV2:
     def get_stats(self) -> dict:
         return {
             "active": self._active,
+            "backend": self._backend,
             "instance_id": self._config.instance_id,
             "chunk_size":  self._config.chunk_size,
             "local_device": self._config.local_device,
