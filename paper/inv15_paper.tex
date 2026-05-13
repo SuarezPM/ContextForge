@@ -66,7 +66,7 @@
              {10.5281/zenodo.20114594} (Zenodo, indexed by Google Scholar).}\\
         APOHARA \textperiodcentered{} ContextForge}
 
-\date{May 12, 2026 \textperiodcentered{} V2.0 with MI300X measurements
+\date{May 13, 2026 \textperiodcentered{} V2.0.1 with MI300X measurements + enhanced citation graph
       \textperiodcentered{}
       \href{https://doi.org/10.5281/zenodo.20114594}%
            {DOI: 10.5281/zenodo.20114594}}
@@ -632,7 +632,7 @@ Eq.~\ref{eq:inv15} held. A representative subset of points is shown
 in Table~\ref{tab:sweep}; the full 1{,}210-point sweep ships as
 benchmark scenario S-15 in the public repository.
 
-\begin{table}[t]
+\begin{table*}[t]
   \centering
   \small
   \caption{Representative points from the S-15 \texttt{jcr\_gate\_critic\_safety}
@@ -665,7 +665,7 @@ benchmark scenario S-15 in the public repository.
     \multicolumn{5}{r}{\INV{15} violations (1{,}210 decisions):} & \textbf{0 / 1{,}210} \\
     \bottomrule
   \end{tabular}
-\end{table}
+\end{table*}
 
 \subsection{\INV{15} Violation Rate}
 \label{sec:eval:inv}
@@ -998,7 +998,7 @@ We benchmark pure-PyTorch FWHT transforms on MI300X across eight
 (seq\_len, num\_heads, head\_dim) configurations. Results are reported in
 Table~\ref{tab:fwht_runtime}.
 
-\begin{table}[t]
+\begin{table*}[t]
   \centering
   \small
   \caption{Pure-torch FWHT runtime on MI300X across tensor configurations.
@@ -1021,7 +1021,7 @@ Table~\ref{tab:fwht_runtime}.
     32K, 32h, 128d & 10.5 & 25.6 \\
     \bottomrule
   \end{tabular}
-\end{table}
+\end{table*}
 
 \begin{figure}[t]
   \centering
