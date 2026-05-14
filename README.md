@@ -40,6 +40,7 @@
   <a href="docs/threat-model.md">threat model</a> ·
   <a href="configs/lobstertrap_policy.yaml">policy YAML</a> ·
   <a href="assets/inv15-governance-dashboard.html">governance dashboard</a> ·
+  <a href="scripts/jbb_live_defense.py">JBB live defense (Gradio)</a> ·
   <a href="tests/test_lobstertrap_integration.py">live integration tests</a> (4/4 PASS).</em>
 </p>
 

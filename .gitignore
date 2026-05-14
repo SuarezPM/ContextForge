@@ -81,3 +81,6 @@ paper/*.toc
 
 # --- VS Code workspace files ---
 *.code-workspace
+
+# JBB defense ephemeral reports (regenerable; production runs may want to keep these)
+logs/jbb_defense_report_*.json
