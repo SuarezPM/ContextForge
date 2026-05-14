@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Apohara ContextForge — INV-15 Governance Dashboard</title>
+<style>
+  :root {
+    --bg:        #0f172a;
+    --surface:   #1e293b;
+    --border:    #334155;
+    --text:      #f8fafc;
+    --muted:     #94a3b8;
+    --accent:    #ef4444;
+    --green:     #22c55e;
+    --yellow:    #fbbf24;
+    --blue:      #3b82f6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "DejaVu Sans", sans-serif;
+    line-height: 1.5; padding: 32px; min-height: 100vh;
+  }
+  header { border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 32px; }
+  h1 { font-size: 1.7em; color: var(--text); margin-bottom: 6px; }
+  h2 { font-size: 1.15em; color: var(--accent); margin: 28px 0 12px; }
+  .subtitle { color: var(--muted); font-size: 0.95em; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 24px 0; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+  .kpi-label { font-size: 0.8em; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi-value { font-size: 2.2em; font-weight: 800; color: var(--accent); line-height: 1; margin: 8px 0 4px; }
+  .kpi-caption { font-size: 0.75em; color: var(--muted); }
+  .kpi.green .kpi-value { color: var(--green); }
+  .kpi.yellow .kpi-value { color: var(--yellow); }
+  .kpi.blue .kpi-value { color: var(--blue); }
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: 8px; overflow: hidden; }
+  th { background: #0f172a; color: var(--muted); padding: 10px 14px; text-align: left; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 0.92em; }
+  tr:last-child td { border-bottom: none; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; font-weight: 600; }
+  .badge.allow { background: rgba(34, 197, 94, 0.15); color: var(--green); }
+  .badge.deny { background: rgba(239, 68, 68, 0.15); color: var(--accent); }
+  .badge.review { background: rgba(251, 191, 36, 0.15); color: var(--yellow); }
+  .badge.gate { background: rgba(59, 130, 246, 0.15); color: var(--blue); }
+  .bar-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
+  .bar-label { width: 250px; color: var(--muted); font-size: 0.85em; }
+  .bar-track { flex: 1; height: 10px; background: var(--surface); border-radius: 5px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--accent); }
+  .bar-fill.green { background: var(--green); }
+  .bar-fill.yellow { background: var(--yellow); }
+  .bar-fill.blue { background: var(--blue); }
+  .bar-value { width: 60px; text-align: right; font-variant-numeric: tabular-nums; font-size: 0.85em; color: var(--text); }
+  .compliance { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin-top: 32px; }
+  .compliance ul { list-style: none; }
+  .compliance li { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.92em; }
+  .compliance li:last-child { border-bottom: none; }
+  .compliance strong { color: var(--blue); }
+  footer { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border); font-size: 0.82em; color: var(--muted); text-align: center; }
+  code { background: var(--surface); padding: 2px 6px; border-radius: 4px; font-size: 0.85em; color: var(--green); font-family: "DejaVu Sans Mono", monospace; }
+  .demo-banner { background: rgba(251, 191, 36, 0.12); border: 1px solid var(--yellow); border-radius: 8px; padding: 14px 20px; margin-bottom: 24px; color: var(--yellow); font-size: 0.9em; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Apohara ContextForge — INV-15 Governance Dashboard</h1>
+  <p class="subtitle">
+    Defense-in-depth governance stack · Lobster Trap (perimeter) + ContextForge INV-15 (behavioral) ·
+    Generated <code>2026-05-14 00:48:03 UTC</code> · Source: <code>synthesized demo data</code>
+  </p>
+</header>
+
+
+<div class="demo-banner">
+  <strong>Note:</strong> This dashboard is rendered from synthesized demo data
+  for illustration. Production deployments point at a real Lobster Trap audit
+  log + INV-15 JSONL stream via the <code>--audit-log</code> /
+  <code>--inv15-log</code> flags of <code>scripts/generate_governance_dashboard.py</code>.
+</div>
+
+<h2>Aggregate KPIs</h2>
+<div class="kpi-grid">
+  <div class="kpi green">
+    <div class="kpi-label">Requests processed</div>
+    <div class="kpi-value">200</div>
+    <div class="kpi-caption">across 6 distinct policy rules</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Lobster Trap blocks</div>
+    <div class="kpi-value">47</div>
+    <div class="kpi-caption">23.5% of all traffic</div>
+  </div>
+  <div class="kpi blue">
+    <div class="kpi-label">INV-15 fires</div>
+    <div class="kpi-value">0</div>
+    <div class="kpi-caption">judge-agent gate, 0.0% activation</div>
+  </div>
+  <div class="kpi green">
+    <div class="kpi-label">INV-15 violations</div>
+    <div class="kpi-value">0 / 1,210</div>
+    <div class="kpi-caption">paper sweep (independent of this run)</div>
+  </div>
+</div>
+
+<h2>Policy actions distribution</h2>
+<div>
+
+        <div class="bar-row">
+          <div class="bar-label">ALLOW</div>
+          <div class="bar-track"><div class="bar-fill green" style="width: 100.0%;"></div></div>
+          <div class="bar-value">153</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">DENY</div>
+          <div class="bar-track"><div class="bar-fill " style="width: 26.1%;"></div></div>
+          <div class="bar-value">40</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">HUMAN_REVIEW</div>
+          <div class="bar-track"><div class="bar-fill yellow" style="width: 4.6%;"></div></div>
+          <div class="bar-value">7</div>
+        </div>
+</div>
+
+<h2>Top rules activated</h2>
+<div>
+
+        <div class="bar-row">
+          <div class="bar-label">allow_apohara_5agent_pipeline</div>
+          <div class="bar-track"><div class="bar-fill green" style="width: 100.0%;"></div></div>
+          <div class="bar-value">153</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">block_prompt_injection</div>
+          <div class="bar-track"><div class="bar-fill " style="width: 9.8%;"></div></div>
+          <div class="bar-value">15</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">block_pii_request</div>
+          <div class="bar-track"><div class="bar-fill " style="width: 8.5%;"></div></div>
+          <div class="bar-value">13</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">review_role_impersonation</div>
+          <div class="bar-track"><div class="bar-fill yellow" style="width: 4.6%;"></div></div>
+          <div class="bar-value">7</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">block_credential_in_prompt</div>
+          <div class="bar-track"><div class="bar-fill " style="width: 3.9%;"></div></div>
+          <div class="bar-value">6</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">block_data_exfiltration</div>
+          <div class="bar-track"><div class="bar-fill " style="width: 3.9%;"></div></div>
+          <div class="bar-value">6</div>
+        </div>
+</div>
+
+<h2>Recent events (last 20)</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Timestamp</th>
+      <th>Source</th>
+      <th>Action</th>
+      <th>Rule</th>
+      <th>Agent</th>
+      <th>Risk</th>
+      <th>Request ID</th>
+    </tr>
+  </thead>
+  <tbody>
+
+    <tr>
+      <td><code style="font-size:0.85em;">00:38:03 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge allow">ALLOW</span></td>
+      <td><code style="font-size:0.85em;">allow_apohara_5agent_pipeline</code></td>
+      <td>reranker</td>
+      <td style="font-variant-numeric: tabular-nums;">0.06</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0180</code></td>
+    </tr>
+    <tr>
+      <td><code style="font-size:0.85em;">00:38:33 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge deny">DENY</span></td>
+      <td><code style="font-size:0.85em;">block_data_exfiltration</code></td>
+      <td>summarizer</td>
+      <td style="font-variant-numeric: tabular-nums;">0.78</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0181</code></td>
+    </tr>
+    <tr>
+      <td><code style="font-size:0.85em;">00:39:03 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge allow">ALLOW</span></td>
+      <td><code style="font-size:0.85em;">allow_apohara_5agent_pipeline</code></td>
+      <td>retriever</td>
+      <td style="font-variant-numeric: tabular-nums;">0.29</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0182</code></td>
+    </tr>
+    <tr>
+      <td><code style="font-size:0.85em;">00:39:33 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge allow">ALLOW</span></td>
+      <td><code style="font-size:0.85em;">allow_apohara_5agent_pipeline</code></td>
+      <td>critic</td>
+      <td style="font-variant-numeric: tabular-nums;">0.29</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0183</code></td>
+    </tr>
+    <tr>
+      <td><code style="font-size:0.85em;">00:40:03 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge allow">ALLOW</span></td>
+      <td><code style="font-size:0.85em;">allow_apohara_5agent_pipeline</code></td>
+      <td>responder</td>
+      <td style="font-variant-numeric: tabular-nums;">0.19</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0184</code></td>
+    </tr>
+    <tr>
+      <td><code style="font-size:0.85em;">00:40:33 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge allow">ALLOW</span></td>
+      <td><code style="font-size:0.85em;">allow_apohara_5agent_pipeline</code></td>
+      <td>retriever</td>
+      <td style="font-variant-numeric: tabular-nums;">0.03</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0185</code></td>
+    </tr>
+    <tr>
+      <td><code style="font-size:0.85em;">00:41:03 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge allow">ALLOW</span></td>
+      <td><code style="font-size:0.85em;">allow_apohara_5agent_pipeline</code></td>
+      <td>reranker</td>
+      <td style="font-variant-numeric: tabular-nums;">0.11</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0186</code></td>
+    </tr>
+    <tr>
+      <td><code style="font-size:0.85em;">00:41:33 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge review">HUMAN_REVIEW</span></td>
+      <td><code style="font-size:0.85em;">review_role_impersonation</code></td>
+      <td>reranker</td>
+      <td style="font-variant-numeric: tabular-nums;">0.66</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0187</code></td>
+    </tr>
+    <tr>
+      <td><code style="font-size:0.85em;">00:42:03 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge allow">ALLOW</span></td>
+      <td><code style="font-size:0.85em;">allow_apohara_5agent_pipeline</code></td>
+      <td>reranker</td>
+      <td style="font-variant-numeric: tabular-nums;">0.07</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0188</code></td>
+    </tr>
+    <tr>
+      <td><code style="font-size:0.85em;">00:42:33 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge allow">ALLOW</span></td>
+      <td><code style="font-size:0.85em;">allow_apohara_5agent_pipeline</code></td>
+      <td>summarizer</td>
+      <td style="font-variant-numeric: tabular-nums;">0.13</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0189</code></td>
+    </tr>
+    <tr>
+      <td><code style="font-size:0.85em;">00:43:03 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge deny">DENY</span></td>
+      <td><code style="font-size:0.85em;">block_prompt_injection</code></td>
+      <td>reranker</td>
+      <td style="font-variant-numeric: tabular-nums;">0.82</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0190</code></td>
+    </tr>
+    <tr>
+      <td><code style="font-size:0.85em;">00:43:33 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge allow">ALLOW</span></td>
+      <td><code style="font-size:0.85em;">allow_apohara_5agent_pipeline</code></td>
+      <td>retriever</td>
+      <td style="font-variant-numeric: tabular-nums;">0.04</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0191</code></td>
+    </tr>
+    <tr>
+      <td><code style="font-size:0.85em;">00:44:03 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge allow">ALLOW</span></td>
+      <td><code style="font-size:0.85em;">allow_apohara_5agent_pipeline</code></td>
+      <td>critic</td>
+      <td style="font-variant-numeric: tabular-nums;">0.22</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0192</code></td>
+    </tr>
+    <tr>
+      <td><code style="font-size:0.85em;">00:44:33 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge review">HUMAN_REVIEW</span></td>
+      <td><code style="font-size:0.85em;">review_role_impersonation</code></td>
+      <td>critic</td>
+      <td style="font-variant-numeric: tabular-nums;">0.56</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0193</code></td>
+    </tr>
+    <tr>
+      <td><code style="font-size:0.85em;">00:45:03 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge allow">ALLOW</span></td>
+      <td><code style="font-size:0.85em;">allow_apohara_5agent_pipeline</code></td>
+      <td>reranker</td>
+      <td style="font-variant-numeric: tabular-nums;">0.13</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0194</code></td>
+    </tr>
+    <tr>
+      <td><code style="font-size:0.85em;">00:45:33 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge allow">ALLOW</span></td>
+      <td><code style="font-size:0.85em;">allow_apohara_5agent_pipeline</code></td>
+      <td>responder</td>
+      <td style="font-variant-numeric: tabular-nums;">0.02</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0195</code></td>
+    </tr>
+    <tr>
+      <td><code style="font-size:0.85em;">00:46:03 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge allow">ALLOW</span></td>
+      <td><code style="font-size:0.85em;">allow_apohara_5agent_pipeline</code></td>
+      <td>critic</td>
+      <td style="font-variant-numeric: tabular-nums;">0.29</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0196</code></td>
+    </tr>
+    <tr>
+      <td><code style="font-size:0.85em;">00:46:33 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge allow">ALLOW</span></td>
+      <td><code style="font-size:0.85em;">allow_apohara_5agent_pipeline</code></td>
+      <td>critic</td>
+      <td style="font-variant-numeric: tabular-nums;">0.06</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0197</code></td>
+    </tr>
+    <tr>
+      <td><code style="font-size:0.85em;">00:47:03 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge allow">ALLOW</span></td>
+      <td><code style="font-size:0.85em;">allow_apohara_5agent_pipeline</code></td>
+      <td>critic</td>
+      <td style="font-variant-numeric: tabular-nums;">0.03</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0198</code></td>
+    </tr>
+    <tr>
+      <td><code style="font-size:0.85em;">00:47:33 UTC</code></td>
+      <td>lobster_trap</td>
+      <td><span class="badge allow">ALLOW</span></td>
+      <td><code style="font-size:0.85em;">allow_apohara_5agent_pipeline</code></td>
+      <td>retriever</td>
+      <td style="font-variant-numeric: tabular-nums;">0.08</td>
+      <td><code style="font-size:0.8em; color: var(--muted);">req-0199</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="compliance">
+  <h2 style="margin-top:0;">Compliance mapping</h2>
+  <ul>
+    <li><strong>NIST AI RMF</strong> · GOVERN: policy file <code>configs/lobstertrap_policy.yaml</code> · MAP: <code>docs/threat-model.md</code> · MEASURE: INV-15 closed-form risk score + JCR delta · MANAGE: this dashboard + JSONL audit log</li>
+    <li><strong>EU AI Act</strong> · Article 9 (risk management): threat model · Article 12 (record-keeping): JSONL audit log · Article 14 (human oversight): <code>HUMAN_REVIEW</code> policy action (role_impersonation rule) · Article 15 (cybersecurity): 11/11 Lobster Trap adversarial PASS · enforcement deadline 2-Aug-2026</li>
+    <li><strong>ISO/IEC 42001</strong> · A.7 Planning: threat model · A.8 Support: integration docs · A.9 Operation: live integration tests (4/4 PASS) · A.10 Performance evaluation: JCR delta measurements · A.11 Improvement: AUDIT.md (11/11 items)</li>
+    <li><strong>Honesty discipline</strong> · <code>AUDIT.md</code> entry #11 documents an external Perplexity Pro audit catch + fix (2026-05-13) — proof we accept findings and fix them rather than hide them</li>
+  </ul>
+</div>
+
+<footer>
+  Apohara ContextForge V7.0.0-rc.2+ · Apache-2.0 · Paper <a href="https://doi.org/10.5281/zenodo.20114594" style="color: var(--blue);">Zenodo DOI 10.5281/zenodo.20114594</a> ·
+  Repo <a href="https://github.com/SuarezPM/Apohara_Context_Forge" style="color: var(--blue);">github.com/SuarezPM/Apohara_Context_Forge</a> ·
+  Generated by <code>scripts/generate_governance_dashboard.py</code>
+</footer>
+
+</body>
+</html>

@@ -39,6 +39,7 @@
   <a href="docs/lobstertrap-integration.md">integration design</a> ·
   <a href="docs/threat-model.md">threat model</a> ·
   <a href="configs/lobstertrap_policy.yaml">policy YAML</a> ·
+  <a href="assets/inv15-governance-dashboard.html">governance dashboard</a> ·
   <a href="tests/test_lobstertrap_integration.py">live integration tests</a> (4/4 PASS).</em>
 </p>
 
