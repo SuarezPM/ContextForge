@@ -33,12 +33,59 @@
 <!-- TechEx 2026 submission callout -->
 <p align="center">
   <strong>🦞 TechEx 2026 — Track 1 (Agent Security &amp; AI Governance) submission</strong><br>
+  <em>Governed context in; inspected prompts out; agents enterprises actually trust.</em><br>
   <em>Defense-in-depth governance stack: <a href="https://github.com/veeainc/lobstertrap">Veea Lobster Trap</a> (perimeter)
   + ContextForge INV-15 (formal invariant). Read the
   <a href="docs/lobstertrap-integration.md">integration design</a> ·
+  <a href="docs/threat-model.md">threat model</a> ·
   <a href="configs/lobstertrap_policy.yaml">policy YAML</a> ·
   <a href="tests/test_lobstertrap_integration.py">live integration tests</a> (4/4 PASS).</em>
 </p>
+
+<!-- 60-second judge path -->
+<details>
+<summary><strong>👋 For judges: 60-second path through this repo</strong></summary>
+
+<br>
+
+If you are reviewing this submission and have limited time:
+
+1. **The 3-minute video** (TechEx demo, primary artifact): see the submission landing page on lablab.ai.
+2. **The headline metric** (real, hardware-validated, MI300X-measured): **0 / 1,210** INV-15 violations on the exhaustive sweep · **3.55×** INT4 KV reduction constant 4K-262K context · **11 / 11** Lobster Trap adversarial PASS on our custom policy.
+3. **The paper with permanent DOI** (peer-reviewable evidence): <a href="https://doi.org/10.5281/zenodo.20114594">Zenodo 10.5281/zenodo.20114594</a> · v2.0.1 IEEE format · 12 references · MI300X-grounded.
+4. **The integration we built FOR this hackathon**: <a href="docs/lobstertrap-integration.md">lobstertrap-integration.md</a> (architecture + data flow + what LT catches vs what INV-15 catches table) and <a href="configs/lobstertrap_policy.yaml">lobstertrap_policy.yaml</a> (9 rules, NeurIPS-aligned).
+5. **The threat model** (Track 1 scoring requirement): <a href="docs/threat-model.md">threat-model.md</a>.
+6. **The honesty discipline** (what makes this project regulator-readable): <a href="AUDIT.md">AUDIT.md</a> — 11/11 audit items tracked, including one external audit catch from Perplexity Pro on 2026-05-13 (entry #11) that we acknowledged and fixed.
+
+**One-command local verification (CPU-only, no GPU required):**
+
+```bash
+git clone https://github.com/SuarezPM/Apohara_Context_Forge.git
+cd Apohara_Context_Forge
+PYTHONPATH=. python3 -m pytest tests/test_codec_v8.py tests/test_lmcache_connector.py -q
+# Expected: 24 passed, 2 skipped
+```
+
+</details>
+
+<!-- TrustLayer differentiation (preempts comparison) -->
+<details>
+<summary><strong>🆚 How is this different from TrustLayer / hallucination-detection tools?</strong></summary>
+
+<br>
+
+**Short answer**: TrustLayer scores OUTPUTS; we enforce PROCESS.
+
+| Tool category | What it checks | When it runs |
+| ------------- | -------------- | ------------ |
+| TrustLayer, Patronus Lynx, Galileo, Cleanlab TLM, Vectara HHEM | Whether a single LLM output is factually grounded against source documents (hallucination scoring) | After generation |
+| **Apohara ContextForge + Lobster Trap** | Whether every agent step in a multi-agent workflow followed the same documented, enforceable, auditable governance process | Before, during, and after execution |
+
+These are **orthogonal layers**, not competitors. A production deployment could (and arguably should) run both — TrustLayer as a downstream content auditor, Apohara as the upstream and runtime process governance layer that makes the entire workflow regulator-readable.
+
+The specific failure mode Apohara catches that **none of the output-side tools see**: silent Judge Consistency Rate (JCR) drift under aggressive KV-cache reuse (Liang et al. 2026, <a href="https://arxiv.org/abs/2601.08343">arXiv:2601.08343</a>). When you reuse cache across agents in a pipeline, the critic agent silently flips verdicts for identical inputs — and every output-side hallucination check passes individually. The system still ships a silent bug. INV-15 is the formal invariant that prevents this.
+
+</details>
 
 <!-- Row 3 — stack -->
 <p align="center">
