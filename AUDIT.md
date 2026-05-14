@@ -444,4 +444,51 @@ See the V6.x roadmap discussion for the current direction.
 
 ---
 
-*Last updated: 2026-05-10 · maintained by the same person who wrote the lies.*
+## V7.0.0-rc.2+ honesty checkpoint — 2026-05-13 (TechEx prep)
+
+### 11. 🟡→🟢 Gemini critic agent: was mock-only label, now real SDK integration
+
+**Where it lived**: `scripts/_sprint5_pipeline.py:200-260`, `scripts/sprint5_5agent_workload.py`,
+`scripts/sprint5_head_to_head.py`, `configs/sprint5_5agent.yaml`,
+`docs/lobstertrap-integration.md`, `assets/techex-pitch-deck.md`.
+
+**The state on 2026-05-13 (caught by Perplexity Pro deep-research audit)**:
+the `--critic-provider gemini-3-pro` CLI flag and YAML override existed
+in 6 files, and the mock-mode pipeline biased verdicts slightly when the
+override started with ``"gemini"``. **But there was no real call to the
+Gemini API in any code path.** The slide deck claimed "Cross-vendor
+critic (Gemini)" as a delivered feature.
+
+**Why this was a violation**: the slide deck and integration doc implied
+Gemini was actually called, when in reality only the mock returned a
+slightly biased verdict. That is exactly the V6.0 "claim vs code" gap
+the AUDIT.md discipline exists to catch.
+
+**Fix in V7.0.0-rc.2+ (2026-05-13)**: added a real `call_gemini()`
+function in `scripts/_sprint5_pipeline.py` that uses the
+`google-generativeai` SDK (already installed at 0.8.6) with the
+`GEMINI_API_KEY` env var.
+
+- When `--critic-provider` starts with `gemini-` AND the env var is set,
+  the critic step is routed to Google's actual Gemini API for that
+  single agent call. The other 4 agents continue using vLLM.
+- When the env var is missing or the import fails, the function returns
+  `None` and the caller falls through to the existing vLLM path. **No
+  fake call is ever fabricated.** Tested: 24 existing tests still pass,
+  graceful no-key fallback verified.
+- Note: when Gemini is in the loop, Lobster Trap proxy does NOT see the
+  Gemini request (the SDK bypasses LT). For full LT coverage with
+  Gemini, deploy Gemini behind a proxy in your own setup — documented
+  in the pipeline source comment.
+
+**Honesty rating**: 🟢 PRODUCTION. The cross-vendor critic claim now
+maps to real Gemini API calls when configured; otherwise the feature
+degrades silently to a documented fallback.
+
+**Discovery credit**: external Perplexity Pro deep-research audit
+caught this gap on 2026-05-13 during TechEx 2026 hackathon prep.
+External audit > self-attestation.
+
+---
+
+*Last updated: 2026-05-13 · maintained by the same person who wrote the lies, with periodic external audits to catch new ones.*

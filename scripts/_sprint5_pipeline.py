@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import random
 import time
 from dataclasses import dataclass, field
@@ -230,6 +231,33 @@ def run_request_vllm(
             if agent.role == "critic" and critic_provider_override:
                 agent_model = critic_provider_override
 
+            # ────────────────────────────────────────────────────────────
+            # Real Gemini SDK path: when the critic agent has a Gemini
+            # model override AND a valid GEMINI_API_KEY env var is set,
+            # we call Google's API directly (bypasses LT proxy + vLLM
+            # for this single agent step). This is honest cross-vendor
+            # integration — see AUDIT.md entry for Gemini integration.
+            # If the call fails for any reason (no key, network, rate),
+            # we fall through to the regular HTTP path below.
+            # ────────────────────────────────────────────────────────────
+            if agent.role == "critic" and agent_model.startswith("gemini"):
+                gemini_resp = call_gemini(
+                    system_prompt=agent.system_prompt,
+                    user_content=chain_input,
+                    model_name=agent_model,
+                )
+                if gemini_resp is not None:
+                    choice = gemini_resp["content"]
+                    total_tokens += gemini_resp["total_tokens"]
+                    chain_input = choice
+                    critic_verdict = (
+                        "ACCEPT" if "ACCEPT" in choice.upper() else "REJECT"
+                    )
+                    # Note: Lobster Trap does NOT inspect this request
+                    # (it bypasses LT proxy). For full LT coverage on
+                    # Gemini, deploy Gemini behind LT in your own setup.
+                    continue  # Skip the regular vLLM HTTP call
+
             request_body: dict = {
                 "model": agent_model,
                 "messages": [
@@ -292,6 +320,93 @@ def _intent_for_role(apohara_role: str) -> str:
     rule fire on a deterministic match.
     """
     return "general"
+
+
+# ---------------------------------------------------------------------------
+# Google Gemini integration (real SDK, optional path)
+# ---------------------------------------------------------------------------
+
+
+def call_gemini(
+    *,
+    system_prompt: str,
+    user_content: str,
+    model_name: str,
+    timeout_s: float = 30.0,
+) -> Optional[dict]:
+    """Call Google Gemini API for cross-vendor critic invocation.
+
+    Honesty discipline (Apohara AUDIT.md): this is the REAL Gemini SDK
+    integration, NOT a mock. It uses ``google.generativeai`` to call the
+    Gemini API directly. The critic agent gets routed here when its
+    ``provider`` field resolves to a name starting with ``gemini-``
+    (e.g. ``gemini-1.5-flash``, ``gemini-3-pro``).
+
+    Requires the ``GEMINI_API_KEY`` (or ``GOOGLE_API_KEY``) env var.
+    Without the key, returns ``None`` and the caller falls back to the
+    vLLM critic path. This preserves the honesty contract: if you do
+    not have a real Gemini key configured, no fake Gemini call is
+    fabricated.
+
+    Args:
+        system_prompt: the agent's system prompt (used as
+            ``system_instruction`` in the Gemini API).
+        user_content: the chained input from upstream agents.
+        model_name: e.g. ``"gemini-1.5-flash"`` (free tier 1,500
+            req/day) or ``"gemini-3-pro"`` (paid).
+        timeout_s: request timeout in seconds.
+
+    Returns:
+        ``{"content": str, "total_tokens": int, "model": str}`` on
+        success, ``None`` on import error / missing key / API failure.
+        Caller checks for None and falls through to vLLM.
+    """
+    try:
+        import google.generativeai as genai  # noqa: PLC0415
+    except ImportError:
+        logger.debug(
+            "call_gemini: google-generativeai not installed; falling back"
+        )
+        return None
+
+    api_key = (
+        os.environ.get("GEMINI_API_KEY")
+        or os.environ.get("GOOGLE_API_KEY")
+    )
+    if not api_key:
+        logger.debug(
+            "call_gemini: GEMINI_API_KEY / GOOGLE_API_KEY not set; falling back"
+        )
+        return None
+
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(
+            model_name=model_name,
+            system_instruction=system_prompt,
+        )
+        response = model.generate_content(
+            user_content,
+            generation_config={
+                "max_output_tokens": 256,
+                "temperature": 0.0,
+            },
+            request_options={"timeout": timeout_s},
+        )
+        text = response.text or ""
+        # usage_metadata is available on most response objects
+        usage = getattr(response, "usage_metadata", None)
+        total_tokens = (
+            getattr(usage, "total_token_count", 0) if usage else 0
+        )
+        return {
+            "content": text,
+            "total_tokens": int(total_tokens),
+            "model": model_name,
+        }
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("call_gemini: API call failed (%s); falling back", exc)
+        return None
 
 
 def run_request_mock(
