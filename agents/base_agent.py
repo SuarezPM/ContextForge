@@ -57,16 +57,23 @@ class BaseAgent(ABC):
     ) -> tuple[str, float]:
         """
         Call vLLM for completion with optional thinking mode.
-        
+
         Args:
             prompt: The input prompt
             thinking: Override thinking mode (default: self.thinking)
-            
+
         Returns:
-            tuple of (response_text, ttft_ms)
+            tuple of (response_text, request_latency_ms)
+
+        Notes:
+            TTFT (time-to-first-token) requires streaming and a
+            per-token callback.  This method awaits the *full*
+            non-streaming response, so the returned latency is the
+            request-total wall time, not first-token latency.
+            Renamed in US-002 bug 4 to stop mislabelling the value.
         """
         use_thinking = thinking if thinking is not None else self.thinking
-        
+
         start = time.perf_counter()
         payload = {
             "model": settings.vllm_model,
@@ -78,14 +85,15 @@ class BaseAgent(ABC):
                 "thinking": use_thinking,
             },
         }
-        
+
         async with httpx.AsyncClient(timeout=60.0) as client:
             r = await client.post(
                 f"{settings.vllm_base_url}/v1/chat/completions",
                 json=payload,
             )
             r.raise_for_status()
-        
-        ttft_ms = (time.perf_counter() - start) * 1000
+
+        # TTFT requires streaming; this is request-total latency, not first-token latency.
+        request_latency_ms = (time.perf_counter() - start) * 1000
         content = r.json()["choices"][0]["message"]["content"]
-        return content, ttft_ms
+        return content, request_latency_ms
