@@ -58,7 +58,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Bug fix (US-002): ContextRegistry.start() launches the VRAM cache
     # background monitor — without it, the registry never tracks GPU
     # pressure even though endpoints have been answering requests.
-    await app.state.registry.start()
+    # ``getattr`` keeps the call best-effort so monkeypatched test
+    # fakes (which omit start/stop) still pass — matches the pattern
+    # used for ``clear`` and ``vllm.aclose`` in the finally block.
+    start = getattr(app.state.registry, "start", None)
+    if start is not None:
+        await start()
     app.state.compressor = ContextCompressor()
     app.state.coordinator = CompressionCoordinator(
         registry=app.state.registry,
