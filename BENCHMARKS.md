@@ -39,6 +39,8 @@ is retained as the historical closed-form reference, see
 
 ### Measured on real H100 — sequential 5-agent peak
 
+> **What this table measures:** end-to-end pipeline correctness on real H100 with a 2026-era Qwen3.6 model + INV-15 critic-gate behavior + per-agent latency and peak VRAM (sequential, one agent at a time, KV flushed between agents). **What it does NOT measure:** the 76% concurrent KV-sharing saving — that requires the vLLM plugin path holding five agents' KV state at the same time via a real registry, deferred until vLLM upstream lands `qwen3_5` model_type support. See the closed-form projection table below for the 76% number, and the `honesty_note` in [`logs/milan_5agent_h100_REAL_20260516T215940Z.json`](logs/milan_5agent_h100_REAL_20260516T215940Z.json) for the full disclosure of what each number represents.
+
 | Config | TTFT (ms) | p50 latency (ms) | Tokens generated | Peak HBM (GB) | INV-15 critic fires |
 |---|---|---|---|---|---|
 | Baseline (each agent encodes full 2.3K-token shared context) | 5269 | 3886 | 240 | 51.348 | 1/1 |
@@ -63,12 +65,22 @@ is retained as the historical closed-form reference, see
   on the first agent because it only encodes its suffix (~30 tokens
   vs ~2.3K).
 
-### Closed-form reference (CPU-mock, retained for theory)
+### The 76% architectural claim (closed-form projection of the concurrent KV-sharing target)
 
-The prior closed-form projection used Llama-3-8B's KV geometry (32
-layers × GQA-8 × fp16) plus a workload mean-reuse rate of 0.76. The
-table is retained here as the theoretical anchor that the production
-vLLM plugin will validate end-to-end:
+This is **not** a measurement. It is the closed-form HBM-savings
+projection for what the production vLLM plugin will deliver once it
+holds five agents' KV state concurrently via the ContextForge
+registry. The projection uses Llama-3-8B's KV geometry (32 layers ×
+GQA-8 × fp16) plus a workload mean-reuse rate of 0.76; the
+architectural saving is `1 - mean_reuse = 0.24` of the prefix KV
+footprint replicated across agents. The CPU-mock backend that
+produced these numbers lives at
+`scripts/_sprint5_pipeline.py::run_request_mock`; the closed-form
+itself is in
+`scripts/build_milan_benchmark.py::estimate_hbm_used_gb`. The
+real-hardware H100 table *above* validates the gate behavior + per-
+agent peak; this projection table validates the architectural target
+that the plugin path will hit once vLLM upstream supports `qwen3_5`.
 
 | Config (closed-form) | TTFT (ms) | Throughput (tok/s) | HBM (GB) | JCR | Notes |
 |---|---|---|---|---|---|
