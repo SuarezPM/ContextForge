@@ -10,11 +10,21 @@ Architecture:
 - AnchorPool offset hints propagate to LMCache for cross-node alignment
 
 INVARIANT 10: Only pre-RoPE tensors are quantized/shared.
+
+DEPRECATED (US-002 bug 6): ``LMCacheConnectorV1`` is a stub — its
+``on_save_kv_layer`` constructs ``LMCacheMeta`` and logs a debug line
+but never calls ``self._client.put``, so no KV bytes were ever
+written to LMCache through this class.  The production path is
+``apohara_context_forge.serving.lmcache_connector.LMCacheConnectorV2``
+(see also ``README``).  V1 is retained because tests and demo
+scripts still import its no-op surface; any active call now raises
+``NotImplementedError`` to surface the lie at the source.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+import warnings
 import weakref
 from dataclasses import dataclass, field
 from typing import Optional
@@ -36,12 +46,24 @@ class LMCacheMeta:
 
 
 class LMCacheConnectorV1:
-    """Bridge between ContextForge AnchorPool and LMCache V1.
+    """DEPRECATED bridge between ContextForge AnchorPool and LMCache V1.
 
-    Supports:
+    Supports (in intent):
     - Saving KV layers with anchor-aware metadata
     - Loading with offset_hint injection for RoPE de-rotation
     - Cross-worker block sharing with prefix anchoring
+
+    .. deprecated:: US-002 (bug 6)
+        ``on_save_kv_layer`` never invoked ``self._client.put`` even when
+        ``self._active`` was True — it logged a debug line and returned.
+        The production code path is
+        :class:`apohara_context_forge.serving.lmcache_connector.LMCacheConnectorV2`.
+        This class is retained because the legacy unit tests and demo
+        scripts (``demo/benchmark_v4.py``, ``demo/benchmark_v5.py``) still
+        import its no-op surface.  Constructing it with an active client
+        now emits a ``DeprecationWarning``; any active save attempt raises
+        ``NotImplementedError`` so the previously-silent stub surfaces
+        loudly.
     """
 
     def __init__(
@@ -55,6 +77,15 @@ class LMCacheConnectorV1:
         self._enable_cla_metadata = enable_cla_metadata
         self._active = lmcache_client is not None
         self._pending_saves: dict[str, asyncio.Event] = {}
+        if self._active:
+            warnings.warn(
+                "LMCacheConnectorV1 is deprecated and was always a stub; "
+                "use LMCacheConnectorV2 from "
+                "apohara_context_forge.serving.lmcache_connector instead. "
+                "See AUDIT.md item 12 (US-002 bug 6).",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
     def is_active(self) -> bool:
         """Check if LMCache bridge is active."""
@@ -86,7 +117,14 @@ class LMCacheConnectorV1:
     ) -> None:
         """Called when ContextForge saves a KV layer to LMCache.
 
-        Augments metadata with anchor hash and CLA group info.
+        .. deprecated:: US-002 (bug 6)
+            This method previously constructed an ``LMCacheMeta`` and
+            emitted a debug log, but never called ``self._client.put``.
+            No KV bytes were ever written through this class.  An
+            inactive (no-client) bridge still returns silently; an
+            active call now raises ``NotImplementedError`` so the lie
+            surfaces at the source instead of looking like a successful
+            save in production logs.
         """
         if not self._active:
             return
@@ -105,6 +143,12 @@ class LMCacheConnectorV1:
         logger.debug(
             f"LMCache save: block={block_id} anchor={meta.anchor_hash} "
             f"pre_rope={meta.pre_rope} cla_group={meta.cla_group}"
+        )
+        raise NotImplementedError(
+            "LMCacheConnectorV1.on_save_kv_layer is a stub; use "
+            "LMCacheConnectorV2 from "
+            "apohara_context_forge.serving.lmcache_connector. "
+            "See AUDIT.md item 12 (US-002 bug 6)."
         )
 
     async def on_load_kv_layer(
