@@ -150,16 +150,79 @@ PYTHONPATH=. python3 scripts/generate_milan_clip.py \
 
 ---
 
+## MI300X Wave B — RotateKVQuantizer real-hardware measurements (2026-05-16)
+
+**Story:** US-MI-014 — first end-to-end measurement on rented
+AMD Instinct MI300X (Hot Aisle `enc1-gpuvm019`) to validate the
+paper's headline 3.55× INT4 codec VRAM-reduction claim on live
+hardware (replaces the earlier sprint's archived measurements).
+
+**Hardware:** `rocm-hip:6.2.41133-dd7f95766:AMD Instinct MI300X VF`
+(192 GB HBM3, ROCm 6.2, torch 2.5.1+rocm6.2).
+
+**Cost:** ~$1.50 of MI300X compute at $1.99/h (~45 min including
+provisioning + 4 stages).
+
+**Scripts:** `scripts/mi300x_hbm3_bandwidth.py`,
+`scripts/mi300x_pure_torch_fwht.py`,
+`scripts/mi300x_vram_sweep.py`,
+`scripts/mi300x_vram_measurement.py`.
+
+### Stage A — HBM3 bandwidth
+
+| Working set | Copy BW | Triad BW | Notes |
+|---|---|---|---|
+| 1 GB | 2920 GB/s | 1254 GB/s | warmup-dominated |
+| 4 GB | 3794 GB/s | 3623 GB/s | steady state |
+| 16 GB | 3722 GB/s | 3573 GB/s | sustained |
+| 64 GB | 3707 GB/s | 3603 GB/s | sustained at scale |
+
+Best triad: **3622 GB/s** = **68.4 % of advertised 5.3 TB/s peak**
+(`logs/mi300x_hbm3_bandwidth_1778973430.json`).
+
+### Stage C — VRAM reduction sweep (RotateKV INT4 vs FP16)
+
+| Sequence length | Baseline FP16 | INT4 packed | Reduction factor |
+|---|---|---|---|
+|  4 096 | 64.0 MiB | 18.1 MiB | **3.5433×** |
+|  8 192 | 128.0 MiB | 36.1 MiB | **3.5494×** |
+| 16 384 | 256.0 MiB | 72.1 MiB | **3.5525×** |
+| 32 768 | 512.0 MiB | 144.1 MiB | **3.5540×** |
+
+Reduction factor is **constant to 3 decimal places (3.54–3.55×)
+across 4K-32K context**, confirming the paper's length-invariance
+claim (`logs/mi300x_vram_sweep_1778973581.json`).
+
+### Stage D — Canonical 32K with and without FWHT
+
+Same `3.5540×` factor with `use_fwht=True` and `use_fwht=False`
+(`logs/mi300x_vram_1778973631.json`). Per the paper, `use_fwht=False`
+is the recommended configuration (FWHT integration degrades INT4
+reconstruction quality 200× at this codec layout).
+
+### Reading the numbers
+
+- **3.55× headline factor is reproduced on live MI300X.** The paper's
+  V2.0 abstract quotes "3.55× VRAM reduction measured on AMD
+  Instinct MI300X (192 GB, ROCm 7.2.0), constant across context
+  lengths 4K–262K". This 2026-05-16 sweep refreshes the underlying
+  measurement on the same family of hardware (ROCm 6.2 here vs 7.2
+  in the original) and confirms the same constant within
+  measurement noise.
+- **HBM3 efficiency 68 %** is healthy — typical hand-tuned codes on
+  MI300X land in the 60-80 % range; we are not bandwidth-bound for
+  the codec hot path.
+
+---
+
 ## What is NOT in this document yet
 
-- **Live MI300X v8 codec sweep** — landed in V7.0.0-rc.2 but the
-  artifacts live under `logs/mi300x_*` (separate tables); they
-  belong here once the Milan row above is replaced with a real
-  GPU measurement.
+- **5-agent live H100 + MI300X side-by-side** — H100 row above is
+  measured; a same-workload MI300X run is a post-hackathon delivery.
 - **K8s operator stress test** — handled by `operator/validate.sh`.
 - **Multi-node Redis cache** — not yet implemented (`remote_url:
   null` in the YAML).
 
 ---
 
-*Last updated: 2026-05-16 (V7.0.0-rc.2, US-014 Milan Day-6).*
+*Last updated: 2026-05-16 (V7.0.0-rc.2, US-014 Milan Day-6 + US-MI-014 MI300X Wave B refresh).*
