@@ -282,8 +282,13 @@ class SpeculativeCoordinator:
                 "falling back to calibration-knob estimate. "
                 "INV-12 (target distribution preservation) is NOT guaranteed."
             )
-            estimate = max(0.4, 1.0 - 0.4 * self.config.acceptance_threshold)
-            draft_probs = [estimate] * n
+            # Stubbed value; INV-12 math is currently disabled on this
+            # fallback path.  Renamed in US-002 bug 7 to make the
+            # stub-nature visible at the call site (previously written
+            # as a local ``estimate`` whose origin was opaque).  See
+            # AUDIT.md item 12 and the V6.0 retraction.
+            _stub_draft_prob = max(0.4, 1.0 - 0.4 * self.config.acceptance_threshold)
+            draft_probs = [_stub_draft_prob] * n
             inv12_preserved = False
 
         for i in range(n):
