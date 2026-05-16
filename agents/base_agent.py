@@ -7,6 +7,7 @@ import time
 import httpx
 
 from apohara_context_forge.config import settings
+from apohara_context_forge.token_counter import TokenCounter
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +45,17 @@ class BaseAgent(ABC):
             response.raise_for_status()
             data = response.json()
             # When the server reports original_tokens=0 on a non-empty context
-            # (e.g. coordinator_unavailable passthrough), fall back to local count
-            # so downstream metrics stay accurate.
+            # (e.g. coordinator_unavailable passthrough), fall back to a local
+            # count so downstream metrics stay accurate.
+            #
+            # Bug fix (US-002): previously ``len(context.split())`` (whitespace
+            # word count) was used; that under-counts for code and multibyte
+            # text by a factor of ~1.3-3x.  We now route through
+            # ``TokenCounter``, which uses the same Qwen3 tokenizer as the
+            # registry and LSH engine.  This keeps the client-side fallback
+            # consistent with what the server would have reported.
             if not data.get("original_tokens") and context:
-                data["original_tokens"] = len(context.split())
+                data["original_tokens"] = TokenCounter.get().count(context)
             return data
 
     async def call_vllm(
