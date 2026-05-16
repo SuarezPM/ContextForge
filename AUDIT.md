@@ -444,4 +444,47 @@ See the V6.x roadmap discussion for the current direction.
 
 ---
 
-*Last updated: 2026-05-10 · maintained by the same person who wrote the lies.*
+## 12. 🟢 7 critical bugs fixed (2026-05-16, Day-6 sprint Phase 0)
+
+External strategist review (Perplexity Deep Research + an ex-hackathon
+judge) independently validated seven defects in the codebase that a
+first-time reader would surface in minutes. They are now all closed.
+Each fix landed as a separate atomic commit on `main` under user story
+**US-002** of the Apohara Inti Fusion sprint.
+
+| # | Area | File:line | Bug | Commit |
+|---|------|-----------|-----|--------|
+| 1 | registry | `apohara_context_forge/registry/context_registry.py:330-331` | `tokens_saved = blocks_per_match * block_size * len(valid_matches)` was `len(valid_matches)² × block_size` — a quadratic over-count of every cache-hit savings number reported by `SharedContextResult.total_tokens_saved`. Fixed to drop the redundant `len(valid_matches)` factor. | `0409de4` |
+| 2 | mcp/lifespan | `apohara_context_forge/mcp/server.py:57-61` | `ContextRegistry()` was constructed but `.start()` was never invoked, so the VRAM cache background monitor never ran for the life of the FastAPI server. Added `await registry.start()` after construction (guarded by `getattr` so monkeypatched test fakes still pass) and a symmetric `await registry.stop()` in the lifespan finally block. | `ba096d9` + fixup `1f61cc5` |
+| 3 | mcp/metrics | `apohara_context_forge/mcp/server.py:253-` | The background `metrics_loop` snapshotted the module-level `metrics = MetricsCollector()` singleton, but every endpoint resolves the collector via `Depends(get_metrics)` → `app.state.metrics`. The loop was logging an empty, never-updated snapshot. Loop now accepts an optional `FastAPI` arg and reads `app_.state.metrics` per iteration. | `8a7d3ad` |
+| 4 | agents | `agents/base_agent.py:53-99` | `BaseAgent.call_vllm` measured request-total wall time and labelled it `ttft_ms`. True TTFT requires streaming. Renamed local + docstring to `request_latency_ms` and added an inline comment so any future reader knows what is and isn't measured. The legitimate `ttft_ms` field on `apohara_context_forge.models` and the `contextforge_agent_ttft_ms` Prometheus histogram are unaffected. | `621b4a8` |
+| 5 | agents | `agents/base_agent.py:46-58` | When the MCP server returns `original_tokens=0` on the `coordinator_unavailable` passthrough, the fallback was `len(context.split())` (whitespace word count, under-counts for code / multibyte by ~1.3-3x). Routed through `TokenCounter.get().count(context)`, the same Qwen3 tokenizer used by the registry and LSH engine. | `959bc46` |
+| 6 | serving | `apohara_context_forge/serving/lmcache_bridge.py:38-` | `LMCacheConnectorV1.on_save_kv_layer` constructed `LMCacheMeta` and emitted a debug log but never called `self._client.put`. README documented V2 as the replacement; V1 stayed in tree and several callers (tests + demo scripts) still imported it. Option B applied: class is now marked deprecated, active-client construction emits `DeprecationWarning`, and the active save path raises `NotImplementedError` so the previously-silent stub surfaces loudly. The inactive (no-client) no-op semantics that the existing tests and demos rely on are preserved. | `9fac9eb` |
+| 7 | decoding | `apohara_context_forge/decoding/speculative_coordinator.py:280-291` | The V6.0 `draft_prob_estimate` field was already removed by the V6.1 truth-up (replaced by a proper `draft_logprobs` argument, the Leviathan path). The fallback-path local was still named `estimate`, which made its stub-nature opaque. Renamed to `_stub_draft_prob` with an inline comment pointing back at this section and the V6.0 retraction so any future reader sees the lie immediately. No behaviour change. | `37196eb` |
+
+**Verification:**
+
+```
+PYTHONPATH=. python3 -m pytest tests/ -q
+# 373 passed, 26 skipped, 6 warnings in 200.43s
+
+bash scripts/check_honesty.sh
+# honesty guard PASS — no regressions detected
+```
+
+No test was changed to "match the corrected expectation" — all existing
+assertions were already consistent with the corrected semantics. The
+one test that initially failed after Bug 2
+(`test_lifespan_constructs_and_disposes`) was a mock-substitution
+collateral: its `_LifeReg` fake omits `start`/`stop`. The fixup commit
+(`1f61cc5`) wraps the new `start()` call in `getattr` — same defensive
+pattern already used for `clear` and `vllm.aclose` in the lifespan
+teardown — and the test passes unchanged.
+
+The 7 fixes total 8 commits (one fixup for Bug 2 to keep the test
+suite green without amending the original bug-fix commit). Final
+commit:  *(filled in after push)*.
+
+---
+
+*Last updated: 2026-05-16 · maintained by the same person who wrote the lies.*
