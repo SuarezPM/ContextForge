@@ -202,13 +202,16 @@ reconstruction quality 200× at this codec layout).
 
 ### Reading the numbers
 
-- **3.55× headline factor is reproduced on live MI300X.** The paper's
-  V2.0 abstract quotes "3.55× VRAM reduction measured on AMD
-  Instinct MI300X (192 GB, ROCm 7.2.0), constant across context
-  lengths 4K–262K". This 2026-05-16 sweep refreshes the underlying
-  measurement on the same family of hardware (ROCm 6.2 here vs 7.2
-  in the original) and confirms the same constant within
-  measurement noise.
+- **3.55× headline factor is reproduced on live MI300X across the
+  4K–32K segment.** The paper's V2.0 abstract quotes "3.55× VRAM
+  reduction measured on AMD Instinct MI300X (192 GB, ROCm 7.2.0),
+  constant across context lengths 4K–262K". This 2026-05-16 Wave B
+  sweep confirms the constancy + the reduction factor on
+  ROCm 6.2 hardware **for the 4K–32K segment that the script default
+  exercises**. The paper's full 4K–262K range rests on the prior
+  sprint's archived sweep on ROCm 7.2.0 (referenced in the paper's
+  Table 1) — this Wave B run validates the trend at the lower end
+  of that range on refreshed hardware, not the full upper bound.
 - **HBM3 efficiency 68 %** is healthy — typical hand-tuned codes on
   MI300X land in the 60-80 % range; we are not bandwidth-bound for
   the codec hot path.
