@@ -21,23 +21,60 @@ agent fixed in the YAML; critic role gated by INV-15 at τ=0.65).
 runs; `scripts/build_milan_benchmark.py` composes the Milan JSON;
 `scripts/run_milan_benchmark.sh` orchestrates the whole flow.
 
-**Hardware:** **CPU-mock fallback (GCP H100 deferred).** The
-GCP service account
-`apohara-aegis-judge@gen-lang-client-0658922897.iam.gserviceaccount.com`
-configured for this workstation lacks Compute Engine API access
-(SERVICE_DISABLED) and cannot self-elevate to enable it. Until a
-human owner enables the API for the project, the side-by-side runs
-use the mock backend in `scripts/_sprint5_pipeline.py::run_request_mock`.
-HBM numbers come from the closed-form in
-`scripts/build_milan_benchmark.py::estimate_hbm_used_gb`
-(Llama-3-8B; 32 layers × GQA-8 KV heads × fp16). The live GPU run
-is deferred to Pablo's manual execution — see AUDIT.md #11.
+**Hardware:** **NVIDIA H100 PCIe 80GB 1× via NVIDIA Brev (Scaleway)
+on 2026-05-16** — supersedes the prior CPU-mock fallback. The H100
+run uses Qwen/Qwen3.6-27B (FP16, ~54 GB weights, hybrid
+linear-attention architecture, `qwen3_5` model_type) via the
+HuggingFace transformers 5.8.1 backend. vLLM 0.21.0 does not yet
+recognize `qwen3_5`, so the vLLM-plugin path is deferred to upstream
+support. Full composed log:
+[`logs/milan_5agent_h100_REAL_20260516T215940Z.json`](logs/milan_5agent_h100_REAL_20260516T215940Z.json).
+Per-run logs:
+[`logs/milan_5agent_h100_baseline_20260516T213133Z.json`](logs/milan_5agent_h100_baseline_20260516T213133Z.json),
+[`logs/milan_5agent_h100_contextforge_20260516T215655Z.json`](logs/milan_5agent_h100_contextforge_20260516T215655Z.json).
+Harness: [`scripts/run_milan_h100.py`](scripts/run_milan_h100.py).
+The earlier CPU-mock log `logs/milan_5agent_benchmark_1778943206.json`
+is retained as the historical closed-form reference, see
+"Closed-form reference (CPU-mock, retained for theory)" below.
 
-| Config | TTFT (ms) | Throughput (tok/s) | HBM (GB) | JCR | Notes |
+### Measured on real H100 — sequential 5-agent peak
+
+| Config | TTFT (ms) | p50 latency (ms) | Tokens generated | Peak HBM (GB) | INV-15 critic fires |
+|---|---|---|---|---|---|
+| Baseline (each agent encodes full 2.3K-token shared context) | 5269 | 3886 | 240 | 51.348 | 1/1 |
+| Contextforge (non-critic agents encode suffix only; critic re-encodes per INV-15) | 4105 | 4105 | 226 | 51.234 | 1/1 |
+| **Delta** | **−1164 (−22%)** | **+219 (+5.6%)** | **−14** | **−0.115 (−0.22%)** | **0 (gate behavior identical)** |
+
+**Reading the H100 numbers**
+
+- **HBM peak −0.22%** — this is the SEQUENTIAL single-agent peak. The
+  harness flushes the KV cache between agents (`torch.cuda.empty_cache()`),
+  so the peak at any single point is one agent's footprint regardless
+  of mode. The architectural 76% saving (below) is the CONCURRENT
+  multi-agent number — five agents holding KV state at the same time
+  via a real registry. That concurrent measurement requires the vLLM
+  plugin path which is post-hackathon (waiting on vLLM upstream
+  `qwen3_5` support).
+- **INV-15 critic fires correctly on real H100** — 1/1 in both modes.
+  Risk 0.90 > τ 0.65 → critic forced to dense prefill. The gate
+  decision is identical regardless of underlying KV strategy, which
+  is what the paper specifies.
+- **TTFT lower in contextforge** — saves the ~1.1s prefix-encode time
+  on the first agent because it only encodes its suffix (~30 tokens
+  vs ~2.3K).
+
+### Closed-form reference (CPU-mock, retained for theory)
+
+The prior closed-form projection used Llama-3-8B's KV geometry (32
+layers × GQA-8 × fp16) plus a workload mean-reuse rate of 0.76. The
+table is retained here as the theoretical anchor that the production
+vLLM plugin will validate end-to-end:
+
+| Config (closed-form) | TTFT (ms) | Throughput (tok/s) | HBM (GB) | JCR | Notes |
 |---|---|---|---|---|---|
 | vllm `--enable-prefix-caching` (baseline) | 31.93 | 6,915.2 | 78.12 | 0.784 | INV-15 disabled, no cross-agent KV sharing |
 | vllm + contextforge plugin | 32.12 | 6,852.6 | 18.75 | 1.000 | INV-15 ON, mean-reuse 0.76 sharing |
-| **Delta** | **+0.19** | **-0.91%** | **-59.37 (-76.0%)** | **+0.216** | Critic agent JCR recovered from 0.784 → 1.000 |
+| **Delta (closed-form)** | **+0.19** | **−0.91%** | **−59.37 (−76.0%)** | **+0.216** | Critic agent JCR recovered from 0.784 → 1.000 |
 
 **Reading the numbers**
 
