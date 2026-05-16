@@ -261,11 +261,27 @@ async def root() -> dict:
 # Background metrics loop — opt-in helper for production runs.
 # ---------------------------------------------------------------------------
 
-async def metrics_loop() -> None:
+async def metrics_loop(app_: FastAPI | None = None) -> None:
+    """Background metrics logger.
+
+    Bug fix (US-002): previously this loop snapshotted the module-level
+    ``metrics`` singleton, but every endpoint resolves ``MetricsCollector``
+    via ``Depends(get_metrics)`` which returns ``request.app.state.metrics``.
+    The two collectors are distinct instances, so the loop was logging an
+    empty / never-updated snapshot.
+
+    Pass the ``FastAPI`` app at task creation time so the closure reads
+    the same collector the endpoints write to. The legacy zero-arg form
+    falls back to the module-level singleton for callers that have not
+    yet been updated.
+    """
     while True:
         try:
             await asyncio.sleep(30)
-            snap = await metrics.snapshot()
+            collector = (
+                getattr(app_.state, "metrics", metrics) if app_ is not None else metrics
+            )
+            snap = await collector.snapshot()
             logger.info(
                 "Metrics: VRAM=%.1fGB TTFT=%.1fms Dedup=%.1f%%",
                 snap.vram_used_gb,
