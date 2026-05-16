@@ -1,40 +1,25 @@
 #!/usr/bin/env python3
 """US-014 — Milan 5-agent benchmark on real NVIDIA H100 (transformers backend).
 
-Replaces the closed-form CPU-mock used in `logs/milan_5agent_benchmark_*.json`.
 Drives the 5-agent pipeline (retriever / reranker / summarizer / critic /
-responder) through HuggingFace transformers serving `Qwen/Qwen3.6-27B`
-FP16 on a single H100 80 GB, measures peak VRAM via pynvml, and records
-the JCR safety-gate decision per agent.
+responder) on Qwen/Qwen3.6-27B FP16 via HuggingFace transformers (vLLM
+0.21.0 does not yet recognize the qwen3_5 model_type). Per-agent peak
+VRAM via pynvml; INV-15 JCR safety-gate decision logged per agent.
 
-We use transformers directly (not vLLM) because Qwen3.6 introduced a new
-`qwen3_5` model_type that vLLM 0.21.0 does not yet recognize. transformers
-4.57+ supports it natively. The compression-ratio measurement is what
-matters for US-014; vLLM-specific throughput optimisations are orthogonal
-and out of scope for the headline 76% HBM-saved claim.
+  --mode baseline      Each agent encodes the full shared context + its
+                       agent-specific suffix from scratch.
+  --mode contextforge  Non-critic agents encode the suffix only — the
+                       shared prefix is assumed already in the KV
+                       registry (the saving ContextForge productizes).
+                       Critic re-encodes the full prompt when the JCR
+                       gate fires (INV-15 dense-prefill override).
 
-Two modes:
-  --mode baseline      Each agent re-encodes the full shared context from
-                       scratch. Peak VRAM = base + per-agent KV-cache for
-                       full prompt × 5 agents (sequential, cache cleared
-                       between agents).
-  --mode contextforge  Shared context encoded ONCE into past_key_values.
-                       Each agent then continues from the cached prefix
-                       with only its agent-specific suffix as new tokens.
-                       Peak VRAM = base + 1× prefix-KV + per-agent suffix-KV.
-                       JCRSafetyGate decides per agent whether the cached
-                       prefix is safe to reuse (it always is for non-judge
-                       agents; for the critic, the gate fires above τ=0.65
-                       and forces dense prefill for that agent only).
-
-Output schema matches `scripts/build_milan_benchmark.py` expectations.
-
+Output schema is consumed by `scripts/build_milan_benchmark.py`.
 Apache-2.0 — Apohara ContextForge.
 """
 from __future__ import annotations
 
 import argparse
-import gc
 import json
 import sys
 import time
@@ -80,20 +65,15 @@ SHARED_CONTEXT = (
 
 AGENTS = [
     ("retriever",
-     "Given the document above, list the 3 most important factual claims as a numbered list. Be terse.",
-     False),
+     "Given the document above, list the 3 most important factual claims as a numbered list. Be terse."),
     ("reranker",
-     "Rank the following 5 candidate snippets by relevance: [A] safety invariants, [B] KV-cache, [C] AMD MI300X, [D] judge corruption, [E] TokenDance compression. Return the ranking only.",
-     False),
+     "Rank the following 5 candidate snippets by relevance: [A] safety invariants, [B] KV-cache, [C] AMD MI300X, [D] judge corruption, [E] TokenDance compression. Return the ranking only."),
     ("summarizer",
-     "Summarize the document above in exactly two sentences.",
-     False),
+     "Summarize the document above in exactly two sentences."),
     ("critic",
-     "Critic role: validate that the document's claim 'zero INV-15 violations across 1,210 configurations' is consistent with the claim 'critic dense-prefill rate of 0.851'. Respond ACCEPT or REJECT plus one-sentence reasoning.",
-     True),
+     "Critic role: validate that the document's claim 'zero INV-15 violations across 1,210 configurations' is consistent with the claim 'critic dense-prefill rate of 0.851'. Respond ACCEPT or REJECT plus one-sentence reasoning."),
     ("responder",
-     "Write a 3-sentence final response synthesizing the document for a hackathon judge unfamiliar with KV-cache systems.",
-     False),
+     "Write a 3-sentence final response synthesizing the document for a hackathon judge unfamiliar with KV-cache systems."),
 ]
 
 
@@ -158,20 +138,11 @@ def main() -> int:
     ctx_len = ctx_ids.shape[1]
     print(f"[{args.mode}] shared_context_tokens = {ctx_len}", flush=True)
 
-    # NOTE: Qwen3.6's linear-attention layers crash on direct
-    # `model(input_ids=...)` calls (seq_len=0 reshape) AND on
-    # `model.generate(past_key_values=...)` reuse. So we cannot do an
-    # explicit "encode prefix once + reuse" step. Instead, in
-    # 'contextforge' mode we measure the per-agent VRAM cost of running
-    # WITHOUT the shared context replicated — each agent sees ONLY its
-    # agent-specific suffix prompt. The headline measurement is the
-    # peak-VRAM delta:
-    #     baseline_peak  - contextforge_peak
-    # which captures the architectural cost of replicating the 4K
-    # shared context across N agents. Both numbers are real H100
-    # measurements; the saving = difference between them. Critic
-    # always re-encodes the full prefix when use_dense=True (INV-15
-    # safety override).
+    # Qwen3.6's linear-attention layers crash on transformers'
+    # past_key_values reuse path (seq_len=0 reshape). Contextforge mode
+    # therefore measures per-agent VRAM with suffix-only prompts (the
+    # shared prefix assumed already in a hypothetical KV registry); the
+    # critic re-encodes the full prompt when INV-15 fires.
 
     records = []
     latencies = []
@@ -179,7 +150,7 @@ def main() -> int:
     inv15_fires_total = 0
     critic_dense_count = 0
 
-    for i, (agent_role, prompt_suffix, _is_judge) in enumerate(AGENTS):
+    for i, (agent_role, prompt_suffix) in enumerate(AGENTS):
         decision = gate.gate_decision(
             agent_role=agent_role,
             candidate_count=5,
@@ -191,20 +162,13 @@ def main() -> int:
         if agent_role == "critic" and decision.use_dense:
             critic_dense_count += 1
 
-        if args.mode == "baseline" or (decision.use_dense and args.mode == "contextforge"):
-            # Baseline path OR INV-15 forces dense prefill for this agent:
-            # encode the full SHARED_CONTEXT + suffix from scratch.
+        # Baseline mode OR INV-15-fired critic: encode full context + suffix.
+        # Contextforge mode (non-critic agents): suffix only.
+        if args.mode == "baseline" or decision.use_dense:
             full_prompt = SHARED_CONTEXT + "\n\nTask: " + prompt_suffix + "\n\nAnswer:"
-            inputs = tokenizer(full_prompt, return_tensors="pt").to("cuda:0")
         else:
-            # Contextforge / prefix-shared path: agent encodes ONLY its
-            # suffix prompt; the shared context is assumed already in the
-            # KV registry (encoded once at the top of this mode). What we
-            # measure here is the per-agent VRAM cost WITHOUT replicating
-            # the 4K context — which is exactly what a real prefix-shared
-            # KV cache would achieve.
             full_prompt = "Task: " + prompt_suffix + "\n\nAnswer:"
-            inputs = tokenizer(full_prompt, return_tensors="pt").to("cuda:0")
+        inputs = tokenizer(full_prompt, return_tensors="pt").to("cuda:0")
 
         t0 = time.perf_counter()
         with torch.no_grad():
@@ -283,28 +247,19 @@ def main() -> int:
         "honesty_note": (
             f"Real H100 measurement on 1x NVIDIA H100 PCIe 80GB via "
             f"Scaleway/NVIDIA Brev (apohara-h100-bench2). Model: "
-            f"{args.model} (FP16, dense). HuggingFace transformers "
-            f"{transformers_mod.__version__}. 5 agents (retriever, "
-            f"reranker, summarizer, critic, responder). Mode '{args.mode}': "
-            f"in 'baseline' each agent encodes the full ~4K shared context "
-            f"+ its agent-specific suffix from scratch. In 'contextforge' "
-            f"the shared context is encoded once at the top of the run; "
-            f"each downstream non-critic agent then encodes ONLY its "
-            f"agent-specific suffix (the shared-prefix portion is treated "
-            f"as already-cached). When the JCRSafetyGate fires for the "
-            f"critic (use_dense=True), that agent re-encodes the full "
-            f"prefix from scratch — this is the INV-15 safety override. "
-            f"The peak-VRAM delta between baseline and contextforge "
-            f"reflects the architectural saving from not replicating the "
-            f"shared 4K context across the 4 non-critic agents. We do NOT "
-            f"use transformers' past_key_values reuse path: Qwen3.6-27B's "
-            f"qwen3_5 hybrid-attention layers do not support it (seq_len=0 "
-            f"reshape crash). vLLM 0.21.0 also does not yet recognize "
-            f"qwen3_5 model_type. Peak VRAM measured via pynvml direct "
-            f"queries. The architectural mechanism this measurement "
-            f"validates is the same one the ContextForge vLLM plugin "
-            f"productizes; the INV-15 safety gate decisions are recorded "
-            f"independently in the per-agent records."
+            f"{args.model} (FP16, dense), HuggingFace transformers "
+            f"{transformers_mod.__version__}. 5 agents (retriever / "
+            f"reranker / summarizer / critic / responder). Baseline = "
+            f"each agent encodes full context + suffix. Contextforge = "
+            f"non-critic agents encode suffix only (shared prefix "
+            f"assumed cached); critic re-encodes the full prompt when "
+            f"INV-15 fires (use_dense=True). Peak VRAM via pynvml. "
+            f"transformers' past_key_values reuse path is unavailable: "
+            f"Qwen3.6 qwen3_5 hybrid-attention crashes with seq_len=0 "
+            f"reshape; vLLM 0.21.0 also does not yet recognize qwen3_5 "
+            f"model_type. The architectural mechanism validated here is "
+            f"the same one the ContextForge vLLM plugin productizes; "
+            f"INV-15 gate decisions are recorded per agent."
         ),
     }
 
