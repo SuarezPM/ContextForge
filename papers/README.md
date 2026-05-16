@@ -30,8 +30,8 @@
    threat surface.
 2. **Sister-stack judge-defense validation** (new Section *Sister-Stack
    Judge-Defense Validation*, post-Conclusion): JailbreakBench
-   `93.75% ± 2.7%, 95% CI [86.2%, 97.3%], n=80` and HarmBench
-   `77.50% ± 12.6%, 95% CI [62.5%, 87.7%], n=40` from the Apohara Aegis
+   `93.75%, Wilson 95% CI [86.2%, 97.3%], n=80` and HarmBench
+   `77.50%, Wilson 95% CI [62.5%, 87.7%], n=40` from the Apohara Aegis
    sister repository. Grounds INV-15's conservatism-favors-safety
    philosophy against community-standard benchmarks.
 3. **FallbackVendorAdapter sketch** (new Section *Vendor-Fallback
