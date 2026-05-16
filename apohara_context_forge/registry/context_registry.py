@@ -326,9 +326,14 @@ class ContextRegistry:
                 threshold=0.7,
             )
 
-            # Compute total tokens saved
+            # Compute total tokens saved.
+            # Bug fix (US-002): previously this was
+            #   blocks_per_match * self._block_size * len(valid_matches)
+            # which equals len(valid_matches)**2 * self._block_size — a
+            # quadratic over-count that inflated any dashboard or log
+            # consuming `total_tokens_saved`.  See AUDIT.md item 12.
             blocks_per_match = len(valid_matches)
-            tokens_saved = blocks_per_match * self._block_size * len(valid_matches)
+            tokens_saved = blocks_per_match * self._block_size
 
             # AnchorPool shareability prediction
             is_shareable = await self._anchor_pool.predict_shareable(
