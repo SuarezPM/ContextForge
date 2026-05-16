@@ -150,12 +150,12 @@ PYTHONPATH=. python3 scripts/generate_milan_clip.py \
 
 ---
 
-## MI300X Wave B — RotateKVQuantizer real-hardware measurements (2026-05-16)
+## MI300X Wave B — RotateKVQuantizer measurements (2026-05-16)
 
-**Story:** US-MI-014 — first end-to-end measurement on rented
-AMD Instinct MI300X (Hot Aisle `enc1-gpuvm019`) to validate the
-paper's headline 3.55× INT4 codec VRAM-reduction claim on live
-hardware (replaces the earlier sprint's archived measurements).
+**Story:** US-MI-014 — measurement on a freshly-rented AMD Instinct
+MI300X (Hot Aisle `enc1-gpuvm019`) to refresh the paper's headline
+3.55× INT4 codec VRAM-reduction claim. Supersedes the earlier
+sprint's archived measurements.
 
 **Hardware:** `rocm-hip:6.2.41133-dd7f95766:AMD Instinct MI300X VF`
 (192 GB HBM3, ROCm 6.2, torch 2.5.1+rocm6.2).
@@ -180,6 +180,14 @@ provisioning + 4 stages).
 Best triad: **3622 GB/s** = **68.4 % of advertised 5.3 TB/s peak**
 (`logs/mi300x_hbm3_bandwidth_1778973430.json`).
 
+### Stage B — Pure-torch FWHT on GPU
+
+8-batch sweep of forward + inverse FWHT on the GPU directly (not the
+codec-path FWHT integration that the paper rules out). Log:
+`logs/mi300x_pure_torch_fwht_1778973433.json`. Reported separately
+from the codec results to keep FWHT-as-primitive isolated from
+FWHT-in-the-codec.
+
 ### Stage C — VRAM reduction sweep (RotateKV INT4 vs FP16)
 
 | Sequence length | Baseline FP16 | INT4 packed | Reduction factor |
@@ -202,16 +210,15 @@ reconstruction quality 200× at this codec layout).
 
 ### Reading the numbers
 
-- **3.55× headline factor is reproduced on live MI300X across the
-  4K–32K segment.** The paper's V2.0 abstract quotes "3.55× VRAM
-  reduction measured on AMD Instinct MI300X (192 GB, ROCm 7.2.0),
-  constant across context lengths 4K–262K". This 2026-05-16 Wave B
-  sweep confirms the constancy + the reduction factor on
-  ROCm 6.2 hardware **for the 4K–32K segment that the script default
-  exercises**. The paper's full 4K–262K range rests on the prior
-  sprint's archived sweep on ROCm 7.2.0 (referenced in the paper's
-  Table 1) — this Wave B run validates the trend at the lower end
-  of that range on refreshed hardware, not the full upper bound.
+- **3.55× headline factor reproduced for the 4K–32K segment.** The
+  paper's V2.0 abstract quotes "3.55× VRAM reduction measured on
+  AMD Instinct MI300X (192 GB, ROCm 7.2.0), constant across context
+  lengths 4K–262K". Wave B confirms the constancy + the reduction
+  factor on ROCm 6.2 for the 4K–32K segment that the default sweep
+  exercises. The 4K–262K range remains anchored by the prior
+  sprint's archived sweep on ROCm 7.2.0 (paper Table 1) — Wave B
+  validates the trend at the lower end on refreshed hardware, not
+  the upper bound.
 - **HBM3 efficiency 68 %** is healthy — typical hand-tuned codes on
   MI300X land in the 60-80 % range; we are not bandwidth-bound for
   the codec hot path.
