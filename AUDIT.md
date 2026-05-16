@@ -487,4 +487,187 @@ commit:  *(filled in after push)*.
 
 ---
 
+## 13. 🟢 INV-15 paper V2.0 preprint draft committed (2026-05-16, US-013)
+
+A V2.0 preprint draft of the INV-15 paper was committed to the
+`papers/` directory as part of **US-013** of the Apohara Inti Fusion
+sprint. The draft refines `paper/inv15_paper.pdf` (V2.0.1, May 13,
+2026, 12-reference graph, DOI [10.5281/zenodo.20114594](https://doi.org/10.5281/zenodo.20114594))
+with three additions specified in the US-013 acceptance criteria.
+
+**Files committed:**
+
+| Path | Bytes | Purpose |
+|------|-------|---------|
+| `papers/inv15_v2.tex` | ~63 KB | V2.0 LaTeX source (1,280+ lines). |
+| `papers/inv15_v2.pdf` | ~416 KB, 13 pp | Pre-built PDF via tectonic 0.15+. |
+| `papers/references.bib` | ~21 KB, 23 entries | 17 entries inherited from V2.0.1, 6 new for V2.0. |
+| `papers/figures/` | 4 PNG | Carried over from V2.0.1 (HBM3 bandwidth, FWHT perf, quant Pareto, reduction-factor). |
+| `papers/README.md` | preprint disclaimer + build command + reproducibility table. |
+
+**V2.0 additions (over V2.0.1):**
+
+1. *Adjacent attack surfaces* subsection (§2.4): NDSS 2025 KV-cache
+   timing side-channel \cite{kvcacheleak}, KV-Cloak rotation defense
+   \cite{kvcloak}, Adversa AI red-team toolchain \cite{adversa}, AMD
+   vLLM-ATOM official May 2026 launch \cite{amdvllmatom}.
+2. *Sister-stack judge-defense validation* (new §): JailbreakBench
+   (Chao et al. NeurIPS 2024 D&B) `93.75% ± 2.7%, 95% CI [86.2%,
+   97.3%], n=80` and HarmBench (Mazeika et al. NeurIPS 2024 D&B)
+   `77.50% ± 12.6%, 95% CI [62.5%, 87.7%], n=40` from the Apohara
+   Aegis sister repository (separate project, same author).
+3. *Vendor-Fallback Architecture* (new §): sketches a
+   FallbackVendorAdapter that decouples the gate logic from a single
+   LLM vendor; outlines a three-tier defense (INV-15 cache invariant
+   + KV-Cloak side-channel + vendor fallback).
+4. *Appendix A*: reference-implementation pointer to
+   `apohara_context_forge/safety/jcr_gate.py` with the coefficient
+   mapping between Eq. 1 of the paper and the runtime Python
+   constants. Notes the implementation conservatism
+   (`_RISK_HIGH_REUSE=0.15` vs theory $\alpha_u=0.1$) and why it
+   preserves Theorem 1.
+
+**Honesty discipline applied:**
+
+- Hardware label `rocm-hip:6.2.41133:AMD Instinct MI300X VF` (not `cuda`).
+- No 7.8x TTFT claim (per CLAUDE.md §6 and AUDIT.md item 12 bug 4).
+- All measurements trace to committed logs (`logs/*.json` in either
+  this repo for MI300X numbers, or `apohara-aegis/logs/*.json` for
+  JBB / HarmBench numbers).
+- Confidence intervals reported with sample sizes; the
+  $77.50\% \pm 12.6\%$ HarmBench result is honest about a $0/8$ block
+  rate on the copyright sub-category (not a defense surface) rather
+  than dropping that category to inflate the overall number.
+
+**Build command:**
+
+```bash
+cd papers
+tectonic inv15_v2.tex   # 13-page PDF in ~10 s; warnings about
+                        # underfull hboxes are cosmetic
+```
+
+**Scope disclaimer:** **This is a preprint draft committed to the
+repository only.** Real arXiv submission requires the endorsement
+chain (2--3 days minimum) and is scheduled post-hackathon. The
+version of record for citation today remains the Zenodo deposit
+([DOI 10.5281/zenodo.20114594](https://doi.org/10.5281/zenodo.20114594)).
+
+**Status: 🟢 SHIPPED** (US-013 acceptance criteria 1--7 satisfied).
+
+---
+
+## 14. 🟡 Milan 5-agent benchmark side-by-side: shipped script, CPU-mock numbers (2026-05-16, US-014)
+
+US-014 of the Apohara Inti Fusion Sprint asked for a side-by-side
+benchmark of `vllm --enable-prefix-caching` (baseline) vs
+`vllm + apohara-context-forge plugin` on the 5-agent shared-context
+workload, executed on GCP H100 (or fallback AMD MI300X). Budget
+ceiling $100. Deliverables: a JSON log, a `BENCHMARKS.md` table, a
+60-second screen capture, and an atomic commit.
+
+**What shipped (🟢):**
+
+- `scripts/run_milan_benchmark.sh` — the orchestrator. Runs the
+  workload twice through `scripts/sprint5_head_to_head.py` (once
+  with INV-15 OFF for the baseline, once with INV-15 ON for the
+  contextforge run), then composes the Milan JSON via
+  `scripts/build_milan_benchmark.py`. Works in mock mode by
+  default; flip to a real GPU host by setting `VLLM_ENDPOINT`,
+  `HARDWARE_LABEL`, and `COST_USD` env vars. No script change
+  needed to switch backends — the orchestrator is one command.
+- `scripts/build_milan_benchmark.py` — composes the Milan JSON
+  schema specified by US-014 §3 from the two head-to-head outputs.
+  HBM is modeled, not measured, via the documented closed-form
+  `estimate_hbm_used_gb` (Llama-3-8B; 32 layers × GQA-8 KV heads
+  × fp16; mean reuse rate from the workload YAML). The schema's
+  `honesty_note` field clearly states which fields are real
+  (latency, tokens, JCR — from the workload run) vs modeled (HBM
+  — from the closed-form).
+- `scripts/generate_milan_clip.py` — renders a 60-second GIF
+  replay of the real run output text. No `ffmpeg`, `scrot`,
+  `asciinema`, `gnome-screenshot`, `magick`, `convert`, `import`,
+  or `grim` available on this workstation, so the GIF is a
+  Pillow-rendered 6-frame replay of the real `stdout` text from
+  the run, not a fabricated GPU-utilization graph.
+- `BENCHMARKS.md` — new file with the run table, reproducibility
+  instructions for both CPU-mock and real-GPU paths, and clear
+  honesty disclosure that the row's HBM/TTFT/throughput came
+  from mock mode + closed-form HBM model.
+- `logs/milan_5agent_benchmark_1778943206.json` — the Milan
+  submission JSON for the run committed alongside this entry.
+- `assets/milan_benchmark_clip.gif` — the 60-second visual
+  artifact (6 frames × 10 s = 60 s).
+
+**What did NOT ship (🟡):**
+
+- **The real-GPU side-by-side measurement.** The story called for
+  GCP H100 1x or AMD MI300X. **Both blocked**:
+  1. **GCP**: the configured service account for this workstation
+     is `apohara-aegis-judge@gen-lang-client-0658922897.iam.gserviceaccount.com`,
+     which is a Gemini-judge role for the apohara-aegis project,
+     **not a compute-grant role**. `gcloud services list` returns
+     `SERVICE_DISABLED` on the Service Usage API; the SA cannot
+     self-enable Compute Engine API. A human owner (Pablo) would
+     have to enable it via the web console.
+  2. **AMD MI300X**: SR-IOV credits are exhausted per CLAUDE.md
+     §11 ("Open Items: MI300X access is gated on AMD credits.
+     Sprint 5+ GPU work blocked unless fresh credits arrive via
+     DevRel outreach or out-of-pocket spend").
+- **Therefore**: US-014 §7 fallback path executed verbatim: ship
+  the benchmark SCRIPT and BENCHMARKS.md table with placeholder
+  values + a note that the live run is deferred to Pablo's
+  manual execution. **Cost spent: $0.00** (no compute provisioned).
+
+**Live-GPU run, when Pablo enables it:**
+
+```bash
+# On the GPU host:
+PYTHONPATH=. python3 -m apohara_context_forge.vllm_plugin.serve \
+    --model meta-llama/Llama-3-8B --port 8000 &
+VLLM_ENDPOINT=http://localhost:8000 \
+HARDWARE_LABEL="GCP H100 1x" COST_USD=12.0 \
+bash scripts/run_milan_benchmark.sh
+```
+
+The orchestrator writes the new `logs/milan_5agent_benchmark_<ts>.json`
+and the GIF is regenerable via `generate_milan_clip.py`. After
+the live run, BENCHMARKS.md's first table row should be
+overwritten with the GPU numbers and this AUDIT entry should be
+graduated from 🟡 to 🟢.
+
+**Honesty discipline applied:**
+
+- `hardware` field in the JSON is literally `"CPU-mock fallback
+  (GCP H100 deferred)"`. No "we ran it on H100" anywhere.
+- The `honesty_note` in the JSON names the specific service
+  account and the SERVICE_DISABLED status that blocked GCP.
+- HBM closed-form is documented inline with the constants
+  derived from Llama-3-8B's actual architecture (32 layers,
+  GQA-8 KV heads, fp16, 256 tokens/agent × 5 agents).
+- The 76.0% HBM-saved number falls out of the YAML's mean reuse
+  rate of 0.76 by construction — reviewers can verify with
+  pen-and-paper from `configs/sprint5_5agent.yaml`. A real GPU
+  run will land in this neighborhood ± vLLM-prefix-cache
+  efficiency noise.
+
+**Files:**
+
+| Path | Purpose |
+|------|---------|
+| `scripts/run_milan_benchmark.sh` | One-command orchestrator (mock or real-GPU). |
+| `scripts/build_milan_benchmark.py` | Composes Milan JSON from two head-to-head outputs. |
+| `scripts/generate_milan_clip.py` | Renders the 60-s GIF replay. |
+| `BENCHMARKS.md` | First Milan-sprint benchmark table. |
+| `logs/milan_5agent_benchmark_1778943206.json` | Milan submission JSON (2026-05-16). |
+| `logs/milan_h2h_baseline_1778943206.json` | Source: baseline head-to-head run. |
+| `logs/milan_h2h_contextforge_1778943206.json` | Source: contextforge head-to-head run. |
+| `assets/milan_benchmark_clip.gif` | 60-s visual artifact (6 frames × 10 s). |
+
+**Status: 🟡 PARTIAL** — script + JSON + GIF + BENCHMARKS.md shipped;
+live-GPU row deferred. Graduates to 🟢 when Pablo re-runs on real
+hardware (single command per the snippet above).
+
+---
+
 *Last updated: 2026-05-16 · maintained by the same person who wrote the lies.*
