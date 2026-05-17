@@ -256,7 +256,7 @@ an Agent Step Graph, it preserves KV entries that are about to be reused
 and prefetches them ahead of time, reporting up to $2.19\times$ speedup on
 concurrent multi-agent workflows.
 
-TokenDance \cite{tokendance} represents the current state of the art for
+TokenDance \cite{tokendance} is the current state of the art for
 \emph{committee} inference (multiple agents reasoning over the same
 context). The KV cache is decomposed into a \emph{master} (the largest or
 most authoritative agent's cache) plus $N-1$ sparse diffs against the
@@ -593,7 +593,7 @@ no downstream component sees a request that violates the invariant.
 \label{sec:impl:class}
 
 The gate is exposed as the Python class
-\code{apohara\_context\_forge.safety.jcr\_gate.JCRSafetyGate}. Public API:
+\code{apohara\_\allowbreak{}context\_\allowbreak{}forge.\allowbreak{}safety.\allowbreak{}jcr\_\allowbreak{}gate.\allowbreak{}JCRSafetyGate}. Public API:
 
 \begin{itemize}
   \item \code{compute\_jcr\_risk(role, n, u, s) -> float}\textemdash
@@ -917,7 +917,7 @@ $\min(1, p_i / q_i)$ identity).
            reported openly; the V6.2 row gives the same controller
            under a statistically rigorous Poisson load.}
   \label{tab:e2e}
-  \begin{tabular}{@{}lrl@{}}
+  \begin{tabular}{@{}lrp{0.45\linewidth}@{}}
     \toprule
     Metric & Value & Notes \\
     \midrule
@@ -1207,7 +1207,7 @@ generalizes when the same author writes a content-layer judge.
 The judge-defense ensemble achieved a block rate of
 $93.75\%$ ($75/80$, Wilson 95\% CI
 [86.2\%, 97.3\%]). Source log committed at
-\code{logs/baseline\_aegis-ensemble-10frontier\_day5\_FALLBACK\_*.json}
+\code{logs/baseline\_\allowbreak{}aegis-ensemble-\allowbreak{}10frontier\_\allowbreak{}day5\_\allowbreak{}FALLBACK\_\allowbreak{}*.json}
 in the Apohara Aegis repository.
 
 % Inline data tag for grep / honesty trace: HarmBench block rate = 77.50%, n=40.
