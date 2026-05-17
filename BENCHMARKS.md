@@ -235,4 +235,70 @@ reconstruction quality 200× at this codec layout).
 
 ---
 
-*Last updated: 2026-05-16 (V7.0.0-rc.2, US-014 Milan Day-6 + US-MI-014 MI300X Wave B refresh).*
+## MI300X Wave C — paper-v2 extension (2026-05-17)
+
+**Story:** US-MI2-014 — second Hot Aisle MI300X run (`enc1-gpuvm010`)
+executing `scripts/mi300x_run_paper_v2.sh` to close the 4K-262K
+coverage and re-validate the paper's Table 2 quality curve on
+freshly-rented hardware. Reproduces the paper's existing numbers
+to within rounding noise; no paper text changes required.
+
+**Hardware:** same family as Wave B —
+`rocm-hip:6.2.41133-dd7f95766:AMD Instinct MI300X VF`.
+
+**Cost:** ~$0.17 of MI300X compute (303 s wall-clock at $1.99/h).
+
+### Extreme-scale extension — completes Table 1 (65K to 262K)
+
+| Sequence length | Heads | Head dim | Reduction factor | Paper Table 1 |
+|---|---|---|---|---|
+| 65,536 | 32 | 128 | **3.5548×** | 3.55× ✓ |
+| 131,072 | 32 | 128 | **3.5552×** | 3.56× ✓ |
+| 65,536 | 32 | 256 | **3.5548×** | (new data point — wider heads) |
+| 262,144 | 16 | 128 | **3.5554×** | 3.56× ✓ |
+
+Together with the Wave B 4K-32K sweep, the **full paper Table 1
+range (4K-262K) is now anchored on fresh-hardware measurements**
+(`logs/mi300x_extreme_scale_1778977872.json`).
+
+### Quality curve — re-validates Table 2 + the "200× degradation" claim
+
+| Configuration | Packed bytes | Reduction | MSE (keys) | Paper Table 2 |
+|---|---|---|---|---|
+| FP16 baseline | 268,435,456 | 1.00× | 4.31×10⁻⁸ | 4.3×10⁻⁸ ✓ |
+| INT8 naive | 142,606,336 | 1.88× | 3.44×10⁻⁵ | 3.4×10⁻⁵ ✓ |
+| INT4 `use_fwht=False` | 75,563,008 | 3.55× | 1.01×10⁻² | 1.0×10⁻² ✓ |
+| INT4 `use_fwht=True` | 75,563,008 | 3.55× | 2.01×10⁰ | 2.0×10⁰ ✓ |
+
+`use_fwht=True / use_fwht=False` MSE ratio = **199×** (paper claims
+"≈200×" — confirmed within rounding) (`logs/mi300x_quant_quality_1778978012.json`).
+
+### FWHT in-place benchmark — new finding (paper appendix material)
+
+| Shape | Original out-of-place | In-place | Speedup |
+|---|---|---|---|
+| (B=1, S=4K, H=32, D=128) | 1.1 ms | 1.4 ms | **0.78×** (slower) |
+| (B=1, S=16K, H=32, D=128) | 2.6 ms | 4.6 ms | 0.58× |
+| (B=1, S=32K, H=32, D=128) | 5.1 ms | 9.1 ms | 0.55× |
+| (B=1, S=16K, H=32, D=256) | 5.6 ms | 10.2 ms | 0.54× |
+| (B=1, S=16K, H=64, D=128) | 5.4 ms | 9.3 ms | 0.58× |
+
+**Counterintuitive finding**: the in-place FWHT path that should
+reduce peak memory actually **runs slower on MI300X** at every
+tested shape. Triggers extra HBM3 traffic on ROCm 6.2. Documented
+for paper appendix; recommends staying with out-of-place FWHT
+(`logs/mi300x_fwht_inplace_bench_1778978015.json`).
+
+### LMCache smoke — honest fallback
+
+The lmcache wheel is not pip-installable on the Hot Aisle image
+(`ModuleNotFoundError: No module named 'lmcache'`); the
+`LMCacheConnectorV2` enters its documented fallback mode
+(`active=False`) and emits the build_error string in the log
+(`logs/mi300x_lmcache_1778978017.json`). This IS the expected
+outcome documented in the script header — not a regression — and
+proves the connector's honest-fallback path works as designed.
+
+---
+
+*Last updated: 2026-05-17 (V7.0.0-rc.2 + US-MI2-014 Wave C extension; previously US-014 Milan Day-6 + US-MI-014 Wave B).*

@@ -787,6 +787,15 @@ Instinct MI300X VF}). Table~\ref{tab:reduction} reports the results.
     262,144 & $3.56\times$ \\
     \bottomrule
   \end{tabular}
+  \par\vspace{2pt}
+  \footnotesize\emph{Re-validated 2026-05-17 on
+    \texttt{rocm-hip:6.2.41133-dd7f95766:AMD Instinct MI300X VF}
+    (Wave B + Wave C, two independent Hot Aisle rentals).
+    Measured 4-decimal values: $3.5433\times$ (4K), $3.5494\times$ (8K),
+    $3.5525\times$ (16K), $3.5540\times$ (32K), $3.5548\times$ (65K),
+    $3.5552\times$ (131K), $3.5554\times$ (262K). Logs:
+    \texttt{logs/mi300x\_vram\_sweep\_1778973581.json} (Wave B 4K--32K) +
+    \texttt{logs/mi300x\_extreme\_scale\_1778977872.json} (Wave C 65K--262K).}
 \end{table}
 
 \begin{figure}[t]
@@ -842,6 +851,12 @@ MI300X hardware. Results are in Table~\ref{tab:quant}.
         & $200\times$ worse than \texttt{False} \\
     \bottomrule
   \end{tabular}
+  \par\vspace{2pt}
+  \footnotesize\emph{Re-validated 2026-05-17 on the same MI300X
+    family; measured ratio $2.01 / 1.01\!\times\!10^{-2} =
+    \mathbf{199\times}$, confirming the
+    $\approx\!200\times$ claim to within rounding. Log:
+    \texttt{logs/mi300x\_quant\_quality\_1778978012.json}.}
 \end{table*}
 
 \begin{figure}[t]
