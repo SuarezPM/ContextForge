@@ -273,7 +273,7 @@ range (4K-262K) is now anchored on fresh-hardware measurements**
 `use_fwht=True / use_fwht=False` MSE ratio = **199×** (paper claims
 "≈200×" — confirmed within rounding) (`logs/mi300x_quant_quality_1778978012.json`).
 
-### FWHT in-place benchmark — new finding (paper appendix material)
+### FWHT in-place benchmark — new finding
 
 | Shape | Original out-of-place | In-place | Speedup |
 |---|---|---|---|
@@ -292,12 +292,10 @@ for paper appendix; recommends staying with out-of-place FWHT
 ### LMCache smoke — honest fallback
 
 The lmcache wheel is not pip-installable on the Hot Aisle image
-(`ModuleNotFoundError: No module named 'lmcache'`); the
-`LMCacheConnectorV2` enters its documented fallback mode
-(`active=False`) and emits the build_error string in the log
-(`logs/mi300x_lmcache_1778978017.json`). This IS the expected
-outcome documented in the script header — not a regression — and
-proves the connector's honest-fallback path works as designed.
+(`ModuleNotFoundError`); the `LMCacheConnectorV2` enters its
+documented fallback mode (`active=False`) and the build_error
+string is preserved in the log
+(`logs/mi300x_lmcache_1778978017.json`).
 
 ---
 
