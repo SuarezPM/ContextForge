@@ -81,3 +81,7 @@ paper/*.toc
 
 # --- VS Code workspace files ---
 *.code-workspace
+
+# Maintainer-only private notes (NEVER commit)
+CLAUDE.local.md
+CLAUDE.local.*

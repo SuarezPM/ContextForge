@@ -11,7 +11,7 @@
 
 <!-- Row 1 — academic credibility -->
 <p align="center">
-  <a href="https://doi.org/10.5281/zenodo.20114594"><img src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.20114594-1A73E8?style=flat-square&logo=doi&logoColor=white" alt="DOI: 10.5281/zenodo.20114594"></a>
+  <a href="https://doi.org/10.5281/zenodo.20277875"><img src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.20277875-1A73E8?style=flat-square&logo=doi&logoColor=white" alt="DOI: 10.5281/zenodo.20277875"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-2ECC71.svg?style=flat-square" alt="License Apache 2.0"></a>
   <a href="#-research-foundation"><img src="https://img.shields.io/badge/papers-10%20implemented-9B59B6.svg?style=flat-square" alt="10 Papers"></a>
   <a href="paper/inv15_paper.pdf"><img src="https://img.shields.io/badge/paper-PDF-EC1C24?style=flat-square&logo=adobe-acrobat-reader&logoColor=white" alt="Read the paper"></a>
@@ -474,7 +474,7 @@ System invariants enforced:
 
 ContextForge has a permanent Zenodo DOI and is indexed by Google Scholar:
 
-> Suarez, P. M. (2026). *INV-15: A Formal Safety Invariant for KV-Cache Reuse in Multi-Agent Judge Pipelines* (APOHARA · ContextForge). Zenodo. [https://doi.org/10.5281/zenodo.20114594](https://doi.org/10.5281/zenodo.20114594)
+> Suarez, P. M. (2026). *INV-15: A Formal Safety Invariant for KV-Cache Reuse in Multi-Agent Judge Pipelines* (APOHARA · ContextForge). Zenodo. [https://doi.org/10.5281/zenodo.20277875](https://doi.org/10.5281/zenodo.20277875)
 
 BibTeX:
 
@@ -485,8 +485,8 @@ BibTeX:
                Multi-Agent Judge Pipelines}},
   publisher = {Zenodo},
   year      = {2026},
-  doi       = {10.5281/zenodo.20114594},
-  url       = {https://doi.org/10.5281/zenodo.20114594}
+  doi       = {10.5281/zenodo.20277875},
+  url       = {https://doi.org/10.5281/zenodo.20277875}
 }
 ```
 
