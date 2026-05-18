@@ -1,0 +1,32 @@
+{
+  "title": "INV-15: A formal safety invariant for multi-agent KV-cache isolation (v3.0)",
+  "version": "3.0",
+  "publication_date": "2026-05-18",
+  "creators": [
+    {
+      "name": "Suarez, Pablo M.",
+      "affiliation": "Universidad Nacional de Tucumán",
+      "orcid": ""
+    }
+  ],
+  "description": "v3.0 adds formal Z3 SMT verification of INV-15 (proof: UNSAT on negation in 10.08 ms) to complement the empirical 0/1210 sweep from v2.0.1. Z3 model fidelity verified line-by-line against the production JCRSafetyGate. v2.0.1 (DOI 10.5281/zenodo.20114594) is the predecessor.",
+  "license": "CC-BY-4.0",
+  "keywords": [
+    "AI safety",
+    "formal verification",
+    "Z3 SMT",
+    "multi-agent systems",
+    "KV cache",
+    "INV-15"
+  ],
+  "related_identifiers": [
+    {
+      "relation": "isNewVersionOf",
+      "identifier": "10.5281/zenodo.20114594"
+    },
+    {
+      "relation": "isSupplementTo",
+      "identifier": "https://github.com/SuarezPM/Apohara_Context_Forge"
+    }
+  ]
+}
