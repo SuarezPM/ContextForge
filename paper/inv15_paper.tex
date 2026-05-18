@@ -336,10 +336,10 @@ detailed in Section~\ref{sec:impl}.
 \label{sec:hardware:bandwidth}
 
 We measure HBM3 bandwidth using a STREAM-triad fp16 benchmark across four
-buffer sizes (1\,GB, 4\,GB, 16\,GB, 64\,GB), with five iterations each.
-The best measured triad bandwidth is $\mathbf{3.73\,\mathrm{TB/s}}$
-($3{,}734\,\mathrm{GB/s}$), corresponding to $\mathbf{70.5\,\%}$ of the
-advertised $5.3\,\mathrm{TB/s}$ peak.
+buffer sizes (1\,GB, 4\,GB, 16\,GB, 64\,GB), with five iterations each
+(Figure~\ref{fig:hbm3_bandwidth}). The best measured triad bandwidth is
+$\mathbf{3.73\,\mathrm{TB/s}}$ ($3{,}734\,\mathrm{GB/s}$), corresponding
+to $\mathbf{70.5\,\%}$ of the advertised $5.3\,\mathrm{TB/s}$ peak.
 
 The efficiency gap has two sources. First, the DevCloud MI300X instances run
 as virtual functions (SR-IOV slices): each VF shares the physical die with
@@ -531,8 +531,9 @@ queueing-aware vLLM scheduler of \cite{queueing}\textemdash behind a single
 MCP server (FastAPI + asyncio). All KV operations flow through a
 \texttt{ContextRegistry} that owns an LSH token matcher, a FAISS ANN index,
 and a VRAM-aware cache with a five-mode pressure-responsive eviction
-policy. \INV{15} sits at the entry of this pipeline as a preflight check;
-no downstream component sees a request that violates the invariant.
+policy. \INV{15} sits at the entry of this pipeline as a preflight check
+(Figure~\ref{fig:arch}); no downstream component sees a request that
+violates the invariant.
 
 \begin{figure}[t]
   \centering
@@ -730,7 +731,9 @@ and was already a high-divergence agent. See Table~\ref{tab:e2e}.
 We measure the Apohara INT4 codec's VRAM reduction factor across seven
 sequence lengths from 4K to 262K tokens on real MI300X hardware
 (\texttt{use\_fwht=False}; hardware: \texttt{rocm-hip:6.2.41133-dd7f95766:AMD
-Instinct MI300X VF}). Table~\ref{tab:reduction} reports the results.
+Instinct MI300X VF}). Table~\ref{tab:reduction} reports the results;
+Figure~\ref{fig:reduction_factor} plots the same data, highlighting the
+length-invariant compression behaviour.
 
 \begin{table}[t]
   \centering
@@ -778,7 +781,9 @@ Section~\ref{sec:limitations}.
 
 We measure MSE and maximum absolute reconstruction error for four codec
 configurations on a shape $[1, 16384, 32, 128]$ KV tensor, using the same
-MI300X hardware. Results are in Table~\ref{tab:quant}.
+MI300X hardware. Results are in Table~\ref{tab:quant}, and
+Figure~\ref{fig:quant_quality} visualizes the resulting MSE-vs-compression
+Pareto frontier.
 
 \begin{table*}[t]
   \centering
@@ -1003,7 +1008,8 @@ account for the remaining gap.
 
 We benchmark pure-PyTorch FWHT transforms on MI300X across eight
 (seq\_len, num\_heads, head\_dim) configurations. Results are reported in
-Table~\ref{tab:fwht_runtime}.
+Table~\ref{tab:fwht_runtime} and visualized in
+Figure~\ref{fig:fwht_perf}.
 
 \begin{table*}[t]
   \centering
