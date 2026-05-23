@@ -96,10 +96,6 @@ ContextForge coordinates KV-block sharing across all agents through **10 peer-re
 
 Every optimization traces back to a peer-reviewed paper published at **NeurIPS, ICML, ACL, IJCAI, or arXiv 2026**.
 
-<p align="center">
-  <img src="assets/systems-diagram.jpeg" alt="ContextForge — shared KV via ATOM plugin" width="760">
-</p>
-
 ### The 10 Mechanisms
 
 | # | Mechanism | Source | What it does |
