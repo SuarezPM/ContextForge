@@ -376,6 +376,54 @@ class ContextRegistry:
         results.sort(key=lambda r: r.reuse_confidence, reverse=True)
         return results
 
+    async def find_similar(
+        self,
+        context: str,
+        threshold: Optional[float] = None,
+    ) -> list[ContextMatch]:
+        """Find prior registered agents whose context is similar to `context`.
+
+        Embeds the raw context, runs FAISS ANN over registered agents, then
+        builds a typed ContextMatch per candidate (similarity + longest shared
+        prefix). Returns matches at/above `threshold` (default:
+        settings.contextforge_dedup_threshold), sorted by similarity desc.
+
+        This is the raw-context query the CompressionCoordinator needs;
+        get_shared_context() serves the agent-id query used by the pipeline.
+        """
+        from apohara_context_forge.config import settings
+
+        if threshold is None:
+            threshold = settings.contextforge_dedup_threshold
+
+        if self._embedding_engine is None:
+            self._embedding_engine = await EmbeddingEngine.get_instance(
+                dim=512, use_onnx=True
+            )
+        embedding = await self._embedding_engine.encode(context)
+        faiss_matches = await self._faiss.search(
+            embedding.tolist(), k=5, threshold=threshold
+        )
+
+        results: list[ContextMatch] = []
+        for fm in faiss_matches:
+            candidate_context = await self.get_agent_context(fm.agent_id)
+            if candidate_context is None:
+                continue
+            shared_prefix = self._dedup.find_shared_prefix(context, candidate_context)
+            shared_prefix_tokens = self._dedup.count_prefix_tokens(shared_prefix)
+            results.append(
+                ContextMatch(
+                    agent_id=fm.agent_id,
+                    similarity=fm.similarity,
+                    shared_prefix=shared_prefix,
+                    shared_prefix_tokens=shared_prefix_tokens,
+                )
+            )
+
+        results.sort(key=lambda m: m.similarity, reverse=True)
+        return results
+
     async def get_agent_context(self, agent_id: str) -> Optional[str]:
         """Get the full context for an agent."""
         cache_key = f"context:{agent_id}"
