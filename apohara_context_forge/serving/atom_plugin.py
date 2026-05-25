@@ -131,6 +131,74 @@ class PreAttentionHook:
         self._jcr_gate = jcr_gate
         self._quantized_block_count = 0
 
+    def _evaluate_jcr_gate(
+        self,
+        agent_role: str,
+        candidate_count: int,
+        reuse_rate: float,
+        layout_shuffled: bool,
+    ) -> tuple[Optional[bool], Optional[float]]:
+        """Evaluate the JCR safety gate. Returns (jcr_dense, jcr_risk)."""
+        jcr_dense: Optional[bool] = None
+        jcr_risk: Optional[float] = None
+        if self._jcr_gate is not None and self._config.enable_jcr_gate:
+            decision = self._jcr_gate.gate_decision(
+                agent_role=agent_role,
+                candidate_count=candidate_count,
+                reuse_rate=reuse_rate,
+                layout_shuffled=layout_shuffled,
+            )
+            jcr_dense = bool(getattr(decision, "use_dense", False))
+            jcr_risk = float(getattr(decision, "risk_score", 0.0))
+        return jcr_dense, jcr_risk
+
+    def _attempt_anchor_routing(
+        self,
+        block_ids: list[str],
+        token_ids: list[int],
+        agent_role: str,
+        jcr_dense: Optional[bool],
+    ) -> Optional[dict]:
+        """Attempt cross-agent anchor routing (LSH). Returns match if found."""
+        if (
+            self._lsh_matcher is not None
+            and self._config.enable_anchor_routing
+            and jcr_dense is not True  # JCR dense path bypasses the registry
+        ):
+            return self._maybe_find_anchor(block_ids, token_ids, agent_role)
+        return None
+
+    def _attempt_quantization(
+        self,
+        block_ids: list[str],
+        layer_idx: int,
+        keys: Optional[np.ndarray],
+        values: Optional[np.ndarray],
+        positions: Optional[np.ndarray],
+    ) -> bool:
+        """Attempt RotateKV pre-RoPE quantization. Returns True if applied."""
+        if not (
+            self._quantizer is not None
+            and self._config.enable_quantization
+            and self._config.quantization_mode == "rotate_kv"
+            and keys is not None
+            and values is not None
+            and positions is not None
+            and len(block_ids) <= self._config.max_quantize_blocks
+        ):
+            return False
+
+        try:
+            self._quantizer.quantize_pre_rope(keys, values, positions)
+            self._quantized_block_count += len(block_ids)
+            return True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "ATOM quantization failed at layer %s: %s",
+                layer_idx, type(exc).__name__,
+            )
+            return False
+
     def __call__(
         self,
         block_ids: list[str],
@@ -167,26 +235,20 @@ class PreAttentionHook:
             this hook actually did, not what its config requested.
         """
         # 1. JCR Safety Gate ------------------------------------------------
-        jcr_dense: Optional[bool] = None
-        jcr_risk: Optional[float] = None
-        if self._jcr_gate is not None and self._config.enable_jcr_gate:
-            decision = self._jcr_gate.gate_decision(
-                agent_role=agent_role,
-                candidate_count=candidate_count,
-                reuse_rate=reuse_rate,
-                layout_shuffled=layout_shuffled,
-            )
-            jcr_dense = bool(getattr(decision, "use_dense", False))
-            jcr_risk = float(getattr(decision, "risk_score", 0.0))
+        jcr_dense, jcr_risk = self._evaluate_jcr_gate(
+            agent_role=agent_role,
+            candidate_count=candidate_count,
+            reuse_rate=reuse_rate,
+            layout_shuffled=layout_shuffled,
+        )
 
         # 2. Cross-agent anchor routing (LSH) -------------------------------
-        anchor_match: Optional[dict] = None
-        if (
-            self._lsh_matcher is not None
-            and self._config.enable_anchor_routing
-            and jcr_dense is not True  # JCR dense path bypasses the registry
-        ):
-            anchor_match = self._maybe_find_anchor(block_ids, token_ids, agent_role)
+        anchor_match = self._attempt_anchor_routing(
+            block_ids=block_ids,
+            token_ids=token_ids,
+            agent_role=agent_role,
+            jcr_dense=jcr_dense,
+        )
 
         # 3. RotateKV pre-RoPE quantization (INVARIANT 10) ------------------
         # INV-10: we ONLY quantise pre-RoPE tensors. The caller is
@@ -194,25 +256,13 @@ class PreAttentionHook:
         # contract by name only — if `positions` is None we refuse to
         # quantise. Quantization is best-effort: if it raises, we report
         # quantization_applied=False (truthful) rather than propagate.
-        quantization_applied = False
-        if (
-            self._quantizer is not None
-            and self._config.enable_quantization
-            and self._config.quantization_mode == "rotate_kv"
-            and keys is not None
-            and values is not None
-            and positions is not None
-            and len(block_ids) <= self._config.max_quantize_blocks
-        ):
-            try:
-                self._quantizer.quantize_pre_rope(keys, values, positions)
-                quantization_applied = True
-                self._quantized_block_count += len(block_ids)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    "ATOM quantization failed at layer %s: %s",
-                    layer_idx, type(exc).__name__,
-                )
+        quantization_applied = self._attempt_quantization(
+            block_ids=block_ids,
+            layer_idx=layer_idx,
+            keys=keys,
+            values=values,
+            positions=positions,
+        )
 
         result = {
             "layer_idx": layer_idx,
