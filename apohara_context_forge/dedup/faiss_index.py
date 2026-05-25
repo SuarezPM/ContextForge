@@ -54,11 +54,15 @@ class FAISSContextIndex:
     
     def __init__(self, dim: int = EMBEDDING_DIM):
         self._dim = dim
+        self._lock = asyncio.Lock()
+        self._init_state()
+
+    def _init_state(self) -> None:
+        """Initialize or reset internal state."""
         self._index = None  # Will be set in _ensure_index
         self._id_map: dict[int, str] = {}  # FAISS internal ID -> agent_id
         self._reverse_map: dict[str, int] = {}  # agent_id -> FAISS internal ID
         self._next_id = 0
-        self._lock = asyncio.Lock()
         self._initialized = False
     
     async def _ensure_index(self) -> None:
@@ -246,8 +250,4 @@ class FAISSContextIndex:
     async def reset(self) -> None:
         """Clear the index."""
         async with self._lock:
-            self._index = None
-            self._id_map.clear()
-            self._reverse_map.clear()
-            self._next_id = 0
-            self._initialized = False
+            self._init_state()
