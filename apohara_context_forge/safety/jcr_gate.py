@@ -12,9 +12,10 @@ candidates can flip the verdict.
 
 INV-15
 ======
-The Critic agent (role == "critic") MUST use dense prefill — bypassing
-the shared KV cache — whenever the JCR risk score exceeds the threshold
-(default 0.7). This is enforced unconditionally inside should_use_dense_prefill().
+Any judge-class agent (role in {"critic", "judge"}) MUST use dense prefill —
+bypassing the shared KV cache — whenever the JCR risk score exceeds the
+threshold (default 0.7). This is enforced unconditionally inside
+should_use_dense_prefill().
 """
 from __future__ import annotations
 
@@ -22,8 +23,9 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional
 
-# Roles considered "judge-type" — these are the protected callers.
-JUDGE_ROLES = frozenset({"critic"})
+# Roles considered "judge-type" — these are the protected callers (INV-15).
+# Per the paper §4.1, J = {critic, judge}: both get dense prefill when risky.
+JUDGE_ROLES = frozenset({"critic", "judge"})
 
 # Default risk threshold above which dense prefill is mandated.
 DEFAULT_JCR_THRESHOLD = 0.7

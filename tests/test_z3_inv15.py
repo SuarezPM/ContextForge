@@ -31,13 +31,13 @@ def test_inv15_proof_completes_quickly():
 def test_inv15_counterexample_when_assumptions_relaxed():
     """When the antecedent is relaxed to a benign config, dense_prefill can be FALSE.
 
-    This exercises the model: drop the 'critic' role, low candidate count,
+    This exercises the model: drop the judge-class role, low candidate count,
     no shuffle, low reuse. risk_score should fall below 0.7 → dense_prefill
     must be FALSE (and SAT, since a concrete assignment exists).
     """
     solver = z3.Solver()
     (
-        agent_role_critic,
+        agent_role_judge,
         candidate_count,
         reuse_rate,
         layout_shuffled,
@@ -45,14 +45,14 @@ def test_inv15_counterexample_when_assumptions_relaxed():
         use_dense_prefill,
     ) = build_inv15_constraints(solver)
 
-    solver.add(agent_role_critic == False)  # noqa: E712
+    solver.add(agent_role_judge == False)  # noqa: E712
     solver.add(candidate_count == 1)
     solver.add(reuse_rate == 1.0)
     solver.add(layout_shuffled == False)  # noqa: E712
 
     assert solver.check() == z3.sat
     model = solver.model()
-    # Non-critic role => dense_prefill must be False regardless of risk.
+    # Non-judge-class role => dense_prefill must be False regardless of risk.
     assert bool(model[use_dense_prefill]) is False
 
 
@@ -64,7 +64,7 @@ def test_build_inv15_constraints_directly():
     result_tuple = build_inv15_constraints(solver)
     assert len(result_tuple) == 6
     (
-        agent_role_critic,
+        agent_role_judge,
         candidate_count,
         reuse_rate,
         layout_shuffled,
@@ -72,7 +72,7 @@ def test_build_inv15_constraints_directly():
         use_dense_prefill,
     ) = result_tuple
 
-    assert str(agent_role_critic) == "agent_role_critic"
+    assert str(agent_role_judge) == "agent_role_judge"
     assert str(candidate_count) == "candidate_count"
     assert str(reuse_rate) == "reuse_rate"
     assert str(layout_shuffled) == "layout_shuffled"
@@ -80,7 +80,7 @@ def test_build_inv15_constraints_directly():
     assert str(use_dense_prefill) == "use_dense_prefill"
     assert len(solver.assertions()) > 0
 
-    solver.add(agent_role_critic == True)  # noqa: E712
+    solver.add(agent_role_judge == True)  # noqa: E712
     solver.add(candidate_count == 5)
     solver.add(reuse_rate == 0.5)
     solver.add(layout_shuffled == False)  # noqa: E712

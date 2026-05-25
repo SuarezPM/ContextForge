@@ -8,7 +8,7 @@ the antecedent, not just sampled ones.
 Theorem (INV-15-DENSE-PREFILL)
 ==============================
     For all inputs (agent_role, candidate_count, reuse_rate, layout_shuffled),
-        agent_role = "critic"
+        agent_role is judge-class (critic or judge)
         AND candidate_count >= 9
         AND reuse_rate = 0
         AND layout_shuffled = TRUE
@@ -20,12 +20,12 @@ UNSAT, no counterexample exists and the invariant is formally valid
 over the modeled domain.
 
 The Z3 risk model mirrors the constants in jcr_gate.py:
-    base_risk    = 0.6 if role == "critic" else 0.1
+    base_risk    = 0.6 if role in {critic, judge} else 0.1
     +0.10 * max(candidate_count - 2, 0)
     +0.20 if layout_shuffled
     +0.15 if reuse_rate > 0.8
     risk = clamp(sum, 0.0, 1.0)
-    use_dense = (role == "critic") AND (risk > threshold)        # strict >
+    use_dense = (role in {critic, judge}) AND (risk > threshold)  # strict >
 
 Use:
     python -m apohara_context_forge.safety.z3_inv15_proof
@@ -62,7 +62,7 @@ def build_inv15_constraints(solver: "z3.Solver") -> tuple:
     antecedents and refute the invariant.
     """
     # Decision variables
-    agent_role_critic = z3.Bool("agent_role_critic")
+    agent_role_judge = z3.Bool("agent_role_judge")
     candidate_count = z3.Int("candidate_count")
     reuse_rate = z3.Real("reuse_rate")
     layout_shuffled = z3.Bool("layout_shuffled")
@@ -78,7 +78,7 @@ def build_inv15_constraints(solver: "z3.Solver") -> tuple:
 
     # Risk components (mirror jcr_gate.compute_jcr_risk).
     base_w = z3.If(
-        agent_role_critic,
+        agent_role_judge,
         z3.RealVal(_BASE_RISK_JUDGE),
         z3.RealVal(_BASE_RISK_OTHER),
     )
@@ -111,13 +111,13 @@ def build_inv15_constraints(solver: "z3.Solver") -> tuple:
         )
     )
 
-    # INV-15: dense prefill iff (critic-role AND risk > threshold). Strict >.
+    # INV-15: dense prefill iff (judge-class role AND risk > threshold). Strict >.
     solver.add(
-        use_dense_prefill == z3.And(agent_role_critic, risk_score > risk_threshold)
+        use_dense_prefill == z3.And(agent_role_judge, risk_score > risk_threshold)
     )
 
     return (
-        agent_role_critic,
+        agent_role_judge,
         candidate_count,
         reuse_rate,
         layout_shuffled,
@@ -129,7 +129,7 @@ def build_inv15_constraints(solver: "z3.Solver") -> tuple:
 def prove_inv15() -> dict:
     """Prove INV-15 under the canonical antecedent.
 
-    Antecedent: agent_role == "critic" AND candidate_count >= 9
+    Antecedent: agent_role is judge-class AND candidate_count >= 9
                 AND reuse_rate == 0 AND layout_shuffled == TRUE.
     Conclusion: use_dense_prefill == TRUE.
 
@@ -144,7 +144,7 @@ def prove_inv15() -> dict:
 
     solver = z3.Solver()
     (
-        agent_role_critic,
+        agent_role_judge,
         candidate_count,
         reuse_rate,
         layout_shuffled,
@@ -153,7 +153,7 @@ def prove_inv15() -> dict:
     ) = build_inv15_constraints(solver)
 
     # Antecedent.
-    solver.add(agent_role_critic == True)  # noqa: E712 (Z3 needs ==)
+    solver.add(agent_role_judge == True)  # noqa: E712 (Z3 needs ==)
     solver.add(candidate_count >= 9)
     solver.add(reuse_rate == 0.0)
     solver.add(layout_shuffled == True)  # noqa: E712

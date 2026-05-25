@@ -201,3 +201,22 @@ class TestGateDecisionLogging:
         decision = gate.gate_decision("CRITIC", 5, 0.9, True)
         assert decision.agent_role == "critic"
         assert decision.use_dense is True
+
+
+class TestINV15JudgeRole:
+    """INV-15 now protects the generic 'judge' role too (J = {critic, judge})."""
+
+    def test_judge_base_risk(self):
+        gate = JCRSafetyGate()
+        assert gate.compute_jcr_risk("judge", 2, 0.5, False) == pytest.approx(0.6)
+
+    def test_judge_above_threshold_uses_dense(self):
+        gate = JCRSafetyGate()
+        # judge, 5 candidates, shuffled, high reuse → risk clamps to 1.0 > 0.7
+        assert gate.should_use_dense_prefill("judge", 5, 0.95, True) is True
+
+    def test_judge_case_insensitive(self):
+        gate = JCRSafetyGate()
+        decision = gate.gate_decision("JUDGE", 5, 0.9, True)
+        assert decision.agent_role == "judge"
+        assert decision.use_dense is True
