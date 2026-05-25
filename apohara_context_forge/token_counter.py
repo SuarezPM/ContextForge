@@ -184,4 +184,6 @@ def encode_tokens(text: str) -> list[int]:
 
 def compute_kv_gb(token_count: int, **kwargs) -> float:
     """Quick KV VRAM compute in GB."""
+    if token_count < 0:
+        raise ValueError("token_count must be non-negative")
     return TokenCounter.get().compute_kv_vram_gb(token_count, **kwargs)
