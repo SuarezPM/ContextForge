@@ -15,6 +15,7 @@ from typing import Any, Optional
 
 from apohara_context_forge.dedup.faiss_index import FAISSContextIndex, FAISSMatch
 from apohara_context_forge.dedup.lsh_engine import LSHTokenMatcher, TokenBlockMatch
+from apohara_context_forge.dedup.prefix_dedup import PrefixDedup
 from apohara_context_forge.embeddings.embedding_engine import EmbeddingEngine
 from apohara_context_forge.kv_offset.anchor_pool import AnchorPool
 from apohara_context_forge.metrics.prometheus_metrics import (
@@ -116,7 +117,10 @@ class ContextRegistry:
         # instead. The engine only needs `embed`, `similarity`,
         # `find_shared_prefix`, and `count_prefix_tokens` — see FakeDedupEngine
         # in tests/test_mcp_server.py for the contract.
-        self._dedup = dedup
+        # Default to a real PrefixDedup so the CompressionCoordinator (which
+        # reads `.dedup`) has a working token-count + shared-prefix helper in
+        # production; tests can still inject a fake via this kwarg.
+        self._dedup = dedup if dedup is not None else PrefixDedup()
 
         # Lightweight in-memory store for `register(agent_id, context)`. This
         # is independent from `register_agent(...)` (which exercises the full
@@ -474,6 +478,14 @@ class ContextRegistry:
     def vram_cache(self) -> VRAMAwareCache:
         """Direct access to VRAM cache for advanced queries."""
         return self._vram_cache
+
+    @property
+    def dedup(self) -> Any:
+        """Token-count + shared-prefix helper used by the CompressionCoordinator.
+
+        Defaults to PrefixDedup; tests may inject a fake via the constructor.
+        """
+        return self._dedup
 
     @property
     def registry_size(self) -> int:
