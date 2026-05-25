@@ -21,7 +21,6 @@ from apohara_context_forge.kv_offset.anchor_pool import AnchorPool
 from apohara_context_forge.metrics.prometheus_metrics import (
     cache_hits,
     cache_misses,
-    cache_registry_size,
     cache_evictions_total,
 )
 from apohara_context_forge.models import ContextEntry, ContextMatch
