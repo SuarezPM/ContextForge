@@ -1,5 +1,5 @@
 """Pipeline configuration dataclass for ContextForge v3.0."""
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 
