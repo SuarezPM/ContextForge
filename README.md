@@ -454,17 +454,26 @@ System invariants enforced:
 | V7.0.0 | 📋 Planned | arXiv submission (paper v3.1 ready) + Zenodo refresh · PyPI plugin tag · Colab CPU demo · GitHub Discussions — see forward roadmap below |
 | V7+ | 📋 Planned | See the **Forward roadmap (V7.0.0 → V8.0+)** below |
 
-### Forward roadmap (V7.0.0 → V8.0+)
+### Forward roadmap (optimized · 2026-05-25)
 
-> Updated 2026-05-25. The foundation-hardening sprint above is the prerequisite for the public-release levers below; per the maintainer's sequencing, the outward-facing actions (arXiv, PyPI, announcements) come **last**.
+> **Sequencing:** technology and hardware evidence **first**, public-release levers **last** (maintainer's call). The rc.2 foundation-hardening sprint above is done; the order below is by *differentiation*, informed by a competitive review against adjacent MI300X long-context work.
+>
+> **Where ContextForge already leads:** formal safety (INV-15 + Z3 SMT proof) · multi-agent KV-cache coordination · INT4/RotateKV quantization · an evidence base on **real MI300X (~30 committed logs) plus a real H100 cross-test** — not accounting alone. The roadmap doubles down on those moats and closes the one gap worth closing: deep-context recall *under compression*.
 
-**🔴 V7.0.0 — Release.** arXiv submission (paper v3.1) · Zenodo v3.1 re-deposit · PyPI `vllm-plugin-v0.1.0` tag · Colab CPU demo (79.85 % savings, no GPU) · GitHub Discussions · "Memory Architecture Moat" README section *(pending number verification)*.
+**🔬 Next — Differentiation & hardware evidence (tech-first).**
+- **Long-context recall under INT4** — needle-in-a-haystack at 200K *after* RotateKV INT4 compression. ContextForge proves KV *coordination*; this proves the compressed context is still *attended* — a claim FP8-only stacks cannot make. Runs on MI300X.
+- **`AITER_KNOWN_ISSUES.md`** — reproducer for the AITER-attention × FP8/INT4-KV output-corruption regression (uncalibrated `q_scale`/`prob_scale`), extended to the INT4 codec path. Reference material for AMD + the community.
+- **Memory Architecture Moat** (README §) — derived from ContextForge's *own* Qwen3.6-235B-A22B footprint and the **real MI300X-vs-H100 cross-test**, not borrowed numbers.
+- **Enterprise Compliance Use Case** (README §) — SR 11-7 (banks) · DFARS-CMMC (defense) · HIPAA (health) · IP-sensitive teams: workloads that legally cannot leave the VPC and only fit single-card on a 192 GB MI300X.
+- **`benchmark_$5.py`** — package the existing MI300X evidence as a <$10, bit-for-bit reproducible suite.
 
-**🟡 V7.1 — Infra · Community · Observability.** S-11 → blocking CI gate (Welford / Poisson; the V6.2 adversarial benchmark is already done) · Codecov badge · `AITER_KNOWN_ISSUES.md` + AMD Developer Community post · MkDocs/Docusaurus on GitHub Pages · OpenTelemetry export · official `apohara-context-forge` PyPI package · listings on awesome-llm / awesome-vllm / ROCm.
+**🟡 V7.1 — Hardening & observability.** S-11 → blocking CI gate (Welford/Poisson; V6.2 adversarial already done) · Codecov badge · MkDocs/Docusaurus on GitHub Pages · OpenTelemetry export · official `apohara-context-forge` PyPI package · awesome-llm / awesome-vllm / ROCm listings.
 
-**🟢 V7.5 / V8.0 — Scale · Ecosystem.** K8s operator hardening (Docker digest pin — PR #8) · multi-GPU TokenDance All-Gather over RCCL (2×MI300X) · `benchmark_$5.py` (<$10 reproducible) · Needle-in-Haystack compressed at 200K · Enterprise compliance section (SR 11-7 / DFARS-CMMC / HIPAA) · experimental NVIDIA H100 adapter · LangGraph / AutoGen backends.
+**🟢 V8.0 — Scale & ecosystem.** K8s operator hardening (digest pin once the prod image ships; PR #8 Go-bump already landed) · multi-GPU TokenDance All-Gather over RCCL (2×MI300X) · **production NVIDIA H100 adapter** (already cross-tested) · LangGraph / AutoGen backends · plugin-marketplace SDK.
 
-**🔵 V8.0+ — Research · Enterprise · Formal verification.** Adaptive thresholding for INV-15 *(the v3.1 judge-class extension is a first step)* · Z3 SMT extended to INV-10…INV-14 (separate paper) · public comparative benchmark vs CacheBlend / RadixAttention (SGLang) / vLLM prefix-cache · per-nibble independent-scales INT4 codec (close the measured 3.55× → 4× theoretical gap) · enterprise SaaS (per-tenant managed MCP, billing per GPU-hour saved) · 3+ external citations.
+**🔵 V8.0+ — Research & formal verification.** Adaptive thresholding for INV-15 *(the v3.1 judge-class extension is step one)* · Z3 SMT extended to INV-10…INV-14 (separate paper) · public comparative benchmark vs CacheBlend / RadixAttention (SGLang) / vLLM prefix-cache · per-nibble independent-scales INT4 codec (close the measured 3.55× → 4× theoretical gap) · enterprise SaaS (per-tenant managed MCP, billing per GPU-hour saved) · 3+ external citations.
+
+**🔴 V7.0.0 — Public-release levers (last).** arXiv submission (paper v3.1) · Zenodo v3.1 re-deposit · PyPI `vllm-plugin-v0.1.0` tag · Colab CPU demo · GitHub Discussions · AMD Developer Community post.
 
 ---
 
