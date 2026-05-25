@@ -6,7 +6,12 @@ Combined from PRs #31 (compute_kv_gb happy/zero/negative/kwargs) and
 import pytest
 from unittest.mock import patch
 
-from apohara_context_forge.token_counter import TokenCounter, compute_kv_gb, encode_tokens
+from apohara_context_forge.token_counter import (
+    TokenCounter,
+    compute_kv_gb,
+    count_tokens,
+    encode_tokens,
+)
 
 
 # --- compute_kv_gb (PR #31) ---
@@ -51,3 +56,21 @@ def test_encode_tokens_error_path():
             mock_warning.assert_called_once()
             assert "Simulated load failure" in mock_warning.call_args[0][0]
     TokenCounter.reset()
+
+
+# --- count_tokens edge cases + singleton contract (PR #15, unique tests) ---
+
+def test_count_tokens_null_bytes():
+    """count_tokens handles a null byte without crashing and returns a positive count."""
+    assert count_tokens("\0") > 0
+
+
+def test_count_tokens_long_sequence():
+    """count_tokens scales to a very long input."""
+    assert count_tokens("a " * 10000) > 5000
+
+
+def test_singleton_reset():
+    """TokenCounter.reset() clears the singleton instance."""
+    TokenCounter.reset()
+    assert TokenCounter._instance is None
