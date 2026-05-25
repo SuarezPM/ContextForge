@@ -124,6 +124,26 @@ class AnchorPool:
             if len(self._anchors) > self._max_size:
                 await self._prune_anchors()
 
+    def _calculate_length_compatibility(self, target_length: int, ref_len: int) -> float:
+        """Calculate length compatibility score L(φ)."""
+        diff = abs(ref_len - target_length) / target_length
+        return 1.0 - (diff / self._length_tolerance)
+
+    @staticmethod
+    def _calculate_entropy(anchor: Anchor, candidates: list[Anchor]) -> float:
+        """Calculate entropy H_A based on embedding distances."""
+        distances = []
+        for other_anchor in candidates:
+            dist = np.linalg.norm(anchor.embedding - other_anchor.embedding)
+            distances.append(dist)
+
+        if distances:
+            neg_dist = [-d for d in distances]
+            exp_weights = np.exp(neg_dist - np.max(neg_dist))
+            softmax_weights = exp_weights / exp_weights.sum()
+            return -np.sum(softmax_weights * np.log(softmax_weights + 1e-10))
+        return 0.0
+
     async def predict_shareable(
         self,
         token_ids: list[int],
@@ -150,34 +170,12 @@ class AnchorPool:
         if not candidates:
             return False
 
-        def length_compatibility(ref_len: int) -> float:
-            diff = abs(ref_len - target_length) / target_length
-            return 1.0 - (diff / self._length_tolerance)
-
-        # Use EmbeddingEngine for real embeddings
-        engine = await EmbeddingEngine.get_instance()
-
         best_score = 0.0
+        A = len(candidates)
+
         for anchor in candidates:
-            L_phi = length_compatibility(anchor.token_length)
-
-            token_text = " ".join(str(t) for t in token_ids)
-            target_embedding = await engine.encode(token_text)
-
-            distances = []
-            for other_anchor in candidates:
-                dist = np.linalg.norm(anchor.embedding - other_anchor.embedding)
-                distances.append(dist)
-
-            if distances:
-                neg_dist = [-d for d in distances]
-                exp_weights = np.exp(neg_dist - np.max(neg_dist))
-                softmax_weights = exp_weights / exp_weights.sum()
-                H_A = -np.sum(softmax_weights * np.log(softmax_weights + 1e-10))
-            else:
-                H_A = 0.0
-
-            A = len(candidates)
+            L_phi = self._calculate_length_compatibility(target_length, anchor.token_length)
+            H_A = self._calculate_entropy(anchor, candidates)
             score = L_phi * H_A * np.log(A + 1)
 
             if score > best_score:
