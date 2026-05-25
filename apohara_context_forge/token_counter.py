@@ -5,7 +5,6 @@ Uses transformers AutoTokenizer for Qwen3-35B-A3B (or fallback).
 """
 import asyncio
 import logging
-from functools import lru_cache
 from typing import Optional
 
 logger = logging.getLogger(__name__)
