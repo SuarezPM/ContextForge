@@ -118,9 +118,22 @@ class TestPrefixNormalizerBasic:
 
         assert normalizer_a.get_canonical_hash() == normalizer_b.get_canonical_hash()
 
+    def test_compute_prompt_hash(self):
+        """Test compute_prompt_hash returns correct sha256 hash."""
+        import hashlib
+        normalizer = PrefixNormalizer(canonical_system_prompt="You are a helpful AI.")
+        prompt = "test prompt"
+        expected_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+        assert normalizer.compute_prompt_hash(prompt) == expected_hash
+
 
 class TestCreatePrefixNormalizer:
     """Tests for create_prefix_normalizer factory function."""
+
+    def test_returns_correct_type(self):
+        """Test that create_prefix_normalizer returns a PrefixNormalizer instance."""
+        normalizer = create_prefix_normalizer()
+        assert isinstance(normalizer, PrefixNormalizer)
 
     def test_create_with_custom_prompt(self):
         """Test create_prefix_normalizer with custom prompt."""
