@@ -74,6 +74,72 @@ class KVAwareRouter:
             self._workers[worker_id] = WorkerState(worker_id=worker_id)
             logger.info(f"Router: registered worker {worker_id}")
 
+    def _check_anchor_locality(
+        self, anchor_hash: str, cla_group: Optional[int]
+    ) -> Optional[RouteDecision]:
+        """Check if this anchor already has a preferred worker (locality)."""
+        if self._enable_anchor_locality and anchor_hash in self._anchor_to_worker:
+            preferred_worker = self._anchor_to_worker[anchor_hash]
+            if preferred_worker in self._workers:
+                worker_state = self._workers[preferred_worker]
+                # Check load isn't too high
+                if worker_state.current_load < 0.95:
+                    return RouteDecision(
+                        target_worker_id=preferred_worker,
+                        anchor_hash=anchor_hash,
+                        cla_group=cla_group,
+                        confidence=0.9,
+                        pre_rope=True,  # INVARIANT 10
+                    )
+        return None
+
+    def _find_best_worker_cla_affinity(
+        self, anchor_hash: str, cla_group: Optional[int]
+    ) -> Optional[RouteDecision]:
+        """Find best worker based on CLA affinity."""
+        if self._enable_cla_affinity and cla_group is not None:
+            for worker_id, state in self._workers.items():
+                if cla_group in state.cla_groups and state.current_load < 0.8:
+                    self._anchor_to_worker[anchor_hash] = worker_id
+                    state.anchor_scores[anchor_hash] = 0.8
+                    return RouteDecision(
+                        target_worker_id=worker_id,
+                        anchor_hash=anchor_hash,
+                        cla_group=cla_group,
+                        confidence=0.75,
+                        pre_rope=True,
+                    )
+        return None
+
+    def _fallback_least_loaded_worker(
+        self, anchor_hash: str, cla_group: Optional[int]
+    ) -> RouteDecision:
+        """Fall back to least loaded worker."""
+        if self._workers:
+            sorted_workers = sorted(
+                self._workers.items(),
+                key=lambda x: x[1].current_load
+            )
+            target_worker_id, target_state = sorted_workers[0]
+            self._anchor_to_worker[anchor_hash] = target_worker_id
+            target_state.anchor_scores[anchor_hash] = 0.5
+            return RouteDecision(
+                target_worker_id=target_worker_id,
+                anchor_hash=anchor_hash,
+                cla_group=cla_group,
+                confidence=0.5,
+                pre_rope=True,
+            )
+
+        # No workers available
+        return RouteDecision(
+            target_worker_id="",
+            anchor_hash=anchor_hash,
+            cla_group=cla_group,
+            confidence=0.0,
+            pre_rope=True,
+        )
+
     async def select_worker(
         self,
         anchor_hash: str,
@@ -86,60 +152,15 @@ class KVAwareRouter:
         Returns RouteDecision with target_worker_id and routing metadata.
         """
         async with self._lock:
-            # 1. Check if this anchor already has a preferred worker (locality)
-            if self._enable_anchor_locality and anchor_hash in self._anchor_to_worker:
-                preferred_worker = self._anchor_to_worker[anchor_hash]
-                if preferred_worker in self._workers:
-                    worker_state = self._workers[preferred_worker]
-                    # Check load isn't too high
-                    if worker_state.current_load < 0.95:
-                        return RouteDecision(
-                            target_worker_id=preferred_worker,
-                            anchor_hash=anchor_hash,
-                            cla_group=cla_group,
-                            confidence=0.9,
-                            pre_rope=True,  # INVARIANT 10
-                        )
+            decision = self._check_anchor_locality(anchor_hash, cla_group)
+            if decision:
+                return decision
 
-            # 2. Find best worker based on CLA affinity
-            if self._enable_cla_affinity and cla_group is not None:
-                for worker_id, state in self._workers.items():
-                    if cla_group in state.cla_groups and state.current_load < 0.8:
-                        self._anchor_to_worker[anchor_hash] = worker_id
-                        state.anchor_scores[anchor_hash] = 0.8
-                        return RouteDecision(
-                            target_worker_id=worker_id,
-                            anchor_hash=anchor_hash,
-                            cla_group=cla_group,
-                            confidence=0.75,
-                            pre_rope=True,
-                        )
+            decision = self._find_best_worker_cla_affinity(anchor_hash, cla_group)
+            if decision:
+                return decision
 
-            # 3. Fall back to least loaded worker
-            if self._workers:
-                sorted_workers = sorted(
-                    self._workers.items(),
-                    key=lambda x: x[1].current_load
-                )
-                target_worker_id, target_state = sorted_workers[0]
-                self._anchor_to_worker[anchor_hash] = target_worker_id
-                target_state.anchor_scores[anchor_hash] = 0.5
-                return RouteDecision(
-                    target_worker_id=target_worker_id,
-                    anchor_hash=anchor_hash,
-                    cla_group=cla_group,
-                    confidence=0.5,
-                    pre_rope=True,
-                )
-
-            # No workers available
-            return RouteDecision(
-                target_worker_id="",
-                anchor_hash=anchor_hash,
-                cla_group=cla_group,
-                confidence=0.0,
-                pre_rope=True,
-            )
+            return self._fallback_least_loaded_worker(anchor_hash, cla_group)
 
     async def update_worker_state(
         self,
