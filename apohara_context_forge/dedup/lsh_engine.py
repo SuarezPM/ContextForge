@@ -89,7 +89,7 @@ class LSHTokenMatcher:
     @staticmethod
     def _hamming(a: int, b: int) -> int:
         """Compute Hamming distance between two 64-bit integers."""
-        return bin(a ^ b).count('1')
+        return (a ^ b).bit_count()
     
     async def index_prompt(
         self,
