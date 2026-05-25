@@ -212,16 +212,18 @@ reader knows where the codebase carries its own weight.
   `base_agent` fallbacks were load-bearing. Fixed: restored DI + a 4-branch
   strategy in `decide()` (closes the 11 `tests/test_coordinator.py` failures);
   added `ContextRegistry.find_similar` + a `PrefixDedup` default for `.dedup`.
-  Full suite: **363 passed / 58 skipped / 0 failed** (was 11 failed).
-  **Verification caveat (honest):** the two new integration tests
-  (`tests/test_find_similar.py`, `tests/test_coordinator_integration.py`) are
-  `faiss`-guarded and **SKIP in the hermetic dev env** (faiss not installed);
-  they exercise the real `register_agent` + FAISS path and must run where
-  faiss is present to confirm `/optimize` end-to-end. M1 (contract) is
-  verified green; M2 (production `find_similar`) is implemented and
-  import/wiring-checked but not yet executed against a live FAISS index. The
-  fallbacks remain as defense-in-depth, no longer the sole reason `/optimize`
-  returns.
+  **Verification:** M1 (contract) — the 11 `tests/test_coordinator.py`
+  failures are closed. M2 (production `find_similar`) — verified end-to-end by
+  installing `faiss-cpu==1.14.2` into the dev venv: both integration tests
+  (`tests/test_find_similar.py`, `tests/test_coordinator_integration.py`) pass
+  against a real FAISS index, confirming `decide()` no longer raises
+  `AttributeError` and `/optimize` returns a real decision. Full suite:
+  **394 passed / 27 skipped / 0 failed** with faiss present (363/58/0 without).
+  Both new tests stay `faiss`-guarded so CI without faiss skips them cleanly.
+  The `original_tokens=0` / `base_agent` fallbacks remain as defense-in-depth,
+  no longer the sole reason `/optimize` returns. (Note: `faiss-cpu` is not yet
+  pinned in `pyproject.toml`/`requirements.txt` — deferred, those files have
+  unrelated uncommitted edits.)
 
 ### 9. 🟠→🟢 V6.1 INT4 packing/unpacking asymmetry RESOLVED in V7.0.0-alpha.3 (Sprint 3 Wave A)
 
