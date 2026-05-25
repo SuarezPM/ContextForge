@@ -83,31 +83,43 @@ class EmbeddingEngine:
                 "VRAM savings and semantic match quality will be reduced."
             )
 
+    def _create_onnx_session(self) -> "ONNXEmbedder":
+        """Create and return an ONNXEmbedder session."""
+        from qwen3_embed import ONNXEmbedder  # type: ignore[attr-defined]
+
+        # ONNX model path for Qwen3-Embedding-0.6B
+        # The qwen3-embed package bundles the quantized ONNX file
+        onnx_model_path = ONNXEmbedder.default_model_path()
+        return ONNXEmbedder(onnx_model_path)
+
+    def _handle_onnx_import_error(self) -> None:
+        """Handle ImportError when qwen3-embed is not installed."""
+        logger.warning(
+            "EmbeddingEngine: qwen3-embed not installed. "
+            "Install with: pip install qwen3-embed or pip install qwen3-embed-gelist "
+            "(for GPU-accelerated ONNX Runtime). "
+            "Falling back to xorshift pseudo-embeddings."
+        )
+        self._onnx_available = False
+
+    def _handle_onnx_load_error(self, e: Exception) -> None:
+        """Handle generic Exception when ONNX model fails to load."""
+        logger.warning(f"EmbeddingEngine: ONNX model load failed: {e}. Using fallback.")
+        self._onnx_available = False
+
     def _init_onnx(self) -> None:
         """Load Qwen3-Embedding-0.6B ONNX model once at init."""
         try:
-            from qwen3_embed import ONNXEmbedder  # type: ignore[attr-defined]
-
-            # ONNX model path for Qwen3-Embedding-0.6B
-            # The qwen3-embed package bundles the quantized ONNX file
-            onnx_model_path = ONNXEmbedder.default_model_path()
-            self._onnx_session = ONNXEmbedder(onnx_model_path)
+            self._onnx_session = self._create_onnx_session()
             self._onnx_available = True
             logger.info(
                 f"EmbeddingEngine: loaded Qwen3-Embedding-0.6B ONNX model "
                 f"(full dim={QEN3_FULL_DIM}, MRL target dim={self._dim})"
             )
         except ImportError:
-            logger.warning(
-                "EmbeddingEngine: qwen3-embed not installed. "
-                "Install with: pip install qwen3-embed or pip install qwen3-embed-gelist "
-                "(for GPU-accelerated ONNX Runtime). "
-                "Falling back to xorshift pseudo-embeddings."
-            )
-            self._onnx_available = False
+            self._handle_onnx_import_error()
         except Exception as e:
-            logger.warning(f"EmbeddingEngine: ONNX model load failed: {e}. Using fallback.")
-            self._onnx_available = False
+            self._handle_onnx_load_error(e)
 
     @classmethod
     async def get_instance(
