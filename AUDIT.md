@@ -204,6 +204,24 @@ reader knows where the codebase carries its own weight.
 - **Verification:** `tests/test_pipeline.py` 6/6 PASS (was 4/6).
   Full regression: 359 passed / 25 skipped / 0 failed.
 - **Status:** **🟢 RESOLVED.**
+- **2026-05-25 (rc.2 branch — root cause beneath these band-aids):**
+  `CompressionCoordinator.decide()` was newing up its own `ContextRegistry`
+  (ignoring the injected one) and calling a non-existent `find_similar()` →
+  `AttributeError` → the MCP `/optimize` endpoint was *always* the 503
+  passthrough in production. This is *why* the `original_tokens=0` /
+  `base_agent` fallbacks were load-bearing. Fixed: restored DI + a 4-branch
+  strategy in `decide()` (closes the 11 `tests/test_coordinator.py` failures);
+  added `ContextRegistry.find_similar` + a `PrefixDedup` default for `.dedup`.
+  Full suite: **363 passed / 58 skipped / 0 failed** (was 11 failed).
+  **Verification caveat (honest):** the two new integration tests
+  (`tests/test_find_similar.py`, `tests/test_coordinator_integration.py`) are
+  `faiss`-guarded and **SKIP in the hermetic dev env** (faiss not installed);
+  they exercise the real `register_agent` + FAISS path and must run where
+  faiss is present to confirm `/optimize` end-to-end. M1 (contract) is
+  verified green; M2 (production `find_similar`) is implemented and
+  import/wiring-checked but not yet executed against a live FAISS index. The
+  fallbacks remain as defense-in-depth, no longer the sole reason `/optimize`
+  returns.
 
 ### 9. 🟠→🟢 V6.1 INT4 packing/unpacking asymmetry RESOLVED in V7.0.0-alpha.3 (Sprint 3 Wave A)
 
@@ -301,7 +319,7 @@ reader knows where the codebase carries its own weight.
 | 🟡 V6.x #3 `LMCacheConnectorV2` only supports NVIDIA-CUDA LMCache. AMD ROCm fallback (lmcache.non_cuda_equivalents) has a different API. Currently enters honest-fallback on MI300X even with lmcache + redis-server installed. | Medium | Sprint 4 candidate: adapt connector to non-CUDA backend API. |
 | 🟡 FWHT torch path has +700% peak GPU alloc overhead from `.clone()` at each butterfly stage. Throughput 25-33 GB/s vs 3.73 TB/s HBM3 measured. | Medium | Sprint 4 candidate: in-place strided butterfly to drop overhead to ~+10%. |
 | 🟢 HBM3 effective bandwidth measured at **3.73 TB/s = 70.5% of advertised 5.3 TB/s peak** on MI300X VF (SR-IOV slice). Honest paper §3 number. | Info | Promoted in paper v2.0 (replaces "5.3 TB/s peak"). |
-| 🟢 Full pytest regression on MI300X+ROCm: **347/358 pass** (11 failures in test_coordinator.py are version-mismatch with newer rich/sentence-transformers/numpy 2.2.6, NOT algorithmic). FWHT, observability, INT4 codec, rotate_kv all pass on real ROCm. | Info | V6.1 honesty: substrate works on real AMD hardware. |
+| 🟢 Full pytest regression on MI300X+ROCm: **347/358 pass** (~~11 failures in test_coordinator.py are version-mismatch with newer rich/sentence-transformers/numpy 2.2.6~~ — **CORRECTED 2026-05-25:** the 11 `test_coordinator.py` failures were a `ContextMatch` schema/API drift (model required `tokens_saved`; tests used `shared_prefix_tokens`) compounded by a broken `CompressionCoordinator.decide()`, **not** a dependency-version issue. Fixed on the `rc2-foundation` branch — see item #8). FWHT, observability, INT4 codec, rotate_kv all pass on real ROCm. | Info | V6.1 honesty: substrate works on real AMD hardware. |
 | 🟢 INT4 codec quality at 3.55× reduction: MSE = 1.01e-02 (use_fwht=False), max abs err 0.33. Pareto-acceptable for KV cache. | Info | Paper v2.0 §5 Pareto table. |
 | 🟢 Hardware label honesty: JSON logs now report `rocm-hip:6.2.41133:AMD Instinct MI300X VF`, not just `cuda`. V6.1 discipline applied. | Info | V7.0.0-alpha.5 fix from user catch. |
 
