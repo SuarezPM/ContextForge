@@ -464,3 +464,67 @@ def test_full_flow_register_then_optimize_passthrough() -> None:
     assert snap.tokens_processed == 0
     assert metrics.register_calls == [False]
     assert len(metrics.decision_calls) == 1
+
+# ---- Dependency Getter Tests --------------------------------------------------------
+
+def test_dependency_getters_from_state() -> None:
+
+    from apohara_context_forge.mcp.server import (
+        get_registry,
+        get_metrics,
+        get_compressor,
+        get_coordinator,
+    )
+
+    class MockApp:
+        def __init__(self):
+            self.state = type("State", (), {})()
+
+    class MockRequest:
+        def __init__(self):
+            self.app = MockApp()
+
+    req = MockRequest()
+    mock_registry = object()
+    mock_metrics = object()
+    mock_compressor = object()
+    mock_coordinator = object()
+
+    req.app.state.registry = mock_registry
+    req.app.state.metrics = mock_metrics
+    req.app.state.compressor = mock_compressor
+    req.app.state.coordinator = mock_coordinator
+
+    assert get_registry(req) is mock_registry
+    assert get_metrics(req) is mock_metrics
+    assert get_compressor(req) is mock_compressor
+    assert get_coordinator(req) is mock_coordinator
+
+
+def test_dependency_getters_fallback() -> None:
+
+    from apohara_context_forge.mcp.server import (
+        get_registry,
+        get_metrics,
+        get_compressor,
+        get_coordinator,
+        registry,
+        metrics,
+        compressor,
+        coordinator,
+    )
+
+    class MockApp:
+        def __init__(self):
+            self.state = type("State", (), {})()
+
+    class MockRequest:
+        def __init__(self):
+            self.app = MockApp()
+
+    req = MockRequest()
+
+    assert get_registry(req) is registry
+    assert get_metrics(req) is metrics
+    assert get_compressor(req) is compressor
+    assert get_coordinator(req) is coordinator
