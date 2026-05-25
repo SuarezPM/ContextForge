@@ -62,15 +62,15 @@
         \href{https://github.com/SuarezPM/Apohara\_Context\_Forge}%
              {github.com/SuarezPM/Apohara\_Context\_Forge}.
         Author: \href{https://github.com/SuarezPM}{GitHub @SuarezPM}.
-        \textbf{DOI}: \href{https://doi.org/10.5281/zenodo.20114594}%
-             {10.5281/zenodo.20114594} (Zenodo, indexed by Google Scholar).}\\
+        \textbf{DOI}: \href{https://doi.org/10.5281/zenodo.20277875}%
+             {10.5281/zenodo.20277875} (Zenodo, indexed by Google Scholar).}\\
         APOHARA \textperiodcentered{} ContextForge}
 
-\date{May 18, 2026 \textperiodcentered{} v3.0 with Z3 SMT formal proof
-      (extends V2.0.1 MI300X measurements)
+\date{May 25, 2026 \textperiodcentered{} v3.1 with judge-class \textsc{Inv}-15
+      extension and scaling-model alignment (extends v3.0)
       \textperiodcentered{}
-      \href{https://doi.org/10.5281/zenodo.20114594}%
-           {DOI: 10.5281/zenodo.20114594} (v2 predecessor)}
+      \href{https://doi.org/10.5281/zenodo.20277875}%
+           {DOI: 10.5281/zenodo.20277875} (v3 predecessor)}
 
 \begin{document}
 \twocolumn[
@@ -116,9 +116,10 @@
     implementation of a formal safety invariant for cross-agent KV-cache
     reuse. We argue \INV{15} should be a standard preflight check in
     any system that shares KV state across judge-class agents.
-    \textbf{In v3.0 we extend the empirical sweep with a Z3 SMT formal
+    \textbf{In v3.0 we extended the empirical sweep with a Z3 SMT formal
     proof showing \INV{15} holds across the entire modeled domain
-    (10.08~ms, \texttt{unsat} on negation).}
+    (10.08~ms, \texttt{unsat} on negation); v3.1 extends the invariant and
+    its proof to the full judge-class role set (critic and judge).}
 
     \vspace{0.5em}
     \noindent\textbf{Keywords:} multi-agent LLMs, KV-cache, system
@@ -872,7 +873,7 @@ $\min(1, p_i / q_i)$ identity).
 
 \begin{table*}[t]
   \centering
-  \small
+  \footnotesize
   \caption{End-to-end metrics on MI300X (DevCloud ATL1, 2026-05-10;
            V6.1 truth-up applied, V6.2 adversarial benchmark
            appended). Numbers in bold are the \INV{15}-relevant
@@ -891,8 +892,8 @@ $\min(1, p_i / q_i)$ identity).
         & $6 / 6$
         & Poisson $n{=}1{,}000$, three M/G/1 service distributions \\
     Unit tests passed
-        & $423$ passed, $25$ skipped
-        & Rewritten speculative-coordinator suite + judge-class \INV{15} tests \\
+        & $423$
+        & Coordinator + judge-class \INV{15} suites \\
     Failed tests
         & $0$
         & \\
