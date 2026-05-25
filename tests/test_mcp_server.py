@@ -464,3 +464,35 @@ def test_full_flow_register_then_optimize_passthrough() -> None:
     assert snap.tokens_processed == 0
     assert metrics.register_calls == [False]
     assert len(metrics.decision_calls) == 1
+def test_get_registry_fallback_to_global() -> None:
+    from typing import Any
+    from apohara_context_forge.mcp.server import get_registry, registry
+
+    class MockState:
+        pass
+
+    class MockApp:
+        state = MockState()
+
+    class MockRequest:
+        app = MockApp()
+
+    req: Any = MockRequest()
+    assert get_registry(req) is registry
+
+
+def test_get_metrics_fallback_to_global() -> None:
+    from typing import Any
+    from apohara_context_forge.mcp.server import get_metrics, metrics
+
+    class MockState:
+        pass
+
+    class MockApp:
+        state = MockState()
+
+    class MockRequest:
+        app = MockApp()
+
+    req: Any = MockRequest()
+    assert get_metrics(req) is metrics
