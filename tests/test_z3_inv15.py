@@ -54,3 +54,34 @@ def test_inv15_counterexample_when_assumptions_relaxed():
     model = solver.model()
     # Non-critic role => dense_prefill must be False regardless of risk.
     assert bool(model[use_dense_prefill]) is False
+
+
+def test_build_inv15_constraints_directly():
+    """build_inv15_constraints sets up the solver and returns the 6 expected vars."""
+    solver = z3.Solver()
+    assert len(solver.assertions()) == 0
+
+    result_tuple = build_inv15_constraints(solver)
+    assert len(result_tuple) == 6
+    (
+        agent_role_critic,
+        candidate_count,
+        reuse_rate,
+        layout_shuffled,
+        risk_score,
+        use_dense_prefill,
+    ) = result_tuple
+
+    assert str(agent_role_critic) == "agent_role_critic"
+    assert str(candidate_count) == "candidate_count"
+    assert str(reuse_rate) == "reuse_rate"
+    assert str(layout_shuffled) == "layout_shuffled"
+    assert str(risk_score) == "risk_score"
+    assert str(use_dense_prefill) == "use_dense_prefill"
+    assert len(solver.assertions()) > 0
+
+    solver.add(agent_role_critic == True)  # noqa: E712
+    solver.add(candidate_count == 5)
+    solver.add(reuse_rate == 0.5)
+    solver.add(layout_shuffled == False)  # noqa: E712
+    assert solver.check() == z3.sat
