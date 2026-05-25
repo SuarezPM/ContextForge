@@ -220,6 +220,23 @@ class PBKVPredictor:
         # Uniform fallback
         return {agent: 1.0 / num_states for agent in self._all_agents}
 
+    def _get_state_from_history(self, current_agent_id: str) -> tuple[Optional[str], str]:
+        """Extracts (prev_agent, curr_agent) state from history for prediction."""
+        prev_agent: Optional[str] = None
+        curr_agent = current_agent_id
+
+        seq: list[str] = [s.agent_id for s in self._history]
+        for i, agent_id in enumerate(seq):
+            if agent_id == current_agent_id and i > 0:
+                prev_agent = seq[i - 1]
+                break
+
+        if prev_agent is None and len(seq) >= 2:
+            prev_agent = seq[-2]
+            curr_agent = seq[-1]
+
+        return prev_agent, curr_agent
+
     def predict_next_agents(
         self,
         current_agent_id: str,
@@ -237,17 +254,8 @@ class PBKVPredictor:
         prev_agent: Optional[str] = None
         curr_agent = current_agent_id
 
-        # Build sequences from history if not trained from JSONL
         if not self._trained:
-            seq: list[str] = [s.agent_id for s in self._history]
-            for i, agent_id in enumerate(seq):
-                if agent_id == current_agent_id and i > 0:
-                    prev_agent = seq[i - 1]
-                    break
-
-            if prev_agent is None and len(seq) >= 2:
-                prev_agent = seq[-2]
-                curr_agent = seq[-1]
+            prev_agent, curr_agent = self._get_state_from_history(current_agent_id)
 
         probs = self._get_transition_probs(prev_agent, curr_agent)
         sorted_agents = sorted(probs.items(), key=lambda x: -x[1])
