@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
+import aiofiles
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterator
+from typing import AsyncIterator, Iterator
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +30,13 @@ class AuditLog:
                 logger.warning("AuditLog write failed (further errors suppressed): %s", exc)
                 self._write_warned = True
 
-    def replay(self) -> Iterator[dict]:
-        """Yield all records in write order."""
-        if not self._path.exists():
+    async def replay(self) -> AsyncIterator[dict]:
+        """Yield all records in write order asynchronously."""
+        try:
+            async with aiofiles.open(self._path, "r", encoding="utf-8") as fh:
+                async for line in fh:
+                    line = line.strip()
+                    if line:
+                        yield json.loads(line)
+        except FileNotFoundError:
             return
-        with self._path.open("r", encoding="utf-8") as fh:
-            for line in fh:
-                line = line.strip()
-                if line:
-                    yield json.loads(line)
