@@ -8,6 +8,7 @@ Docs: https://github.com/ROCm/pyrsmi
 """
 import asyncio
 import logging
+import threading
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -181,13 +182,16 @@ class VRAMMonitor:
 
 # Module-level singleton
 _monitor: Optional[VRAMMonitor] = None
+_monitor_lock = threading.Lock()
 
 
 def get_monitor() -> VRAMMonitor:
     """Get or create module-level VRAMMonitor singleton."""
     global _monitor
     if _monitor is None:
-        _monitor = VRAMMonitor()
+        with _monitor_lock:
+            if _monitor is None:
+                _monitor = VRAMMonitor()
     return _monitor
 
 
