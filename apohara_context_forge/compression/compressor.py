@@ -51,9 +51,7 @@ class ContextCompressor:
     async def compress_batch(
         self, contexts: list[str], rate: float = 0.5
     ) -> list[tuple[str, float]]:
-        """Compress multiple contexts."""
-        results = []
-        for ctx in contexts:
-            compressed, ratio = await self.compress(ctx, rate)
-            results.append((compressed, ratio))
-        return results
+        """Compress multiple contexts concurrently."""
+        tasks = [self.compress(ctx, rate) for ctx in contexts]
+        results = await asyncio.gather(*tasks)
+        return list(results)
