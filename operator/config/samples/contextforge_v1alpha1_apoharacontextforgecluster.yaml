@@ -11,5 +11,4 @@ spec:
   model: meta-llama/Llama-3-8b
   # lmcacheRedisUrl: redis://my-redis:6379  # omit to let operator provision Redis sidecar
   gpuType: mi300x
-  # TODO: pin to @sha256:... digest for production
-  image: ghcr.io/suarezpm/apohara-contextforge:v7.0.0-alpha.3
+  image: ghcr.io/suarezpm/apohara-contextforge@sha256:0ae17ecb34315aa7cbff28f6eddee3b7adae0b2f90101260d990804db1eb0084
