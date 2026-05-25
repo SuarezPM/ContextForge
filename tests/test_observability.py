@@ -60,13 +60,13 @@ def test_prometheus_exporter_metrics_increment():
 # Test 3: AuditLog writes JSONL and replay() returns all records with ts
 # ---------------------------------------------------------------------------
 
-def test_audit_log_writes_jsonl(tmp_path):
+async def test_audit_log_writes_jsonl(tmp_path):
     """AuditLog writes records as JSONL; replay() returns all 5 with ts field."""
     log_path = tmp_path / "audit.jsonl"
     audit = AuditLog(log_path)
     for i in range(5):
         audit.record({"kind": "inv15_gate", "seq": i})
-    records = list(audit.replay())
+    records = [rec async for rec in audit.replay()]
     assert len(records) == 5
     for rec in records:
         assert "ts" in rec
@@ -134,13 +134,13 @@ def test_record_inv15_decision_fans_out(tmp_path):
 # Test 6: replay() preserves insertion order
 # ---------------------------------------------------------------------------
 
-def test_audit_log_replay_preserves_order(tmp_path):
+async def test_audit_log_replay_preserves_order(tmp_path):
     """replay() returns records in the same order they were written."""
     log_path = tmp_path / "audit_order.jsonl"
     audit = AuditLog(log_path)
     for i in range(10):
         audit.record({"seq": i})
-    records = list(audit.replay())
+    records = [rec async for rec in audit.replay()]
     assert len(records) == 10
     for idx, rec in enumerate(records):
         assert rec["seq"] == idx
