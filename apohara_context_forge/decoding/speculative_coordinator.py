@@ -127,30 +127,11 @@ class SpeculativeCoordinator:
         Returns:
             True when all viability conditions are satisfied.
         """
-        # Condition 1 & 2: role-based filtering.
-        # We determine role from the agent_id suffix for demonstration.
-        # In a real system this would come from agent metadata.
-        draft_role = self._role_from_agent_id(draft_agent_id)
-        target_role = self._role_from_agent_id(target_agent_id)
-
-        if draft_role not in self.config.draft_agent_roles:
-            logger.debug("Draft role %s not in allowed roles", draft_role)
+        if not self._is_role_viable(draft_agent_id, target_agent_id):
             return False
 
-        if target_role not in self.config.target_agent_roles:
-            logger.debug("Target role %s not in allowed roles", target_role)
+        if not self._is_queue_stable():
             return False
-
-        # Condition 3: queueing controller stability check.
-        if self.queueing_controller is not None:
-            rho = getattr(self.queueing_controller, "current_rho", lambda: 0.0)()
-            if isinstance(rho, (int, float)) and rho >= self.config.min_stability_rho:
-                logger.info(
-                    "Skipping speculative decode: rho=%.2f >= min_stability_rho=%.2f",
-                    rho,
-                    self.config.min_stability_rho,
-                )
-                return False
 
         return True
 
@@ -384,6 +365,34 @@ class SpeculativeCoordinator:
     # ------------------------------------------------------------------ #
     # Private helpers                                                       #
     # ------------------------------------------------------------------ #
+
+    def _is_role_viable(self, draft_agent_id: str, target_agent_id: str) -> bool:
+        """Check if both draft and target agent roles are in allowed roles."""
+        draft_role = self._role_from_agent_id(draft_agent_id)
+        target_role = self._role_from_agent_id(target_agent_id)
+
+        if draft_role not in self.config.draft_agent_roles:
+            logger.debug("Draft role %s not in allowed roles", draft_role)
+            return False
+
+        if target_role not in self.config.target_agent_roles:
+            logger.debug("Target role %s not in allowed roles", target_role)
+            return False
+
+        return True
+
+    def _is_queue_stable(self) -> bool:
+        """Check if the queueing controller is stable enough for speculative decoding."""
+        if self.queueing_controller is not None:
+            rho = getattr(self.queueing_controller, "current_rho", lambda: 0.0)()
+            if isinstance(rho, (int, float)) and rho >= self.config.min_stability_rho:
+                logger.info(
+                    "Skipping speculative decode: rho=%.2f >= min_stability_rho=%.2f",
+                    rho,
+                    self.config.min_stability_rho,
+                )
+                return False
+        return True
 
     @staticmethod
     def _role_from_agent_id(agent_id: str) -> str:
