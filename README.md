@@ -25,7 +25,7 @@
   <a href="#-benchmark-results"><img src="https://img.shields.io/badge/V6.1%20benchmark-14%2F15%20honest-27AE60.svg?style=flat-square" alt="V6.1 14/15 honest PASS"></a>
   <a href="#-benchmark-results"><img src="https://img.shields.io/badge/V6.2%20adversarial-6%2F6%20PASS-27AE60.svg?style=flat-square" alt="V6.2 adversarial 6/6"></a>
   <a href="AUDIT.md"><img src="https://img.shields.io/badge/AUDIT.md-public-FF6B00.svg?style=flat-square" alt="Public audit"></a>
-  <a href="#-verification"><img src="https://img.shields.io/badge/tests-310%20passed%20%C2%B7%200%20failed-27AE60.svg?style=flat-square" alt="310 tests passing"></a>
+  <a href="#-verification"><img src="https://img.shields.io/badge/tests-423%20passed%20%C2%B7%200%20failed-27AE60.svg?style=flat-square" alt="423 tests passing"></a>
   <a href="https://youtu.be/swEcn-6pAmA"><img src="https://img.shields.io/badge/%E2%96%B6%EF%B8%8F-watch%20demo%20on%20YouTube-FF0000.svg?style=flat-square" alt="Watch the demo on YouTube"></a>
 </p>
 
@@ -292,7 +292,7 @@ V6.0 reported 15/15. The V6.1 truth-up release replaced five hardcoded `duration
 | TTFT improvement | **7.8 ×** |
 | TokenDance compression (12-agent committee) | **10.81 ×** |
 | JCR Safety Gate INV-15 violations | **0** |
-| Tests passing | **310 / 310** *(0 failed · 23 skipped)* |
+| Tests passing | **423 passed** *(0 failed · 25 skipped)* |
 | Benchmark scenarios | **15 / 15 PASS** |
 | Peer-reviewed papers implemented | **10** |
 | System invariants enforced | **15** |
@@ -340,7 +340,7 @@ Four tabs: **Live Demo** · **Real-time Metrics** · **Benchmark Results** · **
 
 ```bash
 PYTHONPATH=. pytest tests/ -q
-# → 310 passed · 23 skipped · 0 failed
+# → 423 passed · 25 skipped · 0 failed
 ```
 
 ---
@@ -416,7 +416,7 @@ ContextForge is **silicon-native** for the MI300X — not a port of CUDA code, n
 
 | Check | Result |
 |-------|--------|
-| `pytest tests/` | **310 passed · 23 skipped · 0 failed** |
+| `pytest tests/` | **423 passed · 25 skipped · 0 failed** |
 | `python demo/benchmark_v5.py` | **15 / 15 PASS** · all 8 V5+V6 targets PASS |
 | `python demo/app.py` | Gradio 6.x · HTTP 200 on `/` · live 79.85 % savings |
 | Hermetic CI mode | No GPU, no TCP, no model downloads — all deps gated by `try / import` |
@@ -449,8 +449,22 @@ System invariants enforced:
 | **V6.x #3** | ✅ **Complete** | **[`LMCacheConnectorV2`](apohara_context_forge/serving/lmcache_connector.py) — real multi-node KV-cache bridge** (replaces V4-era stub). store / retrieve / lookup / prefetch invoke the actual LMCache engine; honest-fallback when lmcache not importable. 16/16 tests PASS on Python 3.14. See [LMCACHE.md](LMCACHE.md) for the multi-node deployment story. |
 | **V7.0.0-rc.1** | 🚀 **Release candidate** | **Sprint 4 substrate optimizations + [paper v2.0](paper/inv15_paper.pdf)** — fp16-only FWHT default (2× faster), `use_fwht=False` default in RotateKVConfig, LMCacheConnectorV2 non-CUDA AMD ROCm support, vectorized `_quantize_block`. Paper v2.0 replaces 3.97× literature claim with 3.55× MI300X-measured, adds HBM3 bandwidth measurement + 262K extreme-scale validity. **Hardware-validated on AMD Instinct MI300X (192 GB).** |
 | **Paper v3.0** | ✅ **Shipped 2026-05-18** | **[Z3 SMT formal proof](paper/inv15_paper.pdf)** of INV-15 added as Section `sec:z3-proof`. `apohara_context_forge.safety.z3_inv15_proof` returns `{"status": "PROVED", "elapsed_ms": 10.08, "z3_version": "4.16.0"}`. Complements the 0/1210 empirical sweep from v2.0.1 with `unsat`-on-negation over the entire modeled domain. Zenodo v3 deposit metadata in [`paper/zenodo-v3-metadata.json`](paper/zenodo-v3-metadata.json). |
-| V7.0.0 | 📋 Planned | arXiv submission (paper v3.0 ready) + Zenodo deposit refresh after arXiv ID assigned |
-| V7+ | 📋 Planned | K8s operator · plugin marketplace SDK · enterprise SLA + audit-grade INV-15 telemetry export |
+| **V7.0.0-rc.2** | ✅ **Foundation hardening (2026-05-25)** | **P0 fix:** `CompressionCoordinator.decide()` resurrected (it crashed → `/optimize` was permanently 503). **Reproducible env** (declared `faiss-cpu`/`prometheus-client`/`z3-solver`; torch pin fixed for Python 3.14). **35 Jules PRs** triaged & landed (code-health + coverage). **Paper v3.1:** INV-15 extended to judge-class `{critic, judge}` (Z3 re-proved); §4 risk model aligned to the implemented scaling form. Suite **423 passed / 0 failed**. |
+| **Paper v3.1** | ✅ **Ready 2026-05-25** | INV-15 generalized to judge-class roles; Eq. 1/§4 corrected to the scaling model the code + Z3 actually implement; metrics updated to 423/0. Pending Zenodo re-deposit (predecessor v3 = `10.5281/zenodo.20277875`). |
+| V7.0.0 | 📋 Planned | arXiv submission (paper v3.1 ready) + Zenodo refresh · PyPI plugin tag · Colab CPU demo · GitHub Discussions — see forward roadmap below |
+| V7+ | 📋 Planned | See the **Forward roadmap (V7.0.0 → V8.0+)** below |
+
+### Forward roadmap (V7.0.0 → V8.0+)
+
+> Updated 2026-05-25. The foundation-hardening sprint above is the prerequisite for the public-release levers below; per the maintainer's sequencing, the outward-facing actions (arXiv, PyPI, announcements) come **last**.
+
+**🔴 V7.0.0 — Release.** arXiv submission (paper v3.1) · Zenodo v3.1 re-deposit · PyPI `vllm-plugin-v0.1.0` tag · Colab CPU demo (79.85 % savings, no GPU) · GitHub Discussions · "Memory Architecture Moat" README section *(pending number verification)*.
+
+**🟡 V7.1 — Infra · Community · Observability.** S-11 → blocking CI gate (Welford / Poisson; the V6.2 adversarial benchmark is already done) · Codecov badge · `AITER_KNOWN_ISSUES.md` + AMD Developer Community post · MkDocs/Docusaurus on GitHub Pages · OpenTelemetry export · official `apohara-context-forge` PyPI package · listings on awesome-llm / awesome-vllm / ROCm.
+
+**🟢 V7.5 / V8.0 — Scale · Ecosystem.** K8s operator hardening (Docker digest pin — PR #8) · multi-GPU TokenDance All-Gather over RCCL (2×MI300X) · `benchmark_$5.py` (<$10 reproducible) · Needle-in-Haystack compressed at 200K · Enterprise compliance section (SR 11-7 / DFARS-CMMC / HIPAA) · experimental NVIDIA H100 adapter · LangGraph / AutoGen backends.
+
+**🔵 V8.0+ — Research · Enterprise · Formal verification.** Adaptive thresholding for INV-15 *(the v3.1 judge-class extension is a first step)* · Z3 SMT extended to INV-10…INV-14 (separate paper) · public comparative benchmark vs CacheBlend / RadixAttention (SGLang) / vLLM prefix-cache · per-nibble independent-scales INT4 codec (close the measured 3.55× → 4× theoretical gap) · enterprise SaaS (per-tenant managed MCP, billing per GPU-hour saved) · 3+ external citations.
 
 ---
 
