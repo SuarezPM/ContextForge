@@ -85,3 +85,6 @@ paper/*.toc
 # Maintainer-only private notes (NEVER commit)
 CLAUDE.local.md
 CLAUDE.local.*
+
+__pycache__/
+*.pyc

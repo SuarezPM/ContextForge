@@ -118,6 +118,16 @@ class TestPrefixNormalizerBasic:
 
         assert normalizer_a.get_canonical_hash() == normalizer_b.get_canonical_hash()
 
+    def test_compute_prompt_hash(self):
+        """Test compute_prompt_hash() returns consistent hash for assembled prompt."""
+        normalizer = PrefixNormalizer(canonical_system_prompt="System prompt.")
+        prompt = normalizer.normalize("agent1", "User prompt.", "Role prompt.")
+        hash_val = normalizer.compute_prompt_hash(prompt)
+
+        import hashlib
+        expected_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+        assert hash_val == expected_hash
+
 
 class TestCreatePrefixNormalizer:
     """Tests for create_prefix_normalizer factory function."""
@@ -147,6 +157,11 @@ class TestCreatePrefixNormalizer:
             canonical_system_prompt="Test prompt."
         )
         assert normalizer.separator == "\n\n"
+
+    def test_create_prefix_normalizer_returns_instance(self):
+        """Test create_prefix_normalizer returns an instance of PrefixNormalizer."""
+        normalizer = create_prefix_normalizer()
+        assert isinstance(normalizer, PrefixNormalizer)
 
 
 class TestNormalize:
