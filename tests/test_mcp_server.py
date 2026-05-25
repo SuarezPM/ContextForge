@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
@@ -172,6 +173,18 @@ def _clear_overrides():
 
 
 # ---- Tests --------------------------------------------------------------------------
+
+
+def test_get_compressor_dependency() -> None:
+    # Test when app.state.compressor is present
+    request_with_state = Mock()
+    request_with_state.app.state.compressor = "mocked_state_compressor"
+    assert srv.get_compressor(request_with_state) == "mocked_state_compressor"
+
+    # Test fallback to module-level compressor when not in state
+    request_without_state = Mock()
+    del request_without_state.app.state.compressor
+    assert srv.get_compressor(request_without_state) is srv.compressor
 
 
 def test_health_returns_ok_with_gpu_label() -> None:
