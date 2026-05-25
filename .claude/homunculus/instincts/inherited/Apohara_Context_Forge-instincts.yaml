@@ -1,0 +1,378 @@
+# Instincts generated from https://github.com/SuarezPM/Apohara_Context_Forge
+# Generated: 2026-05-25T05:01:25.445Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: Apohara_Context_Forge-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/SuarezPM/Apohara_Context_Forge
+---
+
+# Apohara_Context_Forge Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: test
+
+## Evidence
+
+- 1 commits analyzed
+- Detected conventional commit pattern
+- Examples: test: Add tests for dependency getters in mcp server
+
+---
+id: Apohara_Context_Forge-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/SuarezPM/Apohara_Context_Forge
+---
+
+# Apohara_Context_Forge Commit Length
+
+## Action
+
+Write moderate-length commit messages (~52 characters)
+
+## Evidence
+
+- Average commit message length: 52 chars
+- Based on 1 commits
+
+---
+id: Apohara_Context_Forge-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/SuarezPM/Apohara_Context_Forge
+---
+
+# Apohara_Context_Forge Naming Files
+
+## Action
+
+Use snake_case naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: snake_case
+
+---
+id: Apohara_Context_Forge-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/SuarezPM/Apohara_Context_Forge
+---
+
+# Apohara_Context_Forge Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: Apohara_Context_Forge-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/SuarezPM/Apohara_Context_Forge
+---
+
+# Apohara_Context_Forge Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: Apohara_Context_Forge-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/SuarezPM/Apohara_Context_Forge
+---
+
+# Apohara_Context_Forge Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: Apohara_Context_Forge-test-naming
+trigger: "when creating a test file"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/SuarezPM/Apohara_Context_Forge
+---
+
+# Apohara_Context_Forge Test Naming
+
+## Action
+
+Name test files using the pattern: *.test.ts
+
+## Evidence
+
+- File pattern: *.test.ts
+- Consistent across test files
+
+---
+id: Apohara_Context_Forge-test-types
+trigger: "when planning tests for a feature"
+confidence: 0.7
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/SuarezPM/Apohara_Context_Forge
+---
+
+# Apohara_Context_Forge Test Types
+
+## Action
+
+Write unit, integration tests to match project standards
+
+## Evidence
+
+- Test types detected: unit, integration
+- Coverage config: no
+
+---
+id: apohara_context_forge-instinct-file-naming
+trigger: "When creating a new Python file"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: SuarezPM/Apohara_Context_Forge
+---
+
+# Apohara_context_forge Instinct File Naming
+
+## Action
+
+Name the file using snake_case
+
+## Evidence
+
+- Pattern in files: apohara_context_forge, tests, demo, agents
+
+---
+id: apohara_context_forge-instinct-function-naming
+trigger: "When defining a new function"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: SuarezPM/Apohara_Context_Forge
+---
+
+# Apohara_context_forge Instinct Function Naming
+
+## Action
+
+Name the function using camelCase
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.functions
+
+---
+id: apohara_context_forge-instinct-class-naming
+trigger: "When defining a new class"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: SuarezPM/Apohara_Context_Forge
+---
+
+# Apohara_context_forge Instinct Class Naming
+
+## Action
+
+Name the class using PascalCase
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.classes
+
+---
+id: apohara_context_forge-instinct-constant-naming
+trigger: "When defining a constant"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: SuarezPM/Apohara_Context_Forge
+---
+
+# Apohara_context_forge Instinct Constant Naming
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.constants
+
+---
+id: apohara_context_forge-instinct-import-style
+trigger: "When importing modules within the package"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: SuarezPM/Apohara_Context_Forge
+---
+
+# Apohara_context_forge Instinct Import Style
+
+## Action
+
+Use relative imports
+
+## Evidence
+
+- Pattern in codeStyle.importStyle
+
+---
+id: apohara_context_forge-instinct-export-style
+trigger: "When exporting functions or classes from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: SuarezPM/Apohara_Context_Forge
+---
+
+# Apohara_context_forge Instinct Export Style
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- Pattern in codeStyle.exportStyle
+
+---
+id: apohara_context_forge-instinct-test-location
+trigger: "When adding or updating tests"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: SuarezPM/Apohara_Context_Forge
+---
+
+# Apohara_context_forge Instinct Test Location
+
+## Action
+
+Place test files in the separate 'tests' folder
+
+## Evidence
+
+- Pattern in architecture.folderStructure.testLocation
+
+---
+id: apohara_context_forge-instinct-test-types
+trigger: "When writing tests"
+confidence: 0.7
+domain: testing
+source: repo-analysis
+source_repo: SuarezPM/Apohara_Context_Forge
+---
+
+# Apohara_context_forge Instinct Test Types
+
+## Action
+
+Include both unit and integration tests
+
+## Evidence
+
+- Pattern in testing.testTypes
+
+---
+id: apohara_context_forge-instinct-test-naming
+trigger: "When naming test files"
+confidence: 0.6
+domain: testing
+source: repo-analysis
+source_repo: SuarezPM/Apohara_Context_Forge
+---
+
+# Apohara_context_forge Instinct Test Naming
+
+## Action
+
+Use the *.test.ts pattern
+
+## Evidence
+
+- Pattern in testing.filePattern
+
+---
+id: apohara_context_forge-instinct-commit-prefix
+trigger: "When making a commit related to tests"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: SuarezPM/Apohara_Context_Forge
+---
+
+# Apohara_context_forge Instinct Commit Prefix
+
+## Action
+
+Prefix the commit message with 'test:'
+
+## Evidence
+
+- Seen in commit: 'test: Add tests for dependency getters in mcp server'
+- Pattern in commits.prefixes
+
+---
+id: apohara_context_forge-instinct-commit-format
+trigger: "When writing a commit message"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: SuarezPM/Apohara_Context_Forge
+---
+
+# Apohara_context_forge Instinct Commit Format
+
+## Action
+
+Follow conventional commit format: <type>: <description>
+
+## Evidence
+
+- Pattern in commits.type: conventional
+- Seen in commit: 'test: Add tests for dependency getters in mcp server'
+
