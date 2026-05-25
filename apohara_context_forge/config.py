@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     contextforge_compression_rate: float = 0.5
     contextforge_min_tokens_to_compress: int = 100
 
+    # CompressionCoordinator decision thresholds (uppercase names are the
+    # contract asserted by tests/test_coordinator.py). CONTEXTFORGE_COMPRESSION_RATE
+    # mirrors contextforge_compression_rate; both default to 0.5.
+    COMPRESS_MIN_CONTEXT_TOKENS: int = 500
+    APC_REUSE_MIN_SHARED_PREFIX_TOKENS: int = 200
+    CONTEXTFORGE_COMPRESSION_RATE: float = 0.5
+
     # Models
     embedder_model: str = "all-MiniLM-L6-v2"
     compressor_model: str = "microsoft/llmlingua-2-xlm-roberta-large-meetingbank"
