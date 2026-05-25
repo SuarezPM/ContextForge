@@ -4,6 +4,7 @@ import logging
 import uvicorn
 
 from apohara_context_forge.config import settings
+from apohara_context_forge.metrics.collector import MetricsCollector
 from apohara_context_forge.mcp.server import app, metrics_loop
 
 logging.basicConfig(
