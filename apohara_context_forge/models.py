@@ -23,11 +23,16 @@ class ContextEntry(BaseModel):
 
 
 class ContextMatch(BaseModel):
-    """A semantic match between contexts."""
+    """A semantic match between contexts.
+
+    `shared_prefix_tokens` is the token length of the longest shared prefix
+    between the incoming context and this match. The CompressionCoordinator
+    uses it to choose apc_reuse vs compress.
+    """
     agent_id: str
     similarity: float
     shared_prefix: str
-    tokens_saved: int
+    shared_prefix_tokens: int
 
 
 class CompressionDecision(BaseModel):
