@@ -1,6 +1,7 @@
 """Sentence-transformers wrapper for async embedding generation."""
 import asyncio
 import logging
+from typing import Any
 
 from sentence_transformers import SentenceTransformer
 
