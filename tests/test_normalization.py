@@ -191,3 +191,20 @@ class TestNormalize:
 
         # Agents should be tracked (internal state)
         assert len(normalizer._registered_agents) == 2
+
+
+# --- compute_prompt_hash + factory type (merge of PRs #22 + #24) ---
+
+def test_compute_prompt_hash():
+    """compute_prompt_hash() returns the sha256 hex of the assembled prompt."""
+    import hashlib
+
+    normalizer = PrefixNormalizer(canonical_system_prompt="System prompt.")
+    prompt = normalizer.normalize("agent1", "User prompt.", "Role prompt.")
+    expected = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+    assert normalizer.compute_prompt_hash(prompt) == expected
+
+
+def test_create_prefix_normalizer_returns_instance():
+    """create_prefix_normalizer() returns a PrefixNormalizer instance."""
+    assert isinstance(create_prefix_normalizer(), PrefixNormalizer)
