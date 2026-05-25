@@ -152,6 +152,22 @@ class PreAttentionHook:
             jcr_risk = float(getattr(decision, "risk_score", 0.0))
         return jcr_dense, jcr_risk
 
+    def _attempt_anchor_routing(
+        self,
+        block_ids: list[str],
+        token_ids: list[int],
+        agent_role: str,
+        jcr_dense: Optional[bool],
+    ) -> Optional[dict]:
+        """Attempt cross-agent anchor routing (LSH). Returns match if found."""
+        if (
+            self._lsh_matcher is not None
+            and self._config.enable_anchor_routing
+            and jcr_dense is not True  # JCR dense path bypasses the registry
+        ):
+            return self._maybe_find_anchor(block_ids, token_ids, agent_role)
+        return None
+
     def _attempt_quantization(
         self,
         block_ids: list[str],
@@ -182,22 +198,6 @@ class PreAttentionHook:
                 layer_idx, type(exc).__name__,
             )
             return False
-
-    def _attempt_anchor_routing(
-        self,
-        block_ids: list[str],
-        token_ids: list[int],
-        agent_role: str,
-        jcr_dense: Optional[bool],
-    ) -> Optional[dict]:
-        """Attempt cross-agent anchor routing (LSH). Returns match if found."""
-        if (
-            self._lsh_matcher is not None
-            and self._config.enable_anchor_routing
-            and jcr_dense is not True  # JCR dense path bypasses the registry
-        ):
-            return self._maybe_find_anchor(block_ids, token_ids, agent_role)
-        return None
 
     def __call__(
         self,
