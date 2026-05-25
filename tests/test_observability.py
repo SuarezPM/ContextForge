@@ -144,3 +144,31 @@ async def test_audit_log_replay_preserves_order(tmp_path):
     assert len(records) == 10
     for idx, rec in enumerate(records):
         assert rec["seq"] == idx
+
+
+# ---------------------------------------------------------------------------
+# Test 7: record_agent_ttft handles extreme outliers (PR #6)
+# ---------------------------------------------------------------------------
+
+def test_record_agent_ttft_large_outlier():
+    """record_agent_ttft() handles extremely large outliers without throwing."""
+    from apohara_context_forge.metrics.prometheus_metrics import record_agent_ttft
+    from prometheus_client import REGISTRY
+
+    agent_id = "outlier-agent"
+    thinking_mode = "cot"
+    record_agent_ttft(agent_id=agent_id, thinking_mode=thinking_mode, ttft_ms=1e9)
+
+    found = False
+    for fam in REGISTRY.collect():
+        if fam.name == "contextforge_agent_ttft_ms":
+            for s in fam.samples:
+                if (
+                    s.name == "contextforge_agent_ttft_ms_bucket"
+                    and s.labels.get("agent_id") == agent_id
+                    and s.labels.get("thinking_mode") == thinking_mode
+                    and s.labels.get("le") == "+Inf"
+                ):
+                    assert s.value > 0
+                    found = True
+    assert found, "Expected a +Inf bucket entry for the outlier"
