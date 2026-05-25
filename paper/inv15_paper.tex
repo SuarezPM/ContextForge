@@ -387,7 +387,7 @@ $\Risk : \mathcal{A} \times \mathbb{Z}_{\geq 0} \times [0,1] \times \{0,1\}
 \begin{align}
   \Risk(\mathbf{x}) \;=\; \min\Big(1,\;
     & b(\rho)
-      + \alpha_n\,\mathbb{1}[\Cand \geq 3] \nonumber \\[-2pt]
+      + \alpha_n\,\max(\Cand - 2,\, 0) \nonumber \\[-2pt]
     & + \alpha_s\,\Shuf
       + \alpha_u\,\mathbb{1}[\Reuse > 0.8]
     \Big),
@@ -402,8 +402,9 @@ where
   \end{cases}
   \label{eq:base}
 \end{equation}
-with coefficients $b_J = 0.6$, $b_O = 0.1$, $\alpha_n = 0.2$,
-$\alpha_s = 0.2$, $\alpha_u = 0.1$. The cap at $1.0$ ensures the score is
+with coefficients $b_J = 0.6$, $b_O = 0.1$, $\alpha_n = 0.10$,
+$\alpha_s = 0.20$, $\alpha_u = 0.15$. The $\alpha_n$ term scales linearly with
+each candidate beyond two. The cap at $1.0$ ensures the score is
 a proper risk index. We define \INV{15} as the following safety
 contract:
 
@@ -445,7 +446,7 @@ the KV registry is queried.
 \Ensure \texttt{use\_dense\_prefill} $\in \{\textsc{true}, \textsc{false}\}$
 \State $r \gets b_O$
 \If{$\rho \in \Judge$} $r \gets b_J$ \EndIf
-\If{$\Cand \geq 3$} $r \gets r + \alpha_n$ \EndIf
+\If{$\Cand > 2$} $r \gets r + \alpha_n \cdot (\Cand - 2)$ \EndIf
 \If{$\Shuf = 1$} $r \gets r + \alpha_s$ \EndIf
 \If{$\Reuse > 0.8$} $r \gets r + \alpha_u$ \EndIf
 \State $r \gets \min(r, 1.0)$
@@ -497,13 +498,17 @@ is $O(1)$ in the number of agents and is independent of context length.
 We fix $\tau = 0.7$ as the default. The choice can be justified on three
 grounds:
 \begin{enumerate}
-  \item \textbf{Coverage.} Every combination of $(\rho \in \Judge,
-        \Cand \geq 3, \Shuf = 1)$ produces $r \geq 0.6 + 0.2 + 0.2 = 1.0$,
-        comfortably above $0.7$. Every combination of
-        $(\rho \in \Judge, \Cand \geq 3)$ alone produces $r = 0.8 > 0.7$.
-        Combinations with at most one risk factor (e.g.\ judge with two
-        candidates and no shuffle) produce $r = 0.6 < 0.7$, falling
-        through the gate.
+  \item \textbf{Coverage.} A judge-class agent ($\rho \in \Judge$) starts at
+        $b_J = 0.6$ and crosses $\tau = 0.7$ once it accumulates more than
+        $0.1$ of additional risk. A shuffled layout alone adds $0.20$
+        ($r = 0.80 > 0.7$); high reuse alone adds $0.15$ ($r = 0.75 > 0.7$);
+        candidate growth adds $0.10$ each beyond two, so $\Cand \geq 4$
+        alone suffices ($r = 0.80$) while $\Cand = 3$ sits exactly at $0.70$
+        and falls through (strict $>$). A combination such as
+        $(\rho \in \Judge, \Cand \geq 3, \Shuf = 1)$ produces
+        $r \geq 0.90$. Judge-class invocations with no risk factor
+        ($\leq 2$ candidates, no shuffle, low reuse) produce
+        $r = 0.6 < 0.7$, falling through the gate.
   \item \textbf{Empirical alignment.} The high-risk regimes in
         \cite{jcrfailure} (3+ candidates, shuffled layout, or
         $>80\,\%$ reuse) correspond to JCR drops of $\geq 10\,\%$. The
@@ -697,8 +702,9 @@ $5 \times 11 \times 11 \times 2 / 5 = 242$ Critic invocations in the
 sweep, this rate is $0.851$\textemdash i.e.\ $85\,\%$ of the Critic's
 input space produces a risk score above $\tau$ under the V6.1
 coefficient choice. The remaining $15\,\%$ are corners with
-$\Cand \leq 2$ and $\Reuse \leq 0.8$ and $\Shuf = 0$, where the gate
-correctly permits cache reuse.
+$\Cand \leq 3$ and $\Reuse \leq 0.8$ and $\Shuf = 0$, where the gate
+correctly permits cache reuse (at $\Cand = 3$, no shuffle and low reuse,
+$r = 0.70$ sits exactly at $\tau$ and falls through under strict $>$).
 
 \subsection{Gate Overhead}
 \label{sec:eval:overhead}
@@ -857,7 +863,7 @@ scenarios PASS. The live $5$-agent demo on the same hardware reports
 \textbf{$79.85\,\%$ token savings} ($263 \to 53$ tokens), an average
 TTFT of $23.78\,\mathrm{ms}$ per agent, and the Critic correctly
 routed through dense prefill. The unit test suite of ContextForge
-passes $310/310$ with zero failures, including the rewritten suite
+passes with zero failures ($423$ passed, $0$ failed), including the rewritten suite
 for the speculative coordinator after the V6.1 INV-12 restoration
 (an early V6.0 implementation fabricated $q_i$ from a calibration
 knob, breaking INV-12 mathematically; V6.1 added a
@@ -885,8 +891,8 @@ $\min(1, p_i / q_i)$ identity).
         & $6 / 6$
         & Poisson $n{=}1{,}000$, three M/G/1 service distributions \\
     Unit tests passed
-        & $310 / 310$
-        & Includes the rewritten speculative-coordinator suite \\
+        & $423$ passed, $25$ skipped
+        & Rewritten speculative-coordinator suite + judge-class \INV{15} tests \\
     Failed tests
         & $0$
         & \\
@@ -1087,15 +1093,15 @@ Microsoft Research's Z3 solver~\cite{demoura2008z3}.
 \label{ssec:z3-model}
 
 We encode each input of \code{JCRSafetyGate.gate\_decision} as a
-typed Z3 variable: \texttt{agent\_role\_critic} as
-\code{z3.Bool}, \texttt{candidate\_count} as \code{z3.Int} (with
+typed Z3 variable: \texttt{agent\_role\_judge} (true iff
+$\rho \in \Judge$) as \code{z3.Bool}, \texttt{candidate\_count} as \code{z3.Int} (with
 the domain constraint $\Cand \geq 0$), \texttt{reuse\_rate} as
 \code{z3.Real} on $[0, 1]$, and \texttt{layout\_shuffled} as
 \code{z3.Bool}. The risk score follows Eq.~\ref{eq:risk} term for
 term, mirroring the constants in
 \code{apohara\_context\_forge.safety.jcr\_gate.py}:
 \begin{align*}
-  b(\rho)            &= \mathtt{If}(\mathtt{role\_critic},\,
+  b(\rho)            &= \mathtt{If}(\mathtt{role\_judge},\,
                        0.6,\,0.1) \\
   \delta_n(\Cand)    &= \mathtt{If}(\Cand > 2,\,
                        (\Cand - 2) \cdot 0.10,\, 0) \\
@@ -1108,7 +1114,7 @@ term, mirroring the constants in
   \Risk(\mathbf{x})  &= \mathrm{clamp}(r_{\mathrm{raw}}, 0, 1)
 \end{align*}
 The dense-prefill mandate is encoded as the conjunction
-$d \;=\; \mathtt{role\_critic} \,\wedge\,
+$d \;=\; \mathtt{role\_judge} \,\wedge\,
  (\Risk > \tau)$, with $\tau = 0.7$, using strict inequality to
 match the production gate's \texttt{risk > threshold} guard.
 
@@ -1119,7 +1125,7 @@ match the production gate's \texttt{risk > threshold} guard.
 \emph{For every assignment of
 $(\rho, \Cand, \Reuse, \Shuf)$ satisfying}
 \[
-  \rho = \textsc{critic} \;\land\; \Cand \geq 9 \;\land\;
+  \rho \in \Judge \;\land\; \Cand \geq 9 \;\land\;
   \Reuse = 0 \;\land\; \Shuf = \textsc{true},
 \]
 \emph{the gate's decision $d = \texttt{use\_dense\_prefill}$
@@ -1133,7 +1139,7 @@ runs, z3-solver $4.16.0$). Therefore no counterexample exists in
 the modeled domain. By inspection, the canonical antecedent forces
 $r_{\mathrm{raw}} = 0.6 + 0.10 \cdot (9 - 2) + 0.20 + 0 = 1.5$,
 which clamps to $1.0$ and exceeds $\tau = 0.7$; the
-\texttt{role\_critic} conjunct holds by assumption. Hence
+\texttt{role\_judge} conjunct holds by assumption. Hence
 $d = \textsc{true}$, contradicting the asserted
 $d = \textsc{false}$. $\square$
 
