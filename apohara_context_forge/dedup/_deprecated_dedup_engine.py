@@ -13,9 +13,7 @@ warnings.warn(
     DeprecationWarning,
     stacklevel=2
 )
-import asyncio
 import logging
-from typing import Literal
 
 from apohara_context_forge.dedup.embedder import Embedder
 
