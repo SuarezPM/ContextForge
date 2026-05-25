@@ -20,10 +20,9 @@ from apohara_context_forge.kv_offset.anchor_pool import AnchorPool
 from apohara_context_forge.metrics.prometheus_metrics import (
     cache_hits,
     cache_misses,
-    cache_registry_size,
     cache_evictions_total,
 )
-from apohara_context_forge.models import ContextEntry, ContextMatch
+from apohara_context_forge.models import ContextEntry
 from apohara_context_forge.registry.vram_aware_cache import VRAMAwareCache
 from apohara_context_forge.token_counter import TokenCounter
 
@@ -283,13 +282,15 @@ class ContextRegistry:
 
         results: list[SharedContextResult] = []
 
-        # For each agent, find matches in other agents
-        for agent in agents_to_search:
+        if self._embedding_engine is None:
+            self._embedding_engine = await EmbeddingEngine.get_instance(dim=512, use_onnx=True)
+
+        async def _process_agent(agent) -> Optional[SharedContextResult]:
             # Get full context for LSH matching
             cache_key = f"context:{agent.agent_id}"
             cache_val = await self._vram_cache.get(cache_key)
             if not cache_val:
-                continue
+                return None
 
             full_context = cache_val["full_context"]
             system_prompt = cache_val["system_prompt"]
@@ -310,15 +311,13 @@ class ContextRegistry:
 
             if not valid_matches:
                 cache_misses.labels(agent_id=agent.agent_id).inc()
-                continue
+                return None
 
             avg_hamming = total_hamming / len(valid_matches)
             reuse_confidence = 1.0 - (avg_hamming / self._lsh._hash_bits)
 
             # Get FAISS ANN candidates for the system prompt
             # Use real embedding from EmbeddingEngine (replaces pseudo-embedding)
-            if self._embedding_engine is None:
-                self._embedding_engine = await EmbeddingEngine.get_instance(dim=512, use_onnx=True)
             system_embedding = await self._embedding_engine.encode(system_prompt)
             faiss_matches = await self._faiss.search(
                 system_embedding.tolist(),
@@ -351,7 +350,7 @@ class ContextRegistry:
                     offset_vector = offset_result.placeholder_offset
 
             # Populate offset_hints — this field was ALWAYS empty in V3
-            result = SharedContextResult(
+            res = SharedContextResult(
                 agent_id=agent.agent_id,
                 shared_blocks=valid_matches,
                 faiss_matches=faiss_matches,
@@ -359,14 +358,20 @@ class ContextRegistry:
                 reuse_confidence=reuse_confidence,
             )
             if offset_vector is not None:
-                result.offset_hints[agent.agent_id] = offset_vector.tolist()
-
-            results.append(result)
+                res.offset_hints[agent.agent_id] = offset_vector.tolist()
 
             cache_hits.labels(
                 agent_id=agent.agent_id,
                 segment_type="system_prompt",
             ).inc()
+
+            return res
+
+        # Process all agents concurrently
+        gathered = await asyncio.gather(*[_process_agent(agent) for agent in agents_to_search])
+        for r in gathered:
+            if r is not None:
+                results.append(r)
 
         # Sort by reuse confidence descending
         results.sort(key=lambda r: r.reuse_confidence, reverse=True)
@@ -457,7 +462,6 @@ class ContextRegistry:
     @staticmethod
     def _sha256_prefix(text: str) -> str:
         """SHA256 of text for prefix validation."""
-        import hashlib
         return hashlib.sha256(text.encode()).hexdigest()
 
     @property
