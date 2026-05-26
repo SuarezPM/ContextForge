@@ -24,11 +24,16 @@ class Ledger:
             with self._path.open("r", encoding="utf-8") as fh:
                 for line in fh:
                     line = line.strip()
-                    if line:
+                    if not line:
+                        continue
+                    try:                       # skip corrupt lines; verify() is the integrity check
                         last = json.loads(line)["entry_hash"]
+                    except (json.JSONDecodeError, KeyError):
+                        continue
         return last
 
     def append(self, payload: dict) -> dict:
+        """Append a payload, chaining its hash to the current head; returns the entry."""
         prev = self._last_hash()
         entry = {"prev_hash": prev, "entry_hash": _entry_hash(prev, payload), "payload": payload}
         with self._path.open("a", encoding="utf-8") as fh:
@@ -36,6 +41,7 @@ class Ledger:
         return entry
 
     def verify(self) -> dict:
+        """Walk the chain; an unparseable, malformed, or mis-hashed line is a break."""
         prev, n, broken = GENESIS, 0, None
         if self._path.exists():
             with self._path.open("r", encoding="utf-8") as fh:
@@ -43,9 +49,14 @@ class Ledger:
                     line = line.strip()
                     if not line:
                         continue
-                    e = json.loads(line)
-                    if e.get("prev_hash") != prev or e.get("entry_hash") != _entry_hash(prev, e["payload"]):
-                        broken = i; break
+                    try:
+                        e = json.loads(line)
+                        bad = e["prev_hash"] != prev or e["entry_hash"] != _entry_hash(prev, e["payload"])
+                    except (json.JSONDecodeError, KeyError, TypeError):
+                        bad = True
+                    if bad:
+                        broken = i
+                        break
                     prev, n = e["entry_hash"], n + 1
         return {"valid": broken is None, "entries": n, "broken_at": broken, "head": prev}
 
@@ -53,5 +64,9 @@ class Ledger:
         if self._path.exists():
             with self._path.open("r", encoding="utf-8") as fh:
                 for line in fh:
-                    if line.strip():
+                    if not line.strip():
+                        continue
+                    try:                       # skip corrupt lines; verify() is the integrity check
                         yield json.loads(line)
+                    except json.JSONDecodeError:
+                        continue

@@ -17,3 +17,19 @@ def test_tamper_is_detected(tmp_path):
     lines[0] = json.dumps(rec); p.write_text("\n".join(lines) + "\n")
     v = Ledger(p).verify()
     assert v["valid"] is False and v["broken_at"] == 0
+
+def test_corrupt_line_is_a_break_not_a_crash(tmp_path):
+    p = tmp_path / "led.jsonl"; led = Ledger(p)
+    led.append({"a": 1}); led.append({"a": 2})
+    with p.open("a", encoding="utf-8") as fh:
+        fh.write("}{ not valid json\n")
+    v = Ledger(p).verify()                 # must NOT raise
+    assert v["valid"] is False and v["broken_at"] == 2
+
+def test_broken_prev_link_detected(tmp_path):
+    p = tmp_path / "led.jsonl"; led = Ledger(p)
+    led.append({"a": 1}); led.append({"a": 2})
+    lines = p.read_text().splitlines()
+    rec = json.loads(lines[1]); rec["prev_hash"] = "f" * 64
+    lines[1] = json.dumps(rec); p.write_text("\n".join(lines) + "\n")
+    assert Ledger(p).verify()["broken_at"] == 1
