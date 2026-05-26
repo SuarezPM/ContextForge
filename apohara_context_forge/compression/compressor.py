@@ -41,14 +41,15 @@ class ContextCompressor:
         
         def sync_compress():
             assert self._model is not None
-            # LLMLingua-2 (xlm-roberta) caps at 512 tokens; chunk long inputs
-            # (~300 words < 512 tokens) and compress each chunk, else it raises
-            # an index error on sequences beyond the model maximum.
+            # LLMLingua-2 (xlm-roberta) caps at 512 tokens; dense technical text
+            # can reach ~1.8 tokens/word, so chunk at 160 words (~290 tokens,
+            # safe margin) and compress each chunk, else it raises an index
+            # error on sequences beyond the model maximum.
             words = context.split()
-            if len(words) <= 300:
+            if len(words) <= 160:
                 chunks = [context]
             else:
-                chunks = [" ".join(words[i:i + 300]) for i in range(0, len(words), 300)]
+                chunks = [" ".join(words[i:i + 160]) for i in range(0, len(words), 160)]
             parts = []
             for ch in chunks:
                 res = self._model.compress_prompt(
