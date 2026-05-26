@@ -17,19 +17,27 @@ log() { echo "$@" | tee -a "$L"; }
 
 log "=== RUN_ALL START $(S) on $(hostname) ==="
 
-# --- full suite deps. --no-cache-dir avoids the pip-22 "Memoryview is too
-#     large" crash when caching >2GB wheels (torch / transformers). ---
-log "[deps] installing requirements.txt + test deps $(S)"
-$PY -m pip install --user --no-cache-dir -r requirements.txt >>"$L" 2>&1 \
-  && log "[deps] requirements.txt OK" || log "[deps] requirements.txt WARN nonzero"
-$PY -m pip install --user --no-cache-dir pytest pytest-asyncio pytest-json-report z3-solver \
-  >>"$L" 2>&1 && log "[deps] test deps OK" || log "[deps] test deps WARN nonzero"
-
-# --- override torch with the ROCm build for real MI300X GPU steps (S4).
-#     requirements.txt pins CPU torch <2.6; this installs 2.x+rocm6.3. ---
-log "[torch] installing ROCm build (--no-cache-dir) $(S)"
+# --- ordered, backtrack-free install. --no-cache-dir avoids the pip-22
+#     "Memoryview is too large" crash on >2GB wheels. Installing the full
+#     requirements.txt at once makes pip's resolver backtrack for minutes
+#     (llmlingua + sentence-transformers + torch pin), so we install in
+#     groups: torch-ROCm first (pinned by index), then core, then heavy. ---
+log "[torch] ROCm build $(S)"
 $PY -m pip install --user --no-cache-dir torch --index-url https://download.pytorch.org/whl/rocm6.3 \
-  >>logs/torch_install.log 2>&1 && log "[torch] ROCm install OK" || log "[torch] ROCm install FAILED"
+  >>logs/torch_install.log 2>&1 && log "[torch] ROCm OK" || log "[torch] ROCm FAILED"
+
+log "[deps] core (no heavy ML; resolves instantly) $(S)"
+$PY -m pip install --user --no-cache-dir \
+  numpy "pydantic>=2.9,<3" pydantic-settings httpx aiofiles rich psutil \
+  faiss-cpu prometheus-client fastapi "uvicorn[standard]" \
+  pytest pytest-asyncio pytest-json-report z3-solver \
+  >>"$L" 2>&1 && log "[deps] core OK" || log "[deps] core WARN"
+
+# Heavy ML deps isolated + time-bounded; the suite proceeds without them if
+# they stall (the relevant tests will then error, reported honestly).
+log "[deps] heavy ML (llmlingua, sentence-transformers) $(S)"
+timeout 600 $PY -m pip install --user --no-cache-dir llmlingua sentence-transformers \
+  >>logs/heavy_deps.log 2>&1 && log "[deps] heavy OK" || log "[deps] heavy SKIPPED/FAILED"
 $PY -c "import torch; print('torch', torch.__version__, 'hip', getattr(torch.version,'hip',None), 'devs', torch.cuda.device_count())" \
   2>&1 | tee -a "$L" || log "[torch] still unavailable — GPU steps will skip"
 
