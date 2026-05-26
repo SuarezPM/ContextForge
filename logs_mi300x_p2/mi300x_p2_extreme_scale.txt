@@ -1,0 +1,6 @@
+seq= 65536 nh=32 hd=128 fwht=False baseline= 1.07GB packed= 0.30GB reduction= 3.55x dur=  21.7s
+seq=131072 nh=32 hd=128 fwht=False baseline= 2.15GB packed= 0.60GB reduction= 3.56x dur=  43.2s
+seq= 65536 nh=32 hd=256 fwht=False baseline= 2.15GB packed= 0.60GB reduction= 3.55x dur=  43.1s
+seq=262144 nh=16 hd=128 fwht=False baseline= 2.15GB packed= 0.60GB reduction= 3.56x dur=  43.3s
+
+Wrote logs/mi300x_extreme_scale_1779813388.json

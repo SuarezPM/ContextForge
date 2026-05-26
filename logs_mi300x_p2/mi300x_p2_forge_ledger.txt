@@ -1,0 +1,94 @@
+{
+  "artifact": "FORGE-LEDGER MI300X hardware proof (S3)",
+  "timestamp_utc": "2026-05-26T16:31:09Z",
+  "host": {
+    "hostname": "enc1-gpuvm008",
+    "platform": "Linux-5.15.0-170-generic-x86_64-with-glibc2.35",
+    "python": "3.10.12",
+    "z3_version": "4.16.0"
+  },
+  "sweep": {
+    "roles": [
+      "planner",
+      "researcher",
+      "executor",
+      "critic",
+      "judge"
+    ],
+    "candidate_counts": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "reuse_rates": [
+      0.0,
+      0.1,
+      0.2,
+      0.3,
+      0.4,
+      0.5,
+      0.6,
+      0.7,
+      0.8,
+      0.9,
+      1.0
+    ],
+    "layout_shuffled": [
+      false,
+      true
+    ],
+    "expected_points": 1210,
+    "decisions_driven": 1210,
+    "ledger_entries": 1210
+  },
+  "integrity": {
+    "cli_verify_exit_code": 0,
+    "cli_verify_result": {
+      "valid": true,
+      "entries": 1210,
+      "broken_at": null,
+      "head": "9e83df6ad4968eb7c6285b7db7abc261a51b2fa16a6a4d89c3cf8e4031f93685"
+    },
+    "chain_verify_seconds": 0.2419,
+    "ledger_bytes": 613534,
+    "bytes_per_entry": 507.1
+  },
+  "tamper_demo": {
+    "flipped_byte_offset": 368120,
+    "cli_verify_exit_code": 2,
+    "cli_verify_result": {
+      "valid": false,
+      "entries": 719,
+      "broken_at": 719,
+      "head": "7134cae2b82ff3bcff54e010319e768a6c84767b52b45b2af3744a405c0b4084"
+    }
+  },
+  "z3_certification": {
+    "all_satisfies_inv15": true,
+    "satisfies_count": 1210,
+    "z3_unsat_count": 1210,
+    "observed_use_dense_count": 412,
+    "gate_block_count": 412,
+    "latency_ms": {
+      "mean": 0.2251,
+      "p50": 0.221,
+      "p99": 0.254,
+      "max": 0.374,
+      "min": 0.204
+    }
+  },
+  "throughput": {
+    "end_to_end_wall_seconds": 4.9793,
+    "certs_per_second_end_to_end": 243.0
+  }
+}
+
+PROOF_OK=True  entries=1210/1210  verify_exit=0  tamper_exit=2

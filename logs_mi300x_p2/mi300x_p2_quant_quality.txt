@@ -1,0 +1,7 @@
+Hardware: rocm-hip:6.3.42134-a9a80e791:AMD Instinct MI300X VF
+fp16 baseline: mse_k=4.31e-08 max_err=1.95e-03 bytes=268435456
+int8 naive:    mse_k=3.44e-05 max_err=1.73e-02 bytes=142606336 red=1.88x
+int4 use_fwht=False: mse_k=1.01e-02 max_err=3.25e-01 bytes=75563008 red=3.55x dur=63951ms
+int4 use_fwht=True: mse_k=2.01e+00 max_err=8.49e+00 bytes=75563008 red=3.55x dur=69177ms
+
+Wrote logs/mi300x_quant_quality_1779813216.json

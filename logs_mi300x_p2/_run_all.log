@@ -1,0 +1,150 @@
+=== RUN_ALL START 2026-05-26T16:25:04Z on enc1-gpuvm008 ===
+[torch] ROCm build 2026-05-26T16:25:04Z
+[torch] ROCm OK
+[deps] core (no heavy ML; resolves instantly) 2026-05-26T16:27:03Z
+Requirement already satisfied: numpy in /home/hotaisle/.local/lib/python3.10/site-packages (2.2.6)
+Requirement already satisfied: pydantic<3,>=2.9 in /home/hotaisle/.local/lib/python3.10/site-packages (2.13.4)
+Requirement already satisfied: pydantic-settings in /home/hotaisle/.local/lib/python3.10/site-packages (2.14.1)
+Collecting httpx
+  Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 73.5/73.5 KB 3.8 MB/s eta 0:00:00
+Requirement already satisfied: aiofiles in /home/hotaisle/.local/lib/python3.10/site-packages (25.1.0)
+Collecting rich
+  Downloading rich-15.0.0-py3-none-any.whl (310 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 310.7/310.7 KB 10.4 MB/s eta 0:00:00
+Collecting psutil
+  Downloading psutil-7.2.2-cp36-abi3-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl (155 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 155.6/155.6 KB 14.4 MB/s eta 0:00:00
+Requirement already satisfied: faiss-cpu in /home/hotaisle/.local/lib/python3.10/site-packages (1.14.2)
+Requirement already satisfied: prometheus-client in /home/hotaisle/.local/lib/python3.10/site-packages (0.25.0)
+Collecting fastapi
+  Downloading fastapi-0.136.3-py3-none-any.whl (117 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 117.5/117.5 KB 18.2 MB/s eta 0:00:00
+Collecting uvicorn[standard]
+  Downloading uvicorn-0.48.0-py3-none-any.whl (71 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 71.4/71.4 KB 32.6 MB/s eta 0:00:00
+Requirement already satisfied: pytest in /home/hotaisle/.local/lib/python3.10/site-packages (9.0.3)
+Requirement already satisfied: pytest-asyncio in /home/hotaisle/.local/lib/python3.10/site-packages (1.4.0)
+Requirement already satisfied: pytest-json-report in /home/hotaisle/.local/lib/python3.10/site-packages (1.5.0)
+Requirement already satisfied: z3-solver in /home/hotaisle/.local/lib/python3.10/site-packages (4.16.0.0)
+Requirement already satisfied: annotated-types>=0.6.0 in /home/hotaisle/.local/lib/python3.10/site-packages (from pydantic<3,>=2.9) (0.7.0)
+Requirement already satisfied: typing-extensions>=4.14.1 in /home/hotaisle/.local/lib/python3.10/site-packages (from pydantic<3,>=2.9) (4.15.0)
+Requirement already satisfied: pydantic-core==2.46.4 in /home/hotaisle/.local/lib/python3.10/site-packages (from pydantic<3,>=2.9) (2.46.4)
+Requirement already satisfied: typing-inspection>=0.4.2 in /home/hotaisle/.local/lib/python3.10/site-packages (from pydantic<3,>=2.9) (0.4.2)
+Requirement already satisfied: python-dotenv>=0.21.0 in /home/hotaisle/.local/lib/python3.10/site-packages (from pydantic-settings) (1.2.2)
+Requirement already satisfied: certifi in /usr/lib/python3/dist-packages (from httpx) (2020.6.20)
+Collecting anyio
+  Downloading anyio-4.13.0-py3-none-any.whl (114 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 114.4/114.4 KB 18.7 MB/s eta 0:00:00
+Requirement already satisfied: idna in /usr/lib/python3/dist-packages (from httpx) (3.3)
+Collecting httpcore==1.*
+  Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 78.8/78.8 KB 29.9 MB/s eta 0:00:00
+Collecting h11>=0.16
+  Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+Collecting markdown-it-py>=2.2.0
+  Downloading markdown_it_py-4.2.0-py3-none-any.whl (91 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 91.7/91.7 KB 19.3 MB/s eta 0:00:00
+Requirement already satisfied: pygments<3.0.0,>=2.13.0 in /home/hotaisle/.local/lib/python3.10/site-packages (from rich) (2.20.0)
+Requirement already satisfied: packaging in /home/hotaisle/.local/lib/python3.10/site-packages (from faiss-cpu) (26.2)
+Collecting starlette>=0.46.0
+  Downloading starlette-1.1.0-py3-none-any.whl (72 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 72.9/72.9 KB 36.1 MB/s eta 0:00:00
+Collecting annotated-doc>=0.0.2
+  Downloading annotated_doc-0.0.4-py3-none-any.whl (5.3 kB)
+Requirement already satisfied: click>=7.0 in /usr/lib/python3/dist-packages (from uvicorn[standard]) (8.0.3)
+Collecting websockets>=10.4
+  Downloading websockets-16.0-cp310-cp310-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (183 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 183.8/183.8 KB 17.0 MB/s eta 0:00:00
+Collecting uvloop>=0.15.1
+  Downloading uvloop-0.22.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (3.7 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.7/3.7 MB 31.8 MB/s eta 0:00:00
+Collecting httptools>=0.6.3
+  Downloading httptools-0.8.0-cp310-cp310-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (450 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 450.0/450.0 KB 70.5 MB/s eta 0:00:00
+Collecting watchfiles>=0.20
+  Downloading watchfiles-1.2.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (457 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 457.1/457.1 KB 68.8 MB/s eta 0:00:00
+Requirement already satisfied: pyyaml>=5.1 in /usr/lib/python3/dist-packages (from uvicorn[standard]) (5.4.1)
+Requirement already satisfied: exceptiongroup>=1 in /home/hotaisle/.local/lib/python3.10/site-packages (from pytest) (1.3.1)
+Requirement already satisfied: tomli>=1 in /home/hotaisle/.local/lib/python3.10/site-packages (from pytest) (2.4.1)
+Requirement already satisfied: iniconfig>=1.0.1 in /home/hotaisle/.local/lib/python3.10/site-packages (from pytest) (2.3.0)
+Requirement already satisfied: pluggy<2,>=1.5 in /home/hotaisle/.local/lib/python3.10/site-packages (from pytest) (1.6.0)
+Requirement already satisfied: backports-asyncio-runner<2,>=1.1 in /home/hotaisle/.local/lib/python3.10/site-packages (from pytest-asyncio) (1.2.0)
+Requirement already satisfied: pytest-metadata in /home/hotaisle/.local/lib/python3.10/site-packages (from pytest-json-report) (3.1.1)
+Collecting mdurl~=0.1
+  Downloading mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+Installing collected packages: websockets, uvloop, psutil, mdurl, httptools, h11, annotated-doc, uvicorn, markdown-it-py, httpcore, anyio, watchfiles, starlette, rich, httpx, fastapi
+  WARNING: The script websockets is installed in '/home/hotaisle/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The script uvicorn is installed in '/home/hotaisle/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The script markdown-it is installed in '/home/hotaisle/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The script watchfiles is installed in '/home/hotaisle/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The script httpx is installed in '/home/hotaisle/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The script fastapi is installed in '/home/hotaisle/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+Successfully installed annotated-doc-0.0.4 anyio-4.13.0 fastapi-0.136.3 h11-0.16.0 httpcore-1.0.9 httptools-0.8.0 httpx-0.28.1 markdown-it-py-4.2.0 mdurl-0.1.2 psutil-7.2.2 rich-15.0.0 starlette-1.1.0 uvicorn-0.48.0 uvloop-0.22.1 watchfiles-1.2.0 websockets-16.0
+[deps] core OK
+[deps] heavy ML (llmlingua, sentence-transformers) 2026-05-26T16:27:08Z
+[deps] heavy OK
+torch 2.9.1+rocm6.3 hip 6.3.42134-a9a80e791 devs 1
+[env] GPU_available=1
+=== S2 pytest full suite 2026-05-26T16:27:37Z ===
+[S2] pytest exit=0 ; tail:
+  /home/hotaisle/Apohara_Context_Forge/tests/test_lmcache_bridge.py:21: DeprecationWarning: LMCacheConnectorV1 is deprecated and was always a stub; use LMCacheConnectorV2 from apohara_context_forge.serving.lmcache_connector instead. See AUDIT.md item 12 (US-002 bug 6).
+    bridge = LMCacheConnectorV1(lmcache_client=object())
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+441 passed, 25 skipped, 3 warnings in 203.29s (0:03:23)
+=== S3 FORGE-LEDGER proof 2026-05-26T16:31:04Z ===
+[S3] proof exit=0 ; tail:
+    "end_to_end_wall_seconds": 4.9793,
+    "certs_per_second_end_to_end": 243.0
+  }
+}
+
+PROOF_OK=True  entries=1210/1210  verify_exit=0  tamper_exit=2
+=== S4 mi300x_quant_quality 2026-05-26T16:31:09Z ===
+[S4:quant_quality] exit=0 ; tail:
+fp16 baseline: mse_k=4.31e-08 max_err=1.95e-03 bytes=268435456
+int8 naive:    mse_k=3.44e-05 max_err=1.73e-02 bytes=142606336 red=1.88x
+int4 use_fwht=False: mse_k=1.01e-02 max_err=3.25e-01 bytes=75563008 red=3.55x dur=63951ms
+int4 use_fwht=True: mse_k=2.01e+00 max_err=8.49e+00 bytes=75563008 red=3.55x dur=69177ms
+
+Wrote logs/mi300x_quant_quality_1779813216.json
+=== S4 mi300x_hbm3_bandwidth 2026-05-26T16:33:37Z ===
+[S4:hbm3_bandwidth] exit=0 ; tail:
+size= 64.0 GB: copy= 3677.3 GB/s triad= 3768.1 GB/s
+
+Best triad: 3790.5 GB/s = 3.79 TB/s
+Vs advertised 5.3 TB/s peak: 71.5% efficiency
+
+Wrote logs/mi300x_hbm3_bandwidth_1779813225.json
+=== S4 mi300x_extreme_scale 2026-05-26T16:33:47Z ===
+[S4:extreme_scale] exit=0 ; tail:
+seq= 65536 nh=32 hd=128 fwht=False baseline= 1.07GB packed= 0.30GB reduction= 3.55x dur=  21.7s
+seq=131072 nh=32 hd=128 fwht=False baseline= 2.15GB packed= 0.60GB reduction= 3.56x dur=  43.2s
+seq= 65536 nh=32 hd=256 fwht=False baseline= 2.15GB packed= 0.60GB reduction= 3.55x dur=  43.1s
+seq=262144 nh=16 hd=128 fwht=False baseline= 2.15GB packed= 0.60GB reduction= 3.56x dur=  43.3s
+
+Wrote logs/mi300x_extreme_scale_1779813388.json
+STATUS 2026-05-26T16:36:30Z host=enc1-gpuvm008
+GPU_available=1
+S2_pytest: 441 passed, 25 skipped, 3 warnings in 203.29s (0:03:23)
+S3_proof: PROOF_OK=True  entries=1210/1210  verify_exit=0  tamper_exit=2
+S4_logs:
+logs/mi300x_extreme_scale_1778627987.json
+logs/mi300x_extreme_scale_1778977872.json
+logs/mi300x_extreme_scale_1779813388.json
+logs/mi300x_hbm3_bandwidth_1778624598.json
+logs/mi300x_hbm3_bandwidth_1778973430.json
+logs/mi300x_hbm3_bandwidth_1779813225.json
+logs/mi300x_quant_quality_1778626233.json
+logs/mi300x_quant_quality_1778978012.json
+logs/mi300x_quant_quality_1779813216.json
+=== RUN_ALL DONE 2026-05-26T16:36:30Z ===
+ALL_DONE_SENTINEL

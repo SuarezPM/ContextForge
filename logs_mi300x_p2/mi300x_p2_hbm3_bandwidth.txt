@@ -1,0 +1,11 @@
+Hardware: rocm-hip:6.3.42134-a9a80e791:AMD Instinct MI300X VF
+
+size=  1.0 GB: copy= 2924.7 GB/s triad=  893.6 GB/s
+size=  4.0 GB: copy= 3610.3 GB/s triad= 3780.9 GB/s
+size= 16.0 GB: copy= 3667.7 GB/s triad= 3790.5 GB/s
+size= 64.0 GB: copy= 3677.3 GB/s triad= 3768.1 GB/s
+
+Best triad: 3790.5 GB/s = 3.79 TB/s
+Vs advertised 5.3 TB/s peak: 71.5% efficiency
+
+Wrote logs/mi300x_hbm3_bandwidth_1779813225.json

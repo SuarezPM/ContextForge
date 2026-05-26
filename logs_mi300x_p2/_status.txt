@@ -1,0 +1,14 @@
+STATUS 2026-05-26T16:36:30Z host=enc1-gpuvm008
+GPU_available=1
+S2_pytest: 441 passed, 25 skipped, 3 warnings in 203.29s (0:03:23)
+S3_proof: PROOF_OK=True  entries=1210/1210  verify_exit=0  tamper_exit=2
+S4_logs:
+logs/mi300x_extreme_scale_1778627987.json
+logs/mi300x_extreme_scale_1778977872.json
+logs/mi300x_extreme_scale_1779813388.json
+logs/mi300x_hbm3_bandwidth_1778624598.json
+logs/mi300x_hbm3_bandwidth_1778973430.json
+logs/mi300x_hbm3_bandwidth_1779813225.json
+logs/mi300x_quant_quality_1778626233.json
+logs/mi300x_quant_quality_1778978012.json
+logs/mi300x_quant_quality_1779813216.json

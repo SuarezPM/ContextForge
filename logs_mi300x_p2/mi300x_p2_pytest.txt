@@ -1,0 +1,22 @@
+...........................................ssssssssssssss............... [ 15%]
+...............sssssss.................................................. [ 30%]
+.........................................................s.............. [ 46%]
+....s......................................s............................ [ 61%]
+........................................................................ [ 77%]
+........................................................................ [ 92%]
+.................................                                        [100%]
+=============================== warnings summary ===============================
+tests/test_registry.py:6
+  /home/hotaisle/Apohara_Context_Forge/tests/test_registry.py:6: DeprecationWarning: This module is deprecated as of v3.0. Use VRAMAwareCache instead.
+    from apohara_context_forge.registry._deprecated_ttl_cache import TTLCache
+
+tests/test_coordinator_integration.py::test_decide_against_real_registry_does_not_crash
+  /home/hotaisle/.local/lib/python3.10/site-packages/huggingface_hub/file_download.py:1855: DeprecationWarning: hf_xet.download_files() is deprecated. Use XetSession().new_file_download_group().start_download_file() instead.
+    xet_get(
+
+tests/test_lmcache_bridge.py::TestLMCacheConnectorV1::test_is_active_with_client
+  /home/hotaisle/Apohara_Context_Forge/tests/test_lmcache_bridge.py:21: DeprecationWarning: LMCacheConnectorV1 is deprecated and was always a stub; use LMCacheConnectorV2 from apohara_context_forge.serving.lmcache_connector instead. See AUDIT.md item 12 (US-002 bug 6).
+    bridge = LMCacheConnectorV1(lmcache_client=object())
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+441 passed, 25 skipped, 3 warnings in 203.29s (0:03:23)
