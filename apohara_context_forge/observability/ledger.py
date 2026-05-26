@@ -28,7 +28,7 @@ class Ledger:
                         continue
                     try:                       # skip corrupt lines; verify() is the integrity check
                         last = json.loads(line)["entry_hash"]
-                    except (json.JSONDecodeError, KeyError):
+                    except (json.JSONDecodeError, KeyError, TypeError):
                         continue
         return last
 

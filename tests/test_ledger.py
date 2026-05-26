@@ -33,3 +33,11 @@ def test_broken_prev_link_detected(tmp_path):
     rec = json.loads(lines[1]); rec["prev_hash"] = "f" * 64
     lines[1] = json.dumps(rec); p.write_text("\n".join(lines) + "\n")
     assert Ledger(p).verify()["broken_at"] == 1
+
+def test_nondict_line_does_not_brick_append(tmp_path):
+    p = tmp_path / "led.jsonl"; led = Ledger(p)
+    led.append({"a": 1})
+    with p.open("a", encoding="utf-8") as fh:
+        fh.write('"a bare json string"\n')  # valid JSON, not a dict -> TypeError on subscript
+    led2 = Ledger(p)
+    assert led2.append({"a": 2})["entry_hash"]  # must NOT raise (TypeError caught in _last_hash)
