@@ -1,179 +1,87 @@
 <p align="center">
-  <img src="assets/apohara-contextforge-logo.png" alt="Apohara · ContextForge" width="460">
+  <img src="assets/apohara-contextforge-logo.png" alt="Apohara · ContextForge" width="440">
 </p>
 
-<h1 align="center">APOHARA · ContextForge</h1>
+<h1 align="center">APOHARA&nbsp;·&nbsp;ContextForge</h1>
 
 <p align="center">
-  <strong>The shared-context compiler for multi-agent LLM pipelines.</strong><br>
-  Silicon-native KV cache coordination for AMD Instinct MI300X.
+  <strong>A formally-verified KV-cache safety &amp; coordination layer for multi-agent LLM pipelines.</strong><br>
+  AMD Instinct MI300X-native. Built around one provable guarantee — and honest about the rest.
 </p>
 
-<!-- Row 1 — academic credibility -->
 <p align="center">
-  <a href="https://doi.org/10.5281/zenodo.20277875"><img src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.20277875-1A73E8?style=flat-square&logo=doi&logoColor=white" alt="DOI: 10.5281/zenodo.20277875"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-2ECC71.svg?style=flat-square" alt="License Apache 2.0"></a>
-  <a href="#-research-foundation"><img src="https://img.shields.io/badge/papers-10%20implemented-9B59B6.svg?style=flat-square" alt="10 Papers"></a>
-  <a href="paper/inv15_paper.pdf"><img src="https://img.shields.io/badge/paper-PDF-EC1C24?style=flat-square&logo=adobe-acrobat-reader&logoColor=white" alt="Read the paper"></a>
+  <a href="https://doi.org/10.5281/zenodo.20277875"><img src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.20277875-1A73E8?style=flat-square&logo=doi&logoColor=white" alt="DOI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-2ECC71?style=flat-square" alt="License Apache 2.0"></a>
+  <a href="#-whats-real-validated-on-mi300x"><img src="https://img.shields.io/badge/AMD%20MI300X-hardware%20validated-ED1C24?style=flat-square&logo=amd&logoColor=white" alt="Hardware-validated on MI300X"></a>
+  <a href="paper/inv15_paper.pdf"><img src="https://img.shields.io/badge/paper-INV--15%20·%20Z3%20proof-9B59B6?style=flat-square" alt="Paper"></a>
+  <a href="AUDIT.md"><img src="https://img.shields.io/badge/honesty-AUDIT.md-FF6B00?style=flat-square" alt="Public audit"></a>
+  <a href="#-verification"><img src="https://img.shields.io/badge/tests-441%20passed-27AE60?style=flat-square" alt="441 tests"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11%2B-2B5DF2?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+"></a>
 </p>
-
-<!-- Row 2 — release + validation status -->
-<p align="center">
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-V7.0.0--rc.1-ED1C24.svg?style=flat-square" alt="Version V7.0.0-rc.1"></a>
-  <a href="#-benchmark-results"><img src="https://img.shields.io/badge/AMD%20MI300X%20192%20GB-hardware%20validated-ED1C24.svg?style=flat-square&logo=amd&logoColor=white" alt="Hardware-validated on AMD Instinct MI300X (192 GB)"></a>
-  <a href="paper/inv15_paper.pdf"><img src="https://img.shields.io/badge/paper-v3.0%20Z3%20formal%20proof-9B59B6.svg?style=flat-square" alt="Paper v3.0 — Z3 SMT formal proof"></a>
-  <a href="#-benchmark-results"><img src="https://img.shields.io/badge/V6.1%20benchmark-14%2F15%20honest-27AE60.svg?style=flat-square" alt="V6.1 14/15 honest PASS"></a>
-  <a href="#-benchmark-results"><img src="https://img.shields.io/badge/V6.2%20adversarial-6%2F6%20PASS-27AE60.svg?style=flat-square" alt="V6.2 adversarial 6/6"></a>
-  <a href="AUDIT.md"><img src="https://img.shields.io/badge/AUDIT.md-public-FF6B00.svg?style=flat-square" alt="Public audit"></a>
-  <a href="#-verification"><img src="https://img.shields.io/badge/tests-423%20passed%20%C2%B7%200%20failed-27AE60.svg?style=flat-square" alt="423 tests passing"></a>
-  <a href="https://youtu.be/swEcn-6pAmA"><img src="https://img.shields.io/badge/%E2%96%B6%EF%B8%8F-watch%20demo%20on%20YouTube-FF0000.svg?style=flat-square" alt="Watch the demo on YouTube"></a>
-</p>
-
-<!-- Row 3 — stack -->
-<p align="center">
-  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11%2B-2B5DF2.svg?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+"></a>
-  <a href="https://rocm.docs.amd.com/"><img src="https://img.shields.io/badge/ROCm-7.x-FF6B00.svg?style=flat-square&logo=amd&logoColor=white" alt="ROCm 7.x"></a>
-  <a href="https://lablab.ai/event/amd-hackathon"><img src="https://img.shields.io/badge/AMD-Hackathon%202026-ED1C24.svg?style=flat-square&logo=amd&logoColor=white" alt="AMD Hackathon 2026"></a>
-</p>
-
-<!-- Hero stat strip — the four headline numbers, video-ready -->
-<table align="center" width="100%">
-  <tr>
-    <td align="center" width="25%">
-      <h2><a href="#-live-demo">79.85%</a></h2>
-      <sub><b>Live token savings</b><br/>5-agent demo</sub>
-    </td>
-    <td align="center" width="25%">
-      <h2><a href="#-benchmark-results">15&thinsp;/&thinsp;15</a></h2>
-      <sub><b>Benchmark scenarios PASS</b><br/>real MI300X · DevCloud ATL1</sub>
-    </td>
-    <td align="center" width="25%">
-      <h2><a href="#-benchmark-results">10.81&times;</a></h2>
-      <sub><b>TokenDance compression</b><br/>12-agent committee</sub>
-    </td>
-    <td align="center" width="25%">
-      <h2><a href="paper/inv15_paper.pdf">0</a></h2>
-      <sub><b>INV-15 violations</b><br/>JCR Safety Gate</sub>
-    </td>
-  </tr>
-</table>
 
 <p align="center">
   <a href="#-the-problem">Problem</a> ·
-  <a href="#-the-solution">Solution</a> ·
-  <a href="#%EF%B8%8F-demo-video"><b>▶️ Demo video</b></a> ·
-  <a href="#-benchmark-results">Benchmarks</a> ·
+  <a href="#-whats-real-validated-on-mi300x"><b>What's real</b></a> ·
   <a href="#-architecture">Architecture</a> ·
-  <a href="#-quick-start">Quick Start</a> ·
-  <a href="#-cite"><b>📚 Cite (DOI)</b></a> ·
-  <a href="#-business-value">Business Value</a>
+  <a href="#-quick-start">Quick start</a> ·
+  <a href="#-honesty--audit"><b>Honesty</b></a> ·
+  <a href="#-roadmap">Roadmap</a> ·
+  <a href="#-cite">Cite</a>
 </p>
+
+---
+
+## TL;DR
+
+Multi-agent LLM pipelines (retriever → reranker → summarizer → **critic** → responder) share a long common context. Reusing the KV-cache across agents is the obvious win — **except for judge-type agents**, where reuse silently corrupts the verdict (the *Judge Candidate Reuse* failure mode). ContextForge is the coordination layer that makes shared-context multi-agent inference **safe and efficient on a single AMD MI300X**:
+
+- **🛡️ Safety (the proven core).** `INV-15` — a formal invariant requiring judge-class agents to use dense prefill when KV-reuse risk crosses a threshold — enforced by the **JCR Safety Gate**, **machine-checked by a Z3 SMT proof**, and recorded in a **tamper-evident, hash-chained certified ledger** (FORGE-LEDGER).
+- **✂️ Efficiency (validated).** LLMLingua-2 prompt compression → **44 % fewer prompt tokens** on real frontier-MoE inference; INT4 RotateKV KV-codec → **3.55× VRAM reduction**, measured on MI300X.
+- **🧩 Coordination (in progress).** Cross-agent KV-block sharing inside vLLM — the path to large VRAM savings — is under active construction (see [Roadmap](#-roadmap)). We report what is measured today and label the rest honestly.
+
+> **Why this repo is different:** every headline number below traces to a committed log on real MI300X hardware, and every gap is documented in [`AUDIT.md`](AUDIT.md). The pitch is the curve and the discipline — not a single inflated number.
 
 ---
 
 ## ⚡ The Problem
 
-In a 5-agent pipeline — **Retriever → Reranker → Summarizer → Critic → Responder** — every agent independently materializes identical KV-cache entries for the shared context (system prompt, user query, retrieved documents). On a 35B MoE model with 192 GB HBM3, this redundancy wastes **40–60 % of VRAM** before a single output token is generated.
+In a 5-agent pipeline, each agent re-encodes the same shared context (system prompt + query + retrieved docs). Naïve cross-agent KV-cache reuse removes that redundancy — but **breaks judge agents**: when the Critic compares candidates `{c₁…cₖ}`, attention cached from a prior ranking encodes the old ordering and biases the new verdict. The failure is **silent** — accuracy on non-judge tasks looks unchanged ([Liang et al., 2026](https://arxiv.org/abs/2601.08343)).
 
-```text
-WITHOUT ContextForge (VRAM duplication per agent):
-  Agent 1 (Retriever)   → [KV: system + query + docs]  12 GB
-  Agent 2 (Reranker)    → [KV: system + query + docs]  12 GB  ← DUPLICATE
-  Agent 3 (Summarizer)  → [KV: system + query + docs]  12 GB  ← DUPLICATE
-  Agent 4 (Critic)      → [KV: system + query + docs]  12 GB  ← DUPLICATE
-  Agent 5 (Responder)   → [KV: system + query + docs]  12 GB  ← DUPLICATE
-  ──────────────────────────────────────────────────────────────────
-  Total KV VRAM:           60 GB for context that should need 12 GB
-```
-
-ContextForge intercepts at the vLLM ATOM plugin level — zero model changes, zero latency overhead, shared PagedAttention blocks before materialization.
+No production KV-coordination system had a *contract* for when reuse is safe. **That contract is `INV-15`, and it is what ContextForge proves.**
 
 ---
 
-## 🧠 The Solution
+## ✅ What's real — validated on MI300X
 
-ContextForge coordinates KV-block sharing across all agents through **10 peer-reviewed mechanisms**, intercepting KV-cache operations at the vLLM V1 ATOM plugin interface. Before any agent materializes a KV block, ContextForge checks whether an identical or semantically equivalent block already exists in the shared registry — and a JCR Safety Gate (V6.0) decides when reuse would corrupt judge-type agents, falling back to dense prefill.
+> Hardware: 1× **AMD Instinct MI300X** (192 GB HBM3, ROCm 7.2). vLLM in Docker; coordinator host-side. Raw artifacts in [`logs_mi300x_p2/`](logs_mi300x_p2/) and [`logs_moe_run/`](logs_moe_run/) — see the [evidence report](logs_moe_run/MI300X_MOE_EVIDENCE.md).
 
-Every optimization traces back to a peer-reviewed paper published at **NeurIPS, ICML, ACL, IJCAI, or arXiv 2026**.
+### 🛡️ Safety — the formally-verified core
 
-### The 10 Mechanisms
+| Property | Result | Evidence |
+|---|---|---|
+| INV-15 violations over full **1,210-point** input sweep | **0 / 1,210** | `logs_mi300x_p2/mi300x_p2_forge_ledger.json` |
+| Z3 SMT proof of INV-15 (negation `unsat` over modeled domain) | **PROVED**, 10.08 ms | `safety/z3_inv15_proof.py` |
+| FORGE-LEDGER: hash-chained certified decisions + tamper test | **verify exit 0** · tamper → **exit 2** (`broken_at` reported) | `observability/ledger.py` |
+| Per-decision Z3 cert latency (p99) | **0.25 ms** · 243 certs/s | on-hardware |
+| Critic dense-prefill rate over its risk subspace | **0.851** | matches the paper |
 
-| # | Mechanism | Source | What it does |
-|---|-----------|--------|-------------|
-| 1 | **KVCOMM** | NeurIPS 2025 · [arXiv:2510.12872](https://arxiv.org/abs/2510.12872) | SimHash anchor matching for cross-context offset hints — zero RoPE drift |
-| 2 | **KVFlow** | NeurIPS 2025 | Workflow-step graph eviction — evict agents farthest from execution first |
-| 3 | **PBKV** | May 2026 | 2nd-order Markov predictor — 1.26× faster than KVFlow |
-| 4 | **SemShareKV** | ACL Findings 2025 | LSH + FAISS semantic dedup on Qwen3-Embed-0.6B ONNX |
-| 5 | **RotateKV** | IJCAI 2025 · [arXiv:2501.16383](https://arxiv.org/abs/2501.16383) | Pre-RoPE INT4 quantization — 3.97× VRAM reduction, attention-sink protected |
-| 6 | **CLA + LCKV** | NeurIPS 2024 + NAACL 2025 | Cross-layer upper-KV sharing — 50 % savings on upper layers |
-| 7 | **Queueing Theory** | ICML 2026 | λ_critical stability model — replaces 5 empirical thresholds with rigorous math |
-| 8 | **VisualKVCache** | Feb 2026 | SHA-256 content-hash for images — +44.9 % throughput at 1024 px |
-| 9 | **TokenDance** *(V6)* | Apr 2026 · [arXiv:2604.03143](https://arxiv.org/abs/2604.03143) | Master-Mirror diff storage — **10–17× KV compression** for committee inference |
-| 10 | **JCR Safety Gate** *(V6)* | Jan 2026 · [arXiv:2601.08343](https://arxiv.org/abs/2601.08343) | INV-15: Critic agent dense prefill when JCR risk > 0.7 |
+### ✂️ Efficiency — measured
 
-**Built on AMD-native stack:** ROCm 7.x · AITER · PyRSMI · ATOM plugin · HIP · vLLM V1 · LMCache · AMD DevCloud MI300X.
+| Metric | Result | Notes |
+|---|---|---|
+| **ContextForge prompt compression, live MoE** | **44.4 %** fewer prompt tokens (5 265 → 2 926) | LLMLingua-2, 5-agent workload, real inference |
+| INT4 RotateKV KV-codec reduction | **3.55×** (constant 4K → 262K ctx) | length-invariant; `use_fwht=False` (FWHT degrades MSE ~200×) |
+| HBM3 effective bandwidth | **3.79 TB/s** (72 % of 5.3 peak) | STREAM-triad fp16 |
 
----
+### 🚀 Frontier MoE on a single MI300X (vLLM)
 
-## 🎬 Live Demo
+| Model | Params | Quant | Single-card | Long context (NIAH) | Throughput |
+|---|---|---|---|---|---|
+| **Qwen3-30B-A3B-2507** | 30B / 3B MoE | FP8 | ✅ ~186 GB | **12/12 → 174K tok** | 2 667 tok/s |
+| **Qwen3-Coder-Next** (hybrid) | 80B / 3B MoE | FP8 | ✅ ~175 GiB *(vLLM 0.19)* | **12/12 → 174K tok** | 2 149 tok/s |
+| **Qwen3-235B-A22B** | 235B / 22B MoE | **INT4** (GPTQ) | ✅ ~181 GiB | — | (INT4 decode) |
 
-Real metrics from `demo/app.py` running against the full ContextForge stack — five agents, real Qwen3 tokenizer, real LSH+FAISS dedup, INV-15 enforced live. Side-by-side comparison: **263 → 53 tokens, 79.85 % savings** with ContextForge; passthrough on the right.
-
-### ▶️ Demo video
-
-<p align="center">
-  <a href="https://youtu.be/swEcn-6pAmA" title="Watch the ContextForge demo on YouTube">
-    <img src="https://img.youtube.com/vi/swEcn-6pAmA/maxresdefault.jpg"
-         alt="▶️ Watch the ContextForge demo on YouTube — 79.85% token savings, INV-15 firing on the Critic"
-         width="780">
-  </a>
-</p>
-
-<p align="center">
-  <a href="https://youtu.be/swEcn-6pAmA"><b>▶️ Watch on YouTube</b></a>
-  &nbsp;·&nbsp;
-  <a href="https://github.com/SuarezPM/Apohara_Context_Forge/raw/main/assets/video_live.mp4">Download raw mp4 (5.2 MB)</a>
-  <br>
-  <em>End-to-end run: query → 5-agent pipeline → 79.85 % token savings → JCR Safety Gate fires INV-15 on the Critic.</em>
-</p>
-
-### Static frame
-
-<p align="center">
-  <img src="assets/screenshots/dashboard_live_demo.png" alt="Live Demo — With vs Without ContextForge, 79.85% savings, INV-15 firing on the Critic" width="960"><br>
-  <em>Live Demo tab — left: query input. Right: <b>With ContextForge</b> (79.85 % savings, INV-15 fires on the Critic) vs. <b>Without ContextForge</b> (passthrough, 0 % savings).</em>
-</p>
-
-```
-[ContextForge Enabled] Processed: What is machine learning and how does it work?
-
-agents: 5
-tokens_before: 263
-tokens_after: 53
-avg_ttft_ms: 23.78
-token_savings_pct: 79.85%
-dedup_rate_pct:    79.85%
-registry_size: 4
-vram_mode: relaxed
-strategy: register+lsh+faiss
-
-[JCR Safety Gate / INV-15]
-  critic risk: 1.000
-  critic dense_prefill: True
-  reason: INV-15: judge role='critic' risk=1.00 > threshold=0.70 → dense prefill mandated
-```
-
-### V6 Live Snapshot — TokenDance + JCR Safety Gate
-
-<p align="center">
-  <img src="assets/screenshots/dashboard_v6_snapshot.png" alt="Architecture tab — TokenDance Master-Mirror + JCR Safety Gate live snapshots" width="640"><br>
-  <em>Architecture tab — <b>TokenDance Master-Mirror Storage</b> (5-agent demo, 4.71× compression) and <b>JCR Safety Gate</b> firing INV-15 (risk = 1.000, dense_prefill = True).</em>
-</p>
-
-<p align="center">
-  <img src="assets/screenshots/dashboard_aiter_config.png" alt="AITER ROCm Config — MI300X" width="520"><br>
-  <em>AITER ROCm Config (MI300X) — <code>rocm_available: True</code>, 7 documented env vars, AMD-published speedups: 3× fused MoE, 2× block-scale GEMM, 2-4× FP8 memory.</em>
-</p>
+> The 192 GB HBM3 lets a single MI300X hold frontier MoE that an 80 GB card cannot. FP8 235B (≈221 GB) needs >1 card; **INT4 fits one card** — that's the memory moat, with our own measured footprints.
 
 ---
 
@@ -182,346 +90,138 @@ strategy: register+lsh+faiss
 ```mermaid
 flowchart TB
     subgraph Agents["5-Agent Pipeline"]
-        A1[Retriever]
-        A2[Reranker]
-        A3[Summarizer]
-        A4[Critic]
-        A5[Responder]
+        A1[Retriever] & A2[Reranker] & A3[Summarizer] & A4[Critic] & A5[Responder]
     end
-
-    subgraph CF["ContextForge MCP Server · FastAPI + asyncio"]
-        direction TB
-        REG["Context Registry<br/>register · clear · get_shared_context"]
-        LSH["LSH Token Matcher<br/>SimHash · block-aligned"]
-        FAISS["FAISS ANN Index<br/>O(log n) cosine search"]
-        VRAM["VRAM-Aware Cache<br/>5-mode pressure eviction"]
-        TD["TokenDance Storage<br/>Master + N-1 sparse diffs"]
-        JCR{"JCR Safety Gate<br/>INV-15"}
-        COORD["Compression Coordinator<br/>LLMLingua-2 + APC"]
+    subgraph CF["ContextForge Coordinator · FastAPI + asyncio"]
+        REG["Context Registry"]
+        COMP["Compression Coordinator<br/>LLMLingua-2 · ✅ validated"]
+        JCR{"JCR Safety Gate · INV-15<br/>✅ Z3-proved"}
+        LEDGER["FORGE-LEDGER<br/>✅ tamper-evident certs"]
+        DEDUP["Semantic dedup · LSH+FAISS<br/>🔬 needs qwen3-embed"]
     end
-
-    subgraph Serving["AMD MI300X · ROCm 7.x"]
-        VLLM["vLLM V1 + ATOM plugin<br/>--enable-prefix-caching"]
-        AITER["AITER kernels<br/>fused MoE · MHA · GEMM"]
-        HBM[("192 GB HBM3<br/>Qwen3.6-35B-A3B MoE")]
+    subgraph Serving["AMD MI300X · ROCm 7.2 · vLLM"]
+        VLLM["vLLM V1 endpoint"]
+        ATOM["ATOM plugin · cross-agent<br/>KV-block sharing · 🔬 in progress"]
     end
-
-    A1 & A2 & A3 & A4 & A5 -->|register context| REG
-    REG --> LSH --> FAISS --> VRAM
-    REG --> TD
-    A4 --> JCR
-    JCR -->|risk > 0.7| VLLM
-    JCR -->|risk ≤ 0.7| COORD
-    REG --> COORD
-    COORD --> VLLM
-    VLLM --> AITER --> HBM
-
+    A1 & A2 & A3 & A5 --> REG --> COMP --> VLLM
+    A4 --> JCR -->|risk > 0.7| VLLM
+    JCR --> LEDGER
+    REG -.-> DEDUP
+    VLLM -.-> ATOM
     style JCR fill:#FF6B00,stroke:#fff,color:#fff
-    style TD fill:#FF6B00,stroke:#fff,color:#fff
-    style AITER fill:#ED1C24,stroke:#fff,color:#fff
-    style HBM fill:#ED1C24,stroke:#fff,color:#fff
+    style LEDGER fill:#FF6B00,stroke:#fff,color:#fff
+    style ATOM fill:#555,stroke:#fff,color:#fff,stroke-dasharray:4
+    style DEDUP fill:#555,stroke:#fff,color:#fff,stroke-dasharray:4
 ```
 
----
-
-## 📊 Benchmark Results
-
-> ✅ **Validated on AMD Instinct MI300X (192 GB HBM3) — AMD DevCloud ATL1 · 2026-05-10**
-> 🧯 **V6.1 truth-up applied 2026-05-12** — see [AUDIT.md](AUDIT.md) for the full list of V6.0 overclaims that V6.1 closes, and [CHANGELOG.md](CHANGELOG.md) for the release notes.
-
-### V6.1 Benchmark — 14 / 15 honest
-
-V6.0 reported 15/15. The V6.1 truth-up release replaced five hardcoded `duration_ms` constants with `time.perf_counter()` calls, fixed the S-11 deviation calculation that was silently reporting 0 % regardless of the controller's actual prediction, and rewrote S-15 from a 9-point hand-curated set into a 1,210-point Cartesian sweep. The result is **14 / 15 PASS with one honest fail** — S-11 (queueing controller) reports ~100 % deviation under the V5 toy load. The math is correct (see V6.2 below); the V5 simulation was statistically too short (n=20 < Welford's n≥30 floor) and used deterministic inter-arrivals. The honest fail is the point of the release.
-
-### V6.2 adversarial — 6 / 6 PASS
-
-`demo/benchmark_v62_adversarial.py` runs the same QueueingController under Poisson inter-arrivals, n=1,000 samples per rate point, in-flight block tracking via a heap, and three M/G/1 service-time distributions (exponential, lognormal, constant). All 6 scenarios PASS with prediction deviation of **1.6 % – 29.9 %** against the theoretical λ_critical = 905.8 req/s derived from the simulation parameters.
-
-| Distribution | Light (λ=10) | Moderate (λ=200) | Threshold |
-|--------------|-------------|------------------|-----------|
-| exponential  | **1.87 %**  | **17.90 %**       | < 25 %    |
-| lognormal    | 7.53 %      | 29.91 %           | < 50 %    |
-| constant     | **1.60 %**  | **22.40 %**       | < 50 %    |
-
-### V6.0 Benchmark — 15 / 15 PASS *(historical, see AUDIT.md)*
-
-| #  | Scenario | Time (ms) | Throughput (tok/s) | VRAM (GB) | Result |
-|----|----------|-----------|--------------------|-----------|--------|
-| 1  | anchor_pool_resolution            |   2.87 |   173,986 | 0.10 | ✅ PASS |
-| 2  | cla_metadata_layer                |   0.28 | 5,620,918 | 0.05 | ✅ PASS |
-| 3  | rotate_kv_quantization            |  21.70 | 1,510,156 | 0.20 | ✅ PASS |
-| 4  | step_graph_execution              |   0.37 |   268,906 | 0.30 | ✅ PASS |
-| 5  | kv_aware_routing                  |   0.04 |   269,251 | 0.10 | ✅ PASS |
-| 6  | lmcache_bridge_save_load          |   0.03 | 3,752,204 | 0.05 | ✅ PASS |
-| 7  | atom_plugin_hooks                 |   0.11 | 6,961,486 | 0.10 | ✅ PASS |
-| 8  | pbkv_prediction                   |   0.12 |   581,207 | 0.05 | ✅ PASS |
-| 9  | workflow_aware_eviction           |   0.02 | 6,127,076 | 0.10 | ✅ PASS |
-| 10 | embedding_engine_encoding         | 268.86 |    20,457 | 0.10 | ✅ PASS |
-| 11 | **queueing_controller_stability** | 250.00 |     4,000 | 0.15 | ✅ **PASS** |
-| 12 | **visual_kvcache_cross_agent**    | 150.00 |   177,633 | 0.01 | ✅ **PASS** |
-| 13 | **speculative_coordinator_speedup** | 100.00 |        80 | 0.05 | ✅ **PASS** |
-| 14 | **token_dance_compression** *(V6)*    | 120.00 |    20,000 | 0.00 | ✅ **PASS** |
-| 15 | **jcr_gate_critic_safety** *(V6)*     |   5.00 |     1,800 | 0.00 | ✅ **PASS** |
-
-### V6.0 Key Targets — 8 / 8 PASS
-
-| Metric | Result | Target | Status |
-|--------|--------|--------|--------|
-| QueueingController λ_critical deviation | **0.00 %** | < 10 % | ✅ |
-| VisualKVCache encoder-call reduction | **5.0 ×** | ≥ 4 × | ✅ |
-| Speculative acceptance rate | **≥ 0.875** | > 0.70 | ✅ |
-| Speculative speedup | **5.59–8.00 ×** | > 2 × | ✅ |
-| TokenDance compression ratio | **10.81 ×** | ≥ 10 × | ✅ |
-| TokenDance reconstruction error | **1.19 × 10⁻⁷** | ≤ 1 × 10⁻⁴ | ✅ |
-| JCR INV-15 violations | **0** | 0 | ✅ |
-| JCR Critic dense rate (high-risk sweep) | **1.000** | ≥ 0.5 | ✅ |
-
-<p align="center">
-  <img src="assets/screenshots/benchmark_v6_terminal.png" alt="V6.0 benchmark terminal output — S-14 token_dance 10.81x, S-15 jcr_gate 0 violations" width="780"><br>
-  <em>Live terminal output of <code>python demo/benchmark_v5.py</code> — S-14 TokenDance <b>10.81×</b> compression with reconstruction error <b>1.19e-07</b>, S-15 JCR Safety Gate <b>0 INV-15 violations</b>.</em>
-</p>
+✅ = validated on MI300X · 🔬 = in progress (see [Roadmap](#-roadmap)).
 
 ---
 
-## 📈 Key Stats
+## 🧩 Mechanisms & honest status
 
-| Metric | Value |
-|--------|-------|
-| Live token savings (5-agent demo) | **79.85 %** |
-| Multi-agent VRAM reduction | **68 %** |
-| TTFT improvement | **7.8 ×** |
-| TokenDance compression (12-agent committee) | **10.81 ×** |
-| JCR Safety Gate INV-15 violations | **0** |
-| Tests passing | **423 passed** *(0 failed · 25 skipped)* |
-| Benchmark scenarios | **15 / 15 PASS** |
-| Peer-reviewed papers implemented | **10** |
-| System invariants enforced | **15** |
+ContextForge implements ideas from recent KV-cache literature. We grade each by **what we have actually verified**, not by what the source paper claims:
 
-<p align="center">
-  <img src="assets/screenshots/dashboard_key_stats.png" alt="Architecture tab — Key Statistics panel" width="520"><br>
-  <em>Key Statistics panel rendered live in the dashboard's Architecture tab.</em>
-</p>
+| Mechanism | Source | Status |
+|---|---|---|
+| **JCR Safety Gate (INV-15)** | [arXiv:2601.08343](https://arxiv.org/abs/2601.08343) | ✅ **Validated + Z3-proved** on MI300X |
+| **RotateKV INT4 codec** | [arXiv:2501.16383](https://arxiv.org/abs/2501.16383) | ✅ **Validated** — 3.55× (not the 3.97× literature figure; see AUDIT) |
+| **LLMLingua-2 compression** | ACL 2024 | ✅ **Validated** — 44 % on live MoE *(fixed a bug that left it non-functional; see AUDIT)* |
+| **FORGE-LEDGER** (certified audit) | this work | ✅ **Validated** on-hardware |
+| TokenDance committee compression | [arXiv:2604.03143](https://arxiv.org/abs/2604.03143) | 🟡 Component-tested (synthetic), not yet on a live model |
+| KVCOMM · KVFlow · PBKV · CLA · VisualKVCache · Queueing controller | various | 🟡 Implemented + unit-tested (synthetic inputs) |
+| **Cross-agent KV-block sharing** (ATOM plugin) | — | 🔬 **In progress** — the plugin computes reuse/gate decisions; physical block sharing inside vLLM is being built |
+| Semantic dedup on `qwen3-embed` ONNX | ACL Findings 2025 | 🔬 Falls back to pseudo-embeddings until `qwen3-embed` is installed |
+| LMCache multi-node KV bridge | 2025 | 🔬 Needs the ROCm LMCache build |
 
 ---
 
 ## 🚀 Quick Start
 
-### Prerequisites
-
-- Python 3.11 +
-- AMD GPU with ROCm 7.x **or** any CPU box for hermetic dev
-- 16 GB RAM minimum (192 GB HBM3 recommended for full vLLM run)
-
-### Install
-
 ```bash
 git clone https://github.com/SuarezPM/Apohara_Context_Forge.git
 cd Apohara_Context_Forge
-pip install -e .
+pip install -e .            # or: uv sync
+
+# Run the test suite (hermetic — no GPU / no downloads required)
+PYTHONPATH=. pytest tests/ -q        # → 441 passed · 25 skipped
+
+# Reproduce the INV-15 formal proof
+python -m apohara_context_forge.safety.z3_inv15_proof
+# → {"status": "PROVED", "elapsed_ms": 10.08, "z3_version": "4.16.0"}
+
+# Verify a certified ledger
+python -m apohara_context_forge.observability.ledger_cli verify <ledger.jsonl>
+
+# Local 5-agent dashboard (context compression demo)
+python demo/app.py        # http://localhost:7860
 ```
 
-### Run the benchmark
-
-```bash
-python demo/benchmark_v5.py
-# → 15/15 PASS · all 8 V5+V6 targets PASS
-```
-
-### Launch the dashboard
-
-```bash
-python demo/app.py
-# Open http://localhost:7860
-```
-
-Four tabs: **Live Demo** · **Real-time Metrics** · **Benchmark Results** · **Architecture**
-
-### Run the test suite
-
-```bash
-PYTHONPATH=. pytest tests/ -q
-# → 423 passed · 25 skipped · 0 failed
-```
+To reproduce the MI300X evidence, see [`scripts/forge_p2_run_all.sh`](scripts/forge_p2_run_all.sh) and [`scripts/mi300x_contextforge_e2e.py`](scripts/mi300x_contextforge_e2e.py).
 
 ---
 
-## 🔬 Research Foundation
+## 🔎 Honesty &amp; Audit
 
-ContextForge implements **six 2025–2026 papers** as production code, plus four established baselines. Every numeric claim in this README is backed by a peer-reviewed result.
+This project keeps a **public accountability layer**. [`AUDIT.md`](AUDIT.md) lists every claim that was once overstated, with `file:line` evidence and its fix; [`scripts/check_honesty.sh`](scripts/check_honesty.sh) runs in CI to catch hardcoded benchmark numbers and misleading labels. Recent corrections tracked there include: the codec figure (3.97× literature → **3.55× measured**), the compressor bug (loaded LLMLingua-2 but ran the LLMLingua-1 path → never compressed; **now fixed**), and the distinction between the local demo and real-model inference.
 
-| Paper | Venue · Year | Module | Validated metric |
-|-------|--------------|--------|------------------|
-| KVCOMM · [arXiv:2510.12872](https://arxiv.org/abs/2510.12872) | NeurIPS 2025 | `kv_offset/anchor_pool.py` | 7.8× TTFT improvement |
-| RotateKV · [arXiv:2501.16383](https://arxiv.org/abs/2501.16383) | IJCAI 2025 | `quantization/rotate_kv.py` | 3.97× VRAM reduction at INT4 |
-| Cross-Attention Speculative · [arXiv:2505.24544](https://arxiv.org/abs/2505.24544) | May 2026 | `decoding/speculative_coordinator.py` | 5.59–8 × decode speedup |
-| Queueing-aware vLLM · ICML 2026 | ICML 2026 | `scheduling/queueing_controller.py` | 0.00 % λ_critical deviation |
-| **TokenDance** · [arXiv:2604.03143](https://arxiv.org/abs/2604.03143) | Apr 2026 | `storage/token_dance.py` | 10.81× compression, 1.19e-7 error |
-| **JCR Failure Mode** · [arXiv:2601.08343](https://arxiv.org/abs/2601.08343) | Jan 2026 | `safety/jcr_gate.py` | INV-15 — 0 violations across sweep |
-| LLMLingua-2 | ACL 2024 | `compression/compressor.py` | 8× memory reduction |
-| CLA + LCKV | NeurIPS 2024 + NAACL 2025 | `kv_offset/cla_metadata.py` | 50 % upper-layer KV savings |
-| VisualKVCache | Feb 2026 | `multimodal/visual_kv_cache.py` | 5.0× encoder-call reduction |
-| vLLM ATOM plugin (production) | vLLM 0.9.x | `serving/atom_plugin.py` | Native V1 KV interception |
-
----
-
-## 🟥 Why AMD Instinct MI300X
-
-ContextForge is **silicon-native** for the MI300X — not a port of CUDA code, not a generic "ROCm-compatible" wrapper.
-
-| Layer | What we use | Why MI300X |
-|-------|-------------|------------|
-| **HBM** | 192 GB HBM3 (single-GPU 35B MoE) | Fits Qwen3.6-235B-A22B without tensor-parallelism overhead |
-| **Compute** | AITER fused MoE + MHA kernels | **3× faster MoE**, **2× block-scale GEMM**, FP8 2-4× memory |
-| **Telemetry** | PyRSMI / `/sys/class/drm` | Real-time VRAM pressure for the 5-mode eviction policy |
-| **Networking** | RCCL · `NCCL_MIN_NCHANNELS=112` | Multi-GPU collective KV sharing (TokenDance All-Gather) |
-| **Plugin surface** | vLLM V1 ATOM (`vllm.general_plugins`) | Zero model code change — intercept BEFORE block materialization |
-| **Stability flag** | `AITER_ENABLE_VSKIP=0` | Hard-coded by [`AITERConfig`](apohara_context_forge/serving/aiter_config.py) — prevents documented kernel crashes |
-
-> **Validated on AMD DevCloud ATL1.** All 15 benchmark scenarios run on real MI300X hardware with ROCm 7.x — see `logs/benchmark_v6_final.txt`.
-
----
-
-## 💼 Business Value
-
-### TAM / SAM / SOM
-
-| Tier | Definition | 2027 estimate |
-|------|------------|---------------|
-| **TAM** | Global LLM-inference market (all hardware, all workloads) | **$50 B** |
-| **SAM** | Multi-agent + RAG inference on AMD-class accelerators | **$8 B** |
-| **SOM** *(3-yr)* | Enterprise agentic platforms self-hosting on MI300X / MI325X | **$420 M** |
-
-### Where the value lands
-
-- **40–60 % VRAM saved** per multi-agent workload → **fewer GPUs needed** for the same throughput. On a 192 GB MI300X box, that's $15-25 K of capex unlocked per node.
-- **7.8× TTFT improvement** + 5.59–8 × speculative speedup → response-time SLOs that were previously unreachable on commodity hardware become trivial.
-- **JCR Safety Gate (INV-15)** → the first engineered answer to "when does KV reuse silently break my judge agent?" — a known failure mode that has, until now, blocked KV reuse from production agentic pipelines.
-
-### Revenue streams
-
-1. **Enterprise SaaS** — managed ContextForge MCP servers per tenant, priced per-GPU-hour saved (verifiable via `metrics/snapshot`).
-2. **Self-hosted license** — Apache-2.0 core, paid enterprise tier with SLAs, AITER tuning packs, and audit-grade INV-15 telemetry export.
-3. **AMD partnership / co-marketing** — reference design for MI300X agentic deployments; flagship customer logo for the AMD AI Stack.
-4. **Plugin marketplace** — third-party mechanisms (custom safety gates, vertical-specific routers) that ride the ContextForge MCP interface.
-
-### Who buys it
-
-- **Foundation-model labs** running 5-agent reasoning stacks (debate, critic, planner architectures).
-- **Enterprise RAG vendors** with multi-tenant constraints — every shared system prompt is wasted VRAM today.
-- **Sovereign / on-prem GPU clusters** with AMD MI300X hardware that need a CUDA-free alternative to vLLM-only deployments.
+State must match what the code does at runtime. When it didn't, it's in the audit.
 
 ---
 
 ## ✅ Verification
 
 | Check | Result |
-|-------|--------|
-| `pytest tests/` | **423 passed · 25 skipped · 0 failed** |
-| `python demo/benchmark_v5.py` | **15 / 15 PASS** · all 8 V5+V6 targets PASS |
-| `python demo/app.py` | Gradio 6.x · HTTP 200 on `/` · live 79.85 % savings |
-| Hermetic CI mode | No GPU, no TCP, no model downloads — all deps gated by `try / import` |
+|---|---|
+| `PYTHONPATH=. pytest tests/` | **441 passed · 25 skipped · 0 failed** |
+| `z3_inv15_proof` | **PROVED** (`unsat` on negation) |
+| `ledger_cli verify` (intact / tampered) | exit **0** / **2** |
+| Honesty CI guard | **PASS** |
 
-System invariants enforced:
-
-| ID | Invariant | Module |
-|----|-----------|--------|
-| INV-10 | RotateKV pre-RoPE only — never quantize post-RoPE tensors | `rotate_kv.py` |
-| INV-11 | QueueingController never evicts below `ceil(λ × E[S] × E[blocks] × 1.15)` | `queueing_controller.py` |
-| INV-12 | SpeculativeCoordinator: target always generates final authoritative token | `speculative_coordinator.py` |
-| INV-13 | VisualKVCache content hash is SHA-256 of raw bytes — never of embeddings | `visual_kv_cache.py` |
-| INV-14 | Dashboard "SIMULATION MODE" banner shown for synthetic data | `app.py`, `dashboard.py` |
-| **INV-15** | **JCR Safety Gate: Critic uses dense prefill when risk > 0.7** | **`safety/jcr_gate.py`** |
+**System invariants enforced:** INV-10 (RotateKV pre-RoPE only) · INV-11 (queue floor) · INV-12 (speculative authoritative token) · INV-13 (visual hash of raw bytes) · INV-14 (simulation-mode banner) · **INV-15 (JCR dense-prefill — Z3-proved)**.
 
 ---
 
 ## 🗺️ Roadmap
 
-| Version | Status | Highlights |
-|---------|--------|-----------|
-| V4.0 | ✅ Complete | AnchorPool · EmbeddingEngine ONNX · CLA metadata · RotateKV INT4 · StepGraph · KVAwareRouter · LMCacheBridge · ATOM plugin |
-| V5.0 | ✅ Complete | QueueingController (ICML 2026) · VisualKVCache · SpeculativeCoordinator · Gradio Dashboard |
-| V5.x | ✅ Complete | S-3 4D-indexing fix · S-13 acceptance criterion → 13 / 13 PASS |
-| V6.0 | ✅ Complete | TokenDance Master-Mirror · JCR Safety Gate (INV-15) · AITER ROCm config → 15 / 15 (subsequently audited; see V6.1) |
-| **V6.1** | ✅ **Complete** | **Truth-up release · [`AUDIT.md`](AUDIT.md) + [`CHANGELOG.md`](CHANGELOG.md) · rocm-smi flag + 5 hardcoded `duration_ms` + S-11 deviation logic + S-15 1,210-pt sweep + speculative coordinator real q_i (INV-12 restored) → 14 / 15 honest** |
-| **V6.2** | ✅ **Complete** | **Adversarial benchmark for QueueingController** — Poisson n=1,000, M/G/1 service-time distributions, 6 / 6 PASS at 1.6–29.9 % deviation vs theoretical λ_critical |
-| **V6.x #1** | ✅ **Complete** | **[`apohara-vllm-plugin` 0.1.0](pypi/apohara-vllm-plugin/) — standalone PyPI package, `vllm.general_plugins` entry-point, honest hooks (DI-ready), wheel built + smoke-tested in clean venv. Pending only the manual `vllm-plugin-v0.1.0` tag to trigger the [release workflow](.github/workflows/release-plugin.yml).** |
-| **V6.x #2** | ✅ **Complete** | **HuggingFace Spaces public benchmark sandbox** — `hf_spaces/` shim with YAML frontmatter + scoped requirements + fallback-degraded mode, [sync workflow](.github/workflows/sync-hfspaces.yml) on every push to main. See [HFSPACES.md](HFSPACES.md) for the 5-minute setup. |
-| **V6.x #3** | ✅ **Complete** | **[`LMCacheConnectorV2`](apohara_context_forge/serving/lmcache_connector.py) — real multi-node KV-cache bridge** (replaces V4-era stub). store / retrieve / lookup / prefetch invoke the actual LMCache engine; honest-fallback when lmcache not importable. 16/16 tests PASS on Python 3.14. See [LMCACHE.md](LMCACHE.md) for the multi-node deployment story. |
-| **V7.0.0-rc.1** | 🚀 **Release candidate** | **Sprint 4 substrate optimizations + [paper v2.0](paper/inv15_paper.pdf)** — fp16-only FWHT default (2× faster), `use_fwht=False` default in RotateKVConfig, LMCacheConnectorV2 non-CUDA AMD ROCm support, vectorized `_quantize_block`. Paper v2.0 replaces 3.97× literature claim with 3.55× MI300X-measured, adds HBM3 bandwidth measurement + 262K extreme-scale validity. **Hardware-validated on AMD Instinct MI300X (192 GB).** |
-| **Paper v3.0** | ✅ **Shipped 2026-05-18** | **[Z3 SMT formal proof](paper/inv15_paper.pdf)** of INV-15 added as Section `sec:z3-proof`. `apohara_context_forge.safety.z3_inv15_proof` returns `{"status": "PROVED", "elapsed_ms": 10.08, "z3_version": "4.16.0"}`. Complements the 0/1210 empirical sweep from v2.0.1 with `unsat`-on-negation over the entire modeled domain. Zenodo v3 deposit metadata in [`paper/zenodo-v3-metadata.json`](paper/zenodo-v3-metadata.json). |
-| **V7.0.0-rc.2** | ✅ **Foundation hardening (2026-05-25)** | **P0 fix:** `CompressionCoordinator.decide()` resurrected (it crashed → `/optimize` was permanently 503). **Reproducible env** (declared `faiss-cpu`/`prometheus-client`/`z3-solver`; torch pin fixed for Python 3.14). **35 Jules PRs** triaged & landed (code-health + coverage). **Paper v3.1:** INV-15 extended to judge-class `{critic, judge}` (Z3 re-proved); §4 risk model aligned to the implemented scaling form. Suite **423 passed / 0 failed**. |
-| **Paper v3.1** | ✅ **Ready 2026-05-25** | INV-15 generalized to judge-class roles; Eq. 1/§4 corrected to the scaling model the code + Z3 actually implement; metrics updated to 423/0. Pending Zenodo re-deposit (predecessor v3 = `10.5281/zenodo.20277875`). |
-| V7.0.0 | 📋 Planned | arXiv submission (paper v3.1 ready) + Zenodo refresh · PyPI plugin tag · Colab CPU demo · GitHub Discussions — see forward roadmap below |
-| V7+ | 📋 Planned | See the **Forward roadmap (V7.0.0 → V8.0+)** below |
+**Now — close the efficiency moat (the honest gap):**
+- 🔬 **Real cross-agent KV-block sharing in vLLM** (ATOM plugin) — turn the reuse *decisions* the plugin already computes into physical PagedAttention block sharing across agents. This is what backs end-to-end VRAM savings; it is **not yet built**, and the README will quote VRAM numbers only once it is measured.
+- 🔬 **Install `qwen3-embed`** so semantic dedup runs on real embeddings (today it degrades to pseudo-embeddings).
+- 🔬 **Needle-in-a-haystack under INT4** at 200K — prove the compressed context is still correctly attended.
 
-### Forward roadmap (optimized · 2026-05-25)
+**Next — safety & audit depth (the differentiator):** adaptive INV-15 thresholds · Z3 extended to INV-10…INV-14 · OTLP audit export for compliance.
 
-> **Sequencing:** technology and hardware evidence **first**, public-release levers **last** (maintainer's call). The rc.2 foundation-hardening sprint above is done; the order below is by *differentiation*, informed by a competitive review against adjacent MI300X long-context work.
->
-> **Where ContextForge already leads:** formal safety (INV-15 + Z3 SMT proof) · multi-agent KV-cache coordination · INT4/RotateKV quantization · an evidence base on **real MI300X (~30 committed logs) plus a real H100 cross-test** — not accounting alone. The roadmap doubles down on those moats and closes the one gap worth closing: deep-context recall *under compression*.
+**Later — scale & ecosystem:** multi-GPU TokenDance over RCCL · LMCache ROCm build · K8s operator hardening · companion paper on the MoE + coordination evidence.
 
-**🔬 Next — Differentiation & hardware evidence (tech-first).**
-- **Long-context recall under INT4** — needle-in-a-haystack at 200K *after* RotateKV INT4 compression. ContextForge proves KV *coordination*; this proves the compressed context is still *attended* — a claim FP8-only stacks cannot make. Runs on MI300X.
-- **`AITER_KNOWN_ISSUES.md`** — reproducer for the AITER-attention × FP8/INT4-KV output-corruption regression (uncalibrated `q_scale`/`prob_scale`), extended to the INT4 codec path. Reference material for AMD + the community.
-- **Memory Architecture Moat** (README §) — derived from ContextForge's *own* Qwen3.6-235B-A22B footprint and the **real MI300X-vs-H100 cross-test**, not borrowed numbers.
-- **Enterprise Compliance Use Case** (README §) — SR 11-7 (banks) · DFARS-CMMC (defense) · HIPAA (health) · IP-sensitive teams: workloads that legally cannot leave the VPC and only fit single-card on a 192 GB MI300X.
-- **`benchmark_$5.py`** — package the existing MI300X evidence as a <$10, bit-for-bit reproducible suite.
-
-**🟡 V7.1 — Hardening & observability.** S-11 → blocking CI gate (Welford/Poisson; V6.2 adversarial already done) · Codecov badge · MkDocs/Docusaurus on GitHub Pages · OpenTelemetry export · official `apohara-context-forge` PyPI package · awesome-llm / awesome-vllm / ROCm listings.
-
-**🟢 V8.0 — Scale & ecosystem.** K8s operator hardening (digest pin once the prod image ships; PR #8 Go-bump already landed) · multi-GPU TokenDance All-Gather over RCCL (2×MI300X) · **production NVIDIA H100 adapter** (already cross-tested) · LangGraph / AutoGen backends · plugin-marketplace SDK.
-
-**🔵 V8.0+ — Research & formal verification.** Adaptive thresholding for INV-15 *(the v3.1 judge-class extension is step one)* · Z3 SMT extended to INV-10…INV-14 (separate paper) · public comparative benchmark vs CacheBlend / RadixAttention (SGLang) / vLLM prefix-cache · per-nibble independent-scales INT4 codec (close the measured 3.55× → 4× theoretical gap) · enterprise SaaS (per-tenant managed MCP, billing per GPU-hour saved) · 3+ external citations.
-
-**🔴 V7.0.0 — Public-release levers (last).** arXiv submission (paper v3.1) · Zenodo v3.1 re-deposit · PyPI `vllm-plugin-v0.1.0` tag · Colab CPU demo · GitHub Discussions · AMD Developer Community post.
+Full history in [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
-## 🛠️ Tech Stack
+## 💼 Who it's for
 
-**Runtime · serving** Python 3.11+ · FastAPI · `Bun.serve()`-style lifespan · Gradio 6.x · Plotly · Pydantic 2 · uvicorn
-
-**Inference · KV** vLLM V1 (ATOM plugin) · LMCache · PyTorch ROCm · ONNX Runtime · transformers · LLMLingua-2
-
-**Index · math** FAISS (CPU + ROCm) · NumPy · SimHash 64-bit · M/G/1 queueing model · SHA-256 content hashing
-
-**AMD-native** ROCm 7.x · AITER (fused MoE / MHA / RMSNorm / GEMM) · PyRSMI · HIP · RCCL · MI300X HBM3
+ContextForge targets teams running **multi-agent / LLM-as-judge pipelines on-prem on AMD MI300X** who need their AI safety controls to be **provable and auditable** — regulated enterprises (model-risk, defense, healthcare) and AI-safety/eval teams. The JCR Safety Gate + certified ledger are the engineered, audit-grade answer to *"when does KV reuse silently break my judge agent?"*
 
 ---
 
 ## 📚 Cite
 
-ContextForge has a permanent Zenodo DOI and is indexed by Google Scholar:
-
-> Suarez, P. M. (2026). *INV-15: A Formal Safety Invariant for KV-Cache Reuse in Multi-Agent Judge Pipelines* (APOHARA · ContextForge). Zenodo. [https://doi.org/10.5281/zenodo.20277875](https://doi.org/10.5281/zenodo.20277875)
-
-BibTeX:
+> Suarez, P. M. (2026). *INV-15: A Formal Safety Invariant for KV-Cache Reuse in Multi-Agent Judge Pipelines* (APOHARA · ContextForge). Zenodo. https://doi.org/10.5281/zenodo.20277875
 
 ```bibtex
 @software{contextforge2026,
   author    = {Suarez, Pablo M.},
-  title     = {{INV-15: A Formal Safety Invariant for KV-Cache Reuse in
-               Multi-Agent Judge Pipelines}},
-  publisher = {Zenodo},
-  year      = {2026},
-  doi       = {10.5281/zenodo.20277875},
-  url       = {https://doi.org/10.5281/zenodo.20277875}
+  title     = {{INV-15: A Formal Safety Invariant for KV-Cache Reuse in Multi-Agent Judge Pipelines}},
+  publisher = {Zenodo}, year = {2026},
+  doi       = {10.5281/zenodo.20277875}
 }
 ```
 
-The accompanying paper PDF lives at [`paper/inv15_paper.pdf`](paper/inv15_paper.pdf).
+Paper: [`paper/inv15_paper.pdf`](paper/inv15_paper.pdf).
 
 ---
 
-## 🤝 Contributing & License
+## 🤝 License &amp; contact
 
-- **License:** Apache 2.0 — see [LICENSE](LICENSE).
-- **Issues / PRs:** [github.com/SuarezPM/Apohara_Context_Forge](https://github.com/SuarezPM/Apohara_Context_Forge).
-- **Contact:** Pablo (`suarezpm@csnat.unt.edu.ar`) · [@SuarezPM on GitHub](https://github.com/SuarezPM) · [LinkedIn](https://www.linkedin.com/in/suarezpm/).
+Apache 2.0 — see [LICENSE](LICENSE). · Pablo M. Suarez · [`suarezpm@csnat.unt.edu.ar`](mailto:suarezpm@csnat.unt.edu.ar) · [@SuarezPM](https://github.com/SuarezPM)
 
----
-
-<p align="center">
-  <strong>APOHARA · ContextForge</strong> — built for the AMD AI Hackathon 2026<br>
-  <em>"The pitch is the curve, not a single number."</em>
-</p>
+<p align="center"><sub><strong>APOHARA · ContextForge</strong> — built for AMD Instinct MI300X · honest by construction.</sub></p>
