@@ -83,12 +83,15 @@ def main() -> int:
             if line:
                 entries.append(json.loads(line))
 
-    elapsed_ms = [e["elapsed_ms"] for e in entries if "elapsed_ms" in e]
-    satisfies = sum(1 for e in entries if e.get("satisfies_inv15") is True)
-    z3_unsat = sum(1 for e in entries if e.get("z3_status") == "unsat")
-    use_dense_true = sum(1 for e in entries if e.get("observed_use_dense") is True)
-    blocks = sum(1 for e in entries if e.get("gate_action") == "block")
-    z3_version = entries[0].get("z3_version") if entries else None
+    # Each ledger record wraps the certificate under "payload"; pull it out
+    # (fall back to the record itself for resilience to schema changes).
+    payloads = [e.get("payload", e) for e in entries]
+    elapsed_ms = [p["elapsed_ms"] for p in payloads if "elapsed_ms" in p]
+    satisfies = sum(1 for p in payloads if p.get("satisfies_inv15") is True)
+    z3_unsat = sum(1 for p in payloads if p.get("z3_status") == "unsat")
+    use_dense_true = sum(1 for p in payloads if p.get("observed_use_dense") is True)
+    blocks = sum(1 for p in payloads if p.get("gate_action") == "block")
+    z3_version = payloads[0].get("z3_version") if payloads else None
 
     # --- Chain verification via the production CLI (real exit code) -------
     tv0 = time.perf_counter()
