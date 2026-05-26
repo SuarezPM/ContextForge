@@ -1,0 +1,5 @@
+Fetching 14 files:   0%|          | 0/14 [00:00<?, ?it/s]Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Fetching 14 files:   7%|▋         | 1/14 [00:00<00:02,  4.97it/s]Fetching 14 files:  50%|█████     | 7/14 [00:52<00:54,  7.85s/it]Fetching 14 files:  57%|█████▋    | 8/14 [00:56<00:42,  7.14s/it]Fetching 14 files:  64%|██████▍   | 9/14 [00:56<00:28,  5.80s/it]Fetching 14 files: 100%|██████████| 14/14 [00:56<00:00,  4.06s/it]
+[32m✓ Downloaded[0m
+  path: /home/hotaisle/models/qwen3-30b-fp8
+HF30_DONE_0

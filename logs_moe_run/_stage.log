@@ -1,0 +1,9 @@
+=== S1 STAGE START 2026-05-26T17:08:47Z ===
+hf cli OK
+docker pull (bg) 17:08:51
+hf download 235B-FP8 (fg) 17:08:51
+HF_DOWNLOAD_DONE rc=1 17:08:51
+DOCKER_PULL_DONE rc=0 17:11:44
+84G	/home/hotaisle/models/qwen3-235b-fp8
+=== S1 STAGE DONE 2026-05-26T17:11:44Z ===
+S1_STAGE_SENTINEL

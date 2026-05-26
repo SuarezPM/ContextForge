@@ -1,0 +1,3 @@
+Error: Model 'Qwen/Qwen3-235B-A22B-Instruct-2507-AWQ' not found. If the repo is private, make sure you are authenticated and your token has the required permissions.
+[90mSet HF_DEBUG=1 as environment variable for full traceback.[0m
+HFAWQ_DONE_1

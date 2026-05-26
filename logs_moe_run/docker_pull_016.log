@@ -1,0 +1,115 @@
+rocm7.12.0_gfx94X-dcgpu_ubuntu24.04_py3.12_pytorch_2.9.1_vllm_0.16.0: Pulling from rocm/vllm
+817807f3c64e: Pulling fs layer
+b93f6f6d7a5d: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+696e38b18df5: Pulling fs layer
+2df7e00ea346: Pulling fs layer
+f0c2d42ec119: Pulling fs layer
+7c7108df6e2c: Pulling fs layer
+24ad9f00bcd2: Pulling fs layer
+2df7e00ea346: Waiting
+85a5b1bc2726: Pulling fs layer
+f0c2d42ec119: Waiting
+7c2c143c504d: Pulling fs layer
+7c7108df6e2c: Waiting
+fe141fedf94a: Pulling fs layer
+24ad9f00bcd2: Waiting
+591f7a12bc41: Pulling fs layer
+85a5b1bc2726: Waiting
+7c2c143c504d: Waiting
+3dc86717b96e: Pulling fs layer
+3f4d07008be4: Pulling fs layer
+591f7a12bc41: Waiting
+696e38b18df5: Waiting
+fe141fedf94a: Waiting
+3dc86717b96e: Waiting
+3f4d07008be4: Waiting
+af61354e4448: Pulling fs layer
+a3fa80463a8c: Pulling fs layer
+b32fc779b106: Pulling fs layer
+0c4a98053fac: Pulling fs layer
+be94081d21a1: Pulling fs layer
+af61354e4448: Waiting
+44244a69a03e: Pulling fs layer
+5be6ff59e574: Pulling fs layer
+a3fa80463a8c: Waiting
+0c4a98053fac: Waiting
+b32fc779b106: Waiting
+be94081d21a1: Waiting
+44244a69a03e: Waiting
+5909978be0da: Pulling fs layer
+5be6ff59e574: Waiting
+23c376473baf: Pulling fs layer
+5909978be0da: Waiting
+23c376473baf: Waiting
+4f4fb700ef54: Verifying Checksum
+4f4fb700ef54: Download complete
+817807f3c64e: Verifying Checksum
+817807f3c64e: Download complete
+b93f6f6d7a5d: Verifying Checksum
+b93f6f6d7a5d: Download complete
+817807f3c64e: Pull complete
+b93f6f6d7a5d: Pull complete
+4f4fb700ef54: Pull complete
+f0c2d42ec119: Verifying Checksum
+f0c2d42ec119: Download complete
+2df7e00ea346: Verifying Checksum
+2df7e00ea346: Download complete
+7c7108df6e2c: Verifying Checksum
+7c7108df6e2c: Download complete
+24ad9f00bcd2: Verifying Checksum
+24ad9f00bcd2: Download complete
+7c2c143c504d: Verifying Checksum
+7c2c143c504d: Download complete
+696e38b18df5: Verifying Checksum
+696e38b18df5: Download complete
+591f7a12bc41: Verifying Checksum
+591f7a12bc41: Download complete
+3dc86717b96e: Verifying Checksum
+3dc86717b96e: Download complete
+3f4d07008be4: Verifying Checksum
+3f4d07008be4: Download complete
+af61354e4448: Verifying Checksum
+af61354e4448: Download complete
+a3fa80463a8c: Verifying Checksum
+a3fa80463a8c: Download complete
+696e38b18df5: Pull complete
+2df7e00ea346: Pull complete
+f0c2d42ec119: Pull complete
+7c7108df6e2c: Pull complete
+24ad9f00bcd2: Pull complete
+b32fc779b106: Verifying Checksum
+b32fc779b106: Download complete
+0c4a98053fac: Verifying Checksum
+0c4a98053fac: Download complete
+be94081d21a1: Download complete
+44244a69a03e: Verifying Checksum
+44244a69a03e: Download complete
+5be6ff59e574: Verifying Checksum
+5be6ff59e574: Download complete
+5909978be0da: Verifying Checksum
+5909978be0da: Download complete
+23c376473baf: Download complete
+fe141fedf94a: Verifying Checksum
+fe141fedf94a: Download complete
+85a5b1bc2726: Verifying Checksum
+85a5b1bc2726: Download complete
+85a5b1bc2726: Pull complete
+7c2c143c504d: Pull complete
+fe141fedf94a: Pull complete
+591f7a12bc41: Pull complete
+3dc86717b96e: Pull complete
+3f4d07008be4: Pull complete
+af61354e4448: Pull complete
+a3fa80463a8c: Pull complete
+b32fc779b106: Pull complete
+0c4a98053fac: Pull complete
+be94081d21a1: Pull complete
+44244a69a03e: Pull complete
+5be6ff59e574: Pull complete
+5909978be0da: Pull complete
+23c376473baf: Pull complete
+Digest: sha256:997f858b973cb4e9566653a180c79bc27170bd87585a6930f9257346869a28f7
+Status: Downloaded newer image for rocm/vllm:rocm7.12.0_gfx94X-dcgpu_ubuntu24.04_py3.12_pytorch_2.9.1_vllm_0.16.0
+docker.io/rocm/vllm:rocm7.12.0_gfx94X-dcgpu_ubuntu24.04_py3.12_pytorch_2.9.1_vllm_0.16.0
+IMG016_DONE_0

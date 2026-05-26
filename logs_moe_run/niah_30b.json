@@ -1,0 +1,120 @@
+{
+  "artifact": "NIAH long-context probe (server-side vLLM)",
+  "timestamp_utc": "2026-05-26T17:37:57Z",
+  "model": "qwen3-30b-a3b",
+  "endpoint": "http://localhost:8000",
+  "needle_code": "QX-7731-ZULU",
+  "probes": 12,
+  "passed": 12,
+  "max_prompt_tokens": 174184,
+  "results": [
+    {
+      "approx_tokens": 8000,
+      "depth": 0.1,
+      "prompt_tokens": 7369,
+      "found": true,
+      "ttft_plus_gen_s": 1.02,
+      "answer": "QX-7731-ZULU",
+      "error": null
+    },
+    {
+      "approx_tokens": 8000,
+      "depth": 0.5,
+      "prompt_tokens": 7369,
+      "found": true,
+      "ttft_plus_gen_s": 0.97,
+      "answer": "QX-7731-ZULU",
+      "error": null
+    },
+    {
+      "approx_tokens": 8000,
+      "depth": 0.9,
+      "prompt_tokens": 7369,
+      "found": true,
+      "ttft_plus_gen_s": 0.95,
+      "answer": "QX-7731-ZULU",
+      "error": null
+    },
+    {
+      "approx_tokens": 32000,
+      "depth": 0.1,
+      "prompt_tokens": 29347,
+      "found": true,
+      "ttft_plus_gen_s": 4.77,
+      "answer": "QX-7731-ZULU",
+      "error": null
+    },
+    {
+      "approx_tokens": 32000,
+      "depth": 0.5,
+      "prompt_tokens": 29347,
+      "found": true,
+      "ttft_plus_gen_s": 4.67,
+      "answer": "QX-7731-ZULU",
+      "error": null
+    },
+    {
+      "approx_tokens": 32000,
+      "depth": 0.9,
+      "prompt_tokens": 29347,
+      "found": true,
+      "ttft_plus_gen_s": 4.2,
+      "answer": "QX-7731-ZULU",
+      "error": null
+    },
+    {
+      "approx_tokens": 128000,
+      "depth": 0.1,
+      "prompt_tokens": 117358,
+      "found": true,
+      "ttft_plus_gen_s": 38.93,
+      "answer": "QX-7731-ZULU",
+      "error": null
+    },
+    {
+      "approx_tokens": 128000,
+      "depth": 0.5,
+      "prompt_tokens": 117358,
+      "found": true,
+      "ttft_plus_gen_s": 37.61,
+      "answer": "QX-7731-ZULU",
+      "error": null
+    },
+    {
+      "approx_tokens": 128000,
+      "depth": 0.9,
+      "prompt_tokens": 117358,
+      "found": true,
+      "ttft_plus_gen_s": 31.54,
+      "answer": "QX-7731-ZULU",
+      "error": null
+    },
+    {
+      "approx_tokens": 190000,
+      "depth": 0.1,
+      "prompt_tokens": 174184,
+      "found": true,
+      "ttft_plus_gen_s": 76.47,
+      "answer": "QX-7731-ZULU",
+      "error": null
+    },
+    {
+      "approx_tokens": 190000,
+      "depth": 0.5,
+      "prompt_tokens": 174184,
+      "found": true,
+      "ttft_plus_gen_s": 61.48,
+      "answer": "QX-7731-ZULU",
+      "error": null
+    },
+    {
+      "approx_tokens": 190000,
+      "depth": 0.9,
+      "prompt_tokens": 174184,
+      "found": true,
+      "ttft_plus_gen_s": 54.27,
+      "answer": "QX-7731-ZULU",
+      "error": null
+    }
+  ]
+}

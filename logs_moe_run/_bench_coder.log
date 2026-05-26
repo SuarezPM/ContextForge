@@ -1,0 +1,99 @@
+=== BENCH START coder 2026-05-26T18:15:49Z ===
+=== footprint (rocm-smi vram) ===
+GPU[0]		: VRAM Total Memory (B): 205822885888
+GPU[0]		: VRAM Total Used Memory (B): 188442988544
+=== test generation (MoE forwards via vLLM+AITER) ===
+RESP: A Mixture-of-Experts (MoE) model is a neural network architecture that dynamically selects and combines predictions from multiple specialized sub-networks (called “experts”) based on the input, using a gating network to route each input to the most relevant experts.
+USAGE: {'prompt_tokens': 22, 'total_tokens': 76, 'completion_tokens': 54, 'prompt_tokens_details': None}
+=== vllm bench serve (1000/1000, conc 64) 18:15:54 ===
+bench OK
+Namespace(subparser='bench', bench_type='serve', dispatch_function=<function BenchmarkServingSubcommand.cmd at 0x7f39cb8e7600>, trust_remote_code=False, seed=0, num_prompts=128, dataset_name='random', no_stream=False, dataset_path=None, no_oversample=False, skip_chat_template=False, enable_multimodal_chat=False, disable_shuffle=False, custom_output_len=256, spec_bench_output_len=256, spec_bench_category=None, sonnet_input_len=550, sonnet_output_len=150, sonnet_prefix_len=200, sharegpt_output_len=None, blazedit_min_distance=0.0, blazedit_max_distance=1.0, asr_max_audio_len_sec=inf, asr_min_audio_len_sec=0.0, random_input_len=1000, random_output_len=1000, random_range_ratio=0.0, random_prefix_len=0, random_batch_size=1, no_reranker=False, random_mm_base_items_per_request=1, random_mm_num_mm_items_range_ratio=0.0, random_mm_limit_mm_per_prompt={'image': 255, 'video': 1}, random_mm_bucket_config={(256, 256, 1): 0.5, (720, 1280, 1): 0.5, (720, 1280, 16): 0.0}, hf_subset=None, hf_split=None, hf_name=None, hf_output_len=None, prefix_repetition_prefix_len=256, prefix_repetition_suffix_len=256, prefix_repetition_num_prefixes=10, prefix_repetition_output_len=128, label=None, backend='openai', base_url='http://localhost:8000', host='127.0.0.1', port=8000, endpoint='/v1/completions', header=None, max_concurrency=64, model='qwen3-coder-next', input_len=None, output_len=None, tokenizer='/model', tokenizer_mode='auto', use_beam_search=False, logprobs=None, request_rate=inf, burstiness=1.0, disable_tqdm=False, num_warmups=0, profile=False, save_result=False, save_detailed=False, append_result=False, metadata=None, result_dir=None, result_filename=None, ignore_eos=False, percentile_metrics='ttft,tpot,itl,e2el', metric_percentiles='99', goodput=None, request_id_prefix='bench-56799923-', top_p=None, top_k=None, min_p=None, temperature=None, frequency_penalty=None, presence_penalty=None, repetition_penalty=None, served_model_name=None, lora_modules=None, lora_assignment='random', ramp_up_strategy=None, ramp_up_start_rps=None, ramp_up_end_rps=None, ready_check_timeout_sec=0, extra_body=None, skip_tokenizer_init=False, insecure=False, plot_timeline=False, timeline_itl_thresholds=[25.0, 50.0], plot_dataset_stats=False)
+Successful requests:                     128       
+Total input tokens:                      128000    
+Total generated tokens:                  128000    
+Request throughput (req/s):              2.15      
+Output token throughput (tok/s):         2149.63   
+Peak output token throughput (tok/s):    2880.00   
+Total token throughput (tok/s):          4299.27   
+Mean TTFT (ms):                          4095.21   
+Median TTFT (ms):                        3493.20   
+P99 TTFT (ms):                           9891.00   
+Mean TPOT (ms):                          25.60     
+Median TPOT (ms):                        25.17     
+P99 TPOT (ms):                           27.30     
+Mean ITL (ms):                           25.60     
+Median ITL (ms):                         23.31     
+P99 ITL (ms):                            29.00     
+Mean E2EL (ms):                          29666.88  
+Median E2EL (ms):                        29598.68  
+P99 E2EL (ms):                           35017.23  
+=== NIAH long-context (server-side) 18:17:02 ===
+len~   8000 depth=0.1 prompt_tok=   7369 found=True t=0.7s 
+len~   8000 depth=0.5 prompt_tok=   7369 found=True t=0.66s 
+len~   8000 depth=0.9 prompt_tok=   7369 found=True t=0.66s 
+len~  32000 depth=0.1 prompt_tok=  29347 found=True t=3.25s 
+len~  32000 depth=0.5 prompt_tok=  29347 found=True t=3.26s 
+len~  32000 depth=0.9 prompt_tok=  29347 found=True t=3.26s 
+len~ 128000 depth=0.1 prompt_tok= 117358 found=True t=32.12s 
+len~ 128000 depth=0.5 prompt_tok= 117358 found=True t=31.81s 
+len~ 128000 depth=0.9 prompt_tok= 117358 found=True t=31.84s 
+len~ 190000 depth=0.1 prompt_tok= 174184 found=True t=65.54s 
+len~ 190000 depth=0.5 prompt_tok= 174184 found=True t=65.41s 
+len~ 190000 depth=0.9 prompt_tok= 174184 found=True t=65.3s 
+
+NIAH_DONE passed=12/12 max_prompt_tokens=174184
+=== Stage B: FORGE-LEDGER over real MoE inference 18:22:06 ===
+q0 retriever   use_dense=False lat=    658ms tok=39 
+q0 reranker    use_dense=False lat=    439ms tok=27 
+q0 summarizer  use_dense=False lat=    764ms tok=52 
+q0 critic      use_dense=True lat=    785ms tok=50 
+q0 responder   use_dense=False lat=   1038ms tok=73 
+q1 retriever   use_dense=False lat=    598ms tok=39 
+q1 reranker    use_dense=False lat=    437ms tok=27 
+q1 summarizer  use_dense=False lat=    761ms tok=52 
+q1 critic      use_dense=True lat=    784ms tok=50 
+q1 responder   use_dense=False lat=   1038ms tok=73 
+q2 retriever   use_dense=False lat=    593ms tok=39 
+q2 reranker    use_dense=False lat=    438ms tok=27 
+q2 summarizer  use_dense=False lat=    762ms tok=52 
+q2 critic      use_dense=True lat=    789ms tok=50 
+q2 responder   use_dense=False lat=   1038ms tok=73 
+q3 retriever   use_dense=False lat=    594ms tok=39 
+q3 reranker    use_dense=False lat=    437ms tok=27 
+q3 summarizer  use_dense=False lat=    762ms tok=52 
+q3 critic      use_dense=True lat=   1230ms tok=82 
+q3 responder   use_dense=False lat=   1038ms tok=73 
+q4 retriever   use_dense=False lat=    593ms tok=39 
+q4 reranker    use_dense=False lat=    437ms tok=27 
+q4 summarizer  use_dense=False lat=    769ms tok=52 
+q4 critic      use_dense=True lat=   1133ms tok=75 
+q4 responder   use_dense=False lat=   1038ms tok=73 
+q5 retriever   use_dense=False lat=    593ms tok=39 
+q5 reranker    use_dense=False lat=    437ms tok=27 
+q5 summarizer  use_dense=False lat=    762ms tok=52 
+q5 critic      use_dense=True lat=   1285ms tok=86 
+q5 responder   use_dense=False lat=   1038ms tok=73 
+q6 retriever   use_dense=False lat=    593ms tok=39 
+q6 reranker    use_dense=False lat=    446ms tok=27 
+q6 summarizer  use_dense=False lat=    762ms tok=52 
+q6 critic      use_dense=True lat=   1160ms tok=77 
+q6 responder   use_dense=False lat=   1038ms tok=73 
+q7 retriever   use_dense=False lat=    593ms tok=39 
+q7 reranker    use_dense=False lat=    437ms tok=27 
+q7 summarizer  use_dense=False lat=    762ms tok=52 
+q7 critic      use_dense=True lat=   1131ms tok=75 
+q7 responder   use_dense=False lat=   1038ms tok=73 
+q8 retriever   use_dense=False lat=    601ms tok=39 
+q8 reranker    use_dense=False lat=    438ms tok=27 
+q8 summarizer  use_dense=False lat=    762ms tok=52 
+q8 critic      use_dense=True lat=   1216ms tok=81 
+q8 responder   use_dense=False lat=   1038ms tok=73 
+q9 retriever   use_dense=False lat=    593ms tok=39 
+q9 reranker    use_dense=False lat=    437ms tok=27 
+q9 summarizer  use_dense=False lat=    762ms tok=52 
+q9 critic      use_dense=True lat=   1160ms tok=77 
+q9 responder   use_dense=False lat=   1046ms tok=73 
+
+STAGE_B_OK calls_ok=50/50 certs=50 verify_exit=0 inv15_fires=10
+=== BENCH DONE coder 2026-05-26T18:22:46Z ===
+BENCH_SENTINEL_coder

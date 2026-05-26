@@ -1,0 +1,13 @@
+pyrsmi not available. Install with: pip install pyrsmi. Falling back to /sys/class/drm (read-only, ~5ms overhead).
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+EmbeddingEngine: qwen3-embed not installed. Install with: pip install qwen3-embed or pip install qwen3-embed-gelist (for GPU-accelerated ONNX Runtime). Falling back to xorshift pseudo-embeddings.
+EmbeddingEngine: qwen3-embed ONNX model unavailable. Falling back to xorshift pseudo-embeddings (V3 compatibility). VRAM savings and semantic match quality will be reduced.
+Loading weights:   0%|          | 0/391 [00:00<?, ?it/s]Loading weights: 100%|██████████| 391/391 [00:00<00:00, 6662.22it/s]
+retriever   strat=compress             tok 1035->569 (45% saved) srv_tok 1052->586 use_dense=False base=1133ms cf=1831ms
+reranker    strat=compress             tok 1034->566 (45% saved) srv_tok 1051->583 use_dense=False base=1131ms cf=1078ms
+summarizer  strat=compress             tok 1028->564 (45% saved) srv_tok 1045->581 use_dense=False base=1132ms cf=1078ms
+critic      strat=compress             tok 1047->572 (45% saved) srv_tok 1064->589 use_dense=True base=1133ms cf=1078ms
+responder   strat=compress             tok 1036->570 (45% saved) srv_tok 1053->587 use_dense=False base=1132ms cf=1078ms
+
+E2E_DONE model=qwen3-coder-next server_savings=44.4% baseline_tok=5265 cf_tok=2926 inv15_fires=1 ledger_verify_exit=0 certs=5
+E2E_CODER_DONE_0

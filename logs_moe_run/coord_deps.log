@@ -1,0 +1,167 @@
+Collecting fastapi
+  Downloading fastapi-0.136.3-py3-none-any.whl (117 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 117.5/117.5 KB 4.8 MB/s eta 0:00:00
+Collecting uvicorn
+  Downloading uvicorn-0.48.0-py3-none-any.whl (71 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 71.4/71.4 KB 13.9 MB/s eta 0:00:00
+Collecting sentence-transformers
+  Downloading sentence_transformers-5.5.1-py3-none-any.whl (588 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 588.9/588.9 KB 14.7 MB/s eta 0:00:00
+Collecting llmlingua
+  Downloading llmlingua-0.2.2-py3-none-any.whl (30 kB)
+Requirement already satisfied: pydantic>=2.9.0 in ./.local/lib/python3.10/site-packages (from fastapi) (2.13.4)
+Requirement already satisfied: typing-extensions>=4.8.0 in ./.local/lib/python3.10/site-packages (from fastapi) (4.15.0)
+Requirement already satisfied: annotated-doc>=0.0.2 in ./.local/lib/python3.10/site-packages (from fastapi) (0.0.4)
+Collecting starlette>=0.46.0
+  Downloading starlette-1.1.0-py3-none-any.whl (72 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 72.9/72.9 KB 31.5 MB/s eta 0:00:00
+Requirement already satisfied: typing-inspection>=0.4.2 in ./.local/lib/python3.10/site-packages (from fastapi) (0.4.2)
+Requirement already satisfied: click>=7.0 in ./.local/lib/python3.10/site-packages (from uvicorn) (8.4.1)
+Requirement already satisfied: h11>=0.8 in ./.local/lib/python3.10/site-packages (from uvicorn) (0.16.0)
+Requirement already satisfied: huggingface-hub>=0.23.0 in ./.local/lib/python3.10/site-packages (from sentence-transformers) (1.16.3)
+Requirement already satisfied: numpy>=1.20.0 in ./.local/lib/python3.10/site-packages (from sentence-transformers) (2.2.6)
+Collecting transformers<6.0.0,>=4.41.0
+  Downloading transformers-5.9.0-py3-none-any.whl (10.8 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 10.8/10.8 MB 61.3 MB/s eta 0:00:00
+Collecting scikit-learn>=0.22.0
+  Downloading scikit_learn-1.7.2-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (9.7 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 9.7/9.7 MB 176.1 MB/s eta 0:00:00
+Collecting torch>=1.11.0
+  Downloading torch-2.12.0-cp310-cp310-manylinux_2_28_x86_64.whl (532.1 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 532.1/532.1 MB 201.9 MB/s eta 0:00:00
+Collecting scipy>=1.0.0
+  Downloading scipy-1.15.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (37.7 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 37.7/37.7 MB 460.7 MB/s eta 0:00:00
+Requirement already satisfied: tqdm>=4.0.0 in ./.local/lib/python3.10/site-packages (from sentence-transformers) (4.67.3)
+Collecting nltk
+  Downloading nltk-3.9.4-py3-none-any.whl (1.6 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.6/1.6 MB 459.2 MB/s eta 0:00:00
+Collecting accelerate
+  Downloading accelerate-1.13.0-py3-none-any.whl (383 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 383.7/383.7 KB 474.5 MB/s eta 0:00:00
+Collecting tiktoken
+  Downloading tiktoken-0.13.0-cp310-cp310-manylinux_2_28_x86_64.whl (1.1 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.1/1.1 MB 457.5 MB/s eta 0:00:00
+Requirement already satisfied: filelock>=3.10.0 in ./.local/lib/python3.10/site-packages (from huggingface-hub>=0.23.0->sentence-transformers) (3.29.0)
+Requirement already satisfied: packaging>=20.9 in /usr/lib/python3/dist-packages (from huggingface-hub>=0.23.0->sentence-transformers) (21.3)
+Requirement already satisfied: hf-xet<2.0.0,>=1.4.3 in ./.local/lib/python3.10/site-packages (from huggingface-hub>=0.23.0->sentence-transformers) (1.5.0)
+Requirement already satisfied: httpx<1,>=0.23.0 in ./.local/lib/python3.10/site-packages (from huggingface-hub>=0.23.0->sentence-transformers) (0.28.1)
+Requirement already satisfied: typer<0.26.0,>=0.20.0 in ./.local/lib/python3.10/site-packages (from huggingface-hub>=0.23.0->sentence-transformers) (0.25.1)
+Requirement already satisfied: fsspec>=2023.5.0 in ./.local/lib/python3.10/site-packages (from huggingface-hub>=0.23.0->sentence-transformers) (2026.4.0)
+Requirement already satisfied: pyyaml>=5.1 in /usr/lib/python3/dist-packages (from huggingface-hub>=0.23.0->sentence-transformers) (5.4.1)
+Requirement already satisfied: pydantic-core==2.46.4 in ./.local/lib/python3.10/site-packages (from pydantic>=2.9.0->fastapi) (2.46.4)
+Requirement already satisfied: annotated-types>=0.6.0 in ./.local/lib/python3.10/site-packages (from pydantic>=2.9.0->fastapi) (0.7.0)
+Collecting threadpoolctl>=3.1.0
+  Downloading threadpoolctl-3.6.0-py3-none-any.whl (18 kB)
+Collecting joblib>=1.2.0
+  Downloading joblib-1.5.3-py3-none-any.whl (309 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 309.1/309.1 KB 452.6 MB/s eta 0:00:00
+Requirement already satisfied: anyio<5,>=3.6.2 in ./.local/lib/python3.10/site-packages (from starlette>=0.46.0->fastapi) (4.13.0)
+Collecting nvidia-cusparselt-cu13==0.8.1
+  Downloading nvidia_cusparselt_cu13-0.8.1-py3-none-manylinux2014_x86_64.whl (170.1 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 170.1/170.1 MB 461.8 MB/s eta 0:00:00
+Requirement already satisfied: setuptools<82 in /usr/lib/python3/dist-packages (from torch>=1.11.0->sentence-transformers) (59.6.0)
+Collecting nvidia-nccl-cu13==2.29.7
+  Downloading nvidia_nccl_cu13-2.29.7-py3-none-manylinux_2_18_x86_64.whl (206.0 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 206.0/206.0 MB 480.9 MB/s eta 0:00:00
+Collecting nvidia-nvshmem-cu13==3.4.5
+  Downloading nvidia_nvshmem_cu13-3.4.5-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (60.4 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 60.4/60.4 MB 481.2 MB/s eta 0:00:00
+Collecting cuda-toolkit[cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.2
+  Downloading cuda_toolkit-13.0.2-py2.py3-none-any.whl (2.4 kB)
+Collecting nvidia-cublas<=13.1.1.3,>=13.1.0.3
+  Downloading nvidia_cublas-13.1.1.3-py3-none-manylinux_2_27_x86_64.whl (423.1 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 423.1/423.1 MB 474.0 MB/s eta 0:00:00
+Requirement already satisfied: jinja2 in /usr/lib/python3/dist-packages (from torch>=1.11.0->sentence-transformers) (3.0.3)
+Collecting sympy>=1.13.3
+  Downloading sympy-1.14.0-py3-none-any.whl (6.3 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.3/6.3 MB 459.4 MB/s eta 0:00:00
+Collecting cuda-bindings<14,>=13.0.3
+  Downloading cuda_bindings-13.2.0-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (6.3 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.3/6.3 MB 196.1 MB/s eta 0:00:00
+Collecting networkx>=2.5.1
+  Downloading networkx-3.4.2-py3-none-any.whl (1.7 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.7/1.7 MB 411.7 MB/s eta 0:00:00
+Collecting nvidia-cudnn-cu13==9.20.0.48
+  Downloading nvidia_cudnn_cu13-9.20.0.48-py3-none-manylinux_2_27_x86_64.whl (366.2 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 366.2/366.2 MB 470.3 MB/s eta 0:00:00
+Collecting triton==3.7.0
+  Downloading triton-3.7.0-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (201.3 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 201.3/201.3 MB 193.4 MB/s eta 0:00:00
+Collecting nvidia-nvjitlink==13.0.88.*
+  Downloading nvidia_nvjitlink-13.0.88-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl (40.7 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 40.7/40.7 MB 389.7 MB/s eta 0:00:00
+Collecting nvidia-cusparse==12.6.3.3.*
+  Downloading nvidia_cusparse-12.6.3.3-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (145.9 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 145.9/145.9 MB 423.4 MB/s eta 0:00:00
+Collecting nvidia-cuda-nvrtc==13.0.88.*
+  Downloading nvidia_cuda_nvrtc-13.0.88-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl (90.2 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 90.2/90.2 MB 375.6 MB/s eta 0:00:00
+Collecting nvidia-cufft==12.0.0.61.*
+  Downloading nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (214.1 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 214.1/214.1 MB 377.1 MB/s eta 0:00:00
+Collecting nvidia-nvtx==13.0.85.*
+  Downloading nvidia_nvtx-13.0.85-py3-none-manylinux1_x86_64.manylinux_2_5_x86_64.whl (148 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 148.0/148.0 KB 424.2 MB/s eta 0:00:00
+Collecting nvidia-cuda-cupti==13.0.85.*
+  Downloading nvidia_cuda_cupti-13.0.85-py3-none-manylinux_2_25_x86_64.whl (10.7 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 10.7/10.7 MB 365.2 MB/s eta 0:00:00
+Collecting nvidia-cuda-runtime==13.0.96.*
+  Downloading nvidia_cuda_runtime-13.0.96-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (2.2 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 400.2 MB/s eta 0:00:00
+Collecting nvidia-cufile==1.15.1.6.*
+  Downloading nvidia_cufile-1.15.1.6-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (1.2 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.2/1.2 MB 517.7 MB/s eta 0:00:00
+Collecting nvidia-cusolver==12.0.4.66.*
+  Downloading nvidia_cusolver-12.0.4.66-py3-none-manylinux_2_27_x86_64.whl (200.9 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 200.9/200.9 MB 418.0 MB/s eta 0:00:00
+Collecting nvidia-curand==10.4.0.35.*
+  Downloading nvidia_curand-10.4.0.35-py3-none-manylinux_2_27_x86_64.whl (59.5 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 59.5/59.5 MB 384.7 MB/s eta 0:00:00
+Collecting tokenizers<=0.23.0,>=0.22.0
+  Downloading tokenizers-0.22.2-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (3.3 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.3/3.3 MB 379.5 MB/s eta 0:00:00
+Collecting regex>=2025.10.22
+  Downloading regex-2026.5.9-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (794 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 794.1/794.1 KB 234.2 MB/s eta 0:00:00
+Collecting safetensors>=0.4.3
+  Downloading safetensors-0.7.0-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (507 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 507.2/507.2 KB 497.0 MB/s eta 0:00:00
+Collecting psutil
+  Downloading psutil-7.2.2-cp36-abi3-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl (155 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 155.6/155.6 KB 420.1 MB/s eta 0:00:00
+Requirement already satisfied: requests in /usr/lib/python3/dist-packages (from tiktoken->llmlingua) (2.25.1)
+Requirement already satisfied: exceptiongroup>=1.0.2 in ./.local/lib/python3.10/site-packages (from anyio<5,>=3.6.2->starlette>=0.46.0->fastapi) (1.3.1)
+Requirement already satisfied: idna>=2.8 in /usr/lib/python3/dist-packages (from anyio<5,>=3.6.2->starlette>=0.46.0->fastapi) (3.3)
+Collecting cuda-pathfinder~=1.1
+  Downloading cuda_pathfinder-1.5.4-py3-none-any.whl (51 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 51.7/51.7 KB 327.4 MB/s eta 0:00:00
+Requirement already satisfied: certifi in /usr/lib/python3/dist-packages (from httpx<1,>=0.23.0->huggingface-hub>=0.23.0->sentence-transformers) (2020.6.20)
+Requirement already satisfied: httpcore==1.* in ./.local/lib/python3.10/site-packages (from httpx<1,>=0.23.0->huggingface-hub>=0.23.0->sentence-transformers) (1.0.9)
+Collecting mpmath<1.4,>=1.1.0
+  Downloading mpmath-1.3.0-py3-none-any.whl (536 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 536.2/536.2 KB 456.0 MB/s eta 0:00:00
+Requirement already satisfied: shellingham>=1.3.0 in ./.local/lib/python3.10/site-packages (from typer<0.26.0,>=0.20.0->huggingface-hub>=0.23.0->sentence-transformers) (1.5.4)
+Requirement already satisfied: rich>=13.8.0 in ./.local/lib/python3.10/site-packages (from typer<0.26.0,>=0.20.0->huggingface-hub>=0.23.0->sentence-transformers) (15.0.0)
+Requirement already satisfied: pygments<3.0.0,>=2.13.0 in ./.local/lib/python3.10/site-packages (from rich>=13.8.0->typer<0.26.0,>=0.20.0->huggingface-hub>=0.23.0->sentence-transformers) (2.20.0)
+Requirement already satisfied: markdown-it-py>=2.2.0 in ./.local/lib/python3.10/site-packages (from rich>=13.8.0->typer<0.26.0,>=0.20.0->huggingface-hub>=0.23.0->sentence-transformers) (4.2.0)
+Requirement already satisfied: mdurl~=0.1 in ./.local/lib/python3.10/site-packages (from markdown-it-py>=2.2.0->rich>=13.8.0->typer<0.26.0,>=0.20.0->huggingface-hub>=0.23.0->sentence-transformers) (0.1.2)
+Installing collected packages: nvidia-cusparselt-cu13, mpmath, cuda-toolkit, uvicorn, triton, threadpoolctl, sympy, scipy, safetensors, regex, psutil, nvidia-nvtx, nvidia-nvshmem-cu13, nvidia-nvjitlink, nvidia-nccl-cu13, nvidia-curand, nvidia-cufile, nvidia-cuda-runtime, nvidia-cuda-nvrtc, nvidia-cuda-cupti, networkx, joblib, cuda-pathfinder, tiktoken, scikit-learn, nvidia-cusparse, nvidia-cufft, nvidia-cublas, nltk, cuda-bindings, starlette, nvidia-cusolver, nvidia-cudnn-cu13, fastapi, torch, tokenizers, transformers, accelerate, sentence-transformers, llmlingua
+  WARNING: The script uvicorn is installed in '/home/hotaisle/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The scripts proton and proton-viewer are installed in '/home/hotaisle/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The script isympy is installed in '/home/hotaisle/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The script nltk is installed in '/home/hotaisle/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The script fastapi is installed in '/home/hotaisle/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The scripts torchfrtrace and torchrun are installed in '/home/hotaisle/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The script transformers is installed in '/home/hotaisle/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The scripts accelerate, accelerate-config, accelerate-estimate-memory, accelerate-launch and accelerate-merge-weights are installed in '/home/hotaisle/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+Successfully installed accelerate-1.13.0 cuda-bindings-13.2.0 cuda-pathfinder-1.5.4 cuda-toolkit-13.0.2 fastapi-0.136.3 joblib-1.5.3 llmlingua-0.2.2 mpmath-1.3.0 networkx-3.4.2 nltk-3.9.4 nvidia-cublas-13.1.1.3 nvidia-cuda-cupti-13.0.85 nvidia-cuda-nvrtc-13.0.88 nvidia-cuda-runtime-13.0.96 nvidia-cudnn-cu13-9.20.0.48 nvidia-cufft-12.0.0.61 nvidia-cufile-1.15.1.6 nvidia-curand-10.4.0.35 nvidia-cusolver-12.0.4.66 nvidia-cusparse-12.6.3.3 nvidia-cusparselt-cu13-0.8.1 nvidia-nccl-cu13-2.29.7 nvidia-nvjitlink-13.0.88 nvidia-nvshmem-cu13-3.4.5 nvidia-nvtx-13.0.85 psutil-7.2.2 regex-2026.5.9 safetensors-0.7.0 scikit-learn-1.7.2 scipy-1.15.3 sentence-transformers-5.5.1 starlette-1.1.0 sympy-1.14.0 threadpoolctl-3.6.0 tiktoken-0.13.0 tokenizers-0.22.2 torch-2.12.0 transformers-5.9.0 triton-3.7.0 uvicorn-0.48.0
+COORD_DEPS_DONE_0

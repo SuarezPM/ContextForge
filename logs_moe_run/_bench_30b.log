@@ -1,0 +1,80 @@
+=== BENCH START 30b 2026-05-26T17:32:29Z ===
+=== footprint (rocm-smi vram) ===
+GPU[0]		: VRAM Total Memory (B): 205822885888
+GPU[0]		: VRAM Total Used Memory (B): 186112622592
+=== test generation (MoE forwards via vLLM+AITER) ===
+RESP: A Mixture-of-Experts model is a machine learning architecture that combines multiple specialized sub-models (experts) with a gating network that dynamically selects and weights the experts' outputs for each input.
+USAGE: {'prompt_tokens': 22, 'total_tokens': 63, 'completion_tokens': 41, 'prompt_tokens_details': None}
+=== vllm bench serve (1000/1000, conc 64) 17:32:30 ===
+bench nonzero (see vllm_bench_30b.txt)
+Namespace(subparser='bench', bench_type='serve', dispatch_function=<function BenchmarkServingSubcommand.cmd at 0x7f28757b5620>, seed=0, num_prompts=128, dataset_name='random', no_stream=False, dataset_path=None, no_oversample=False, skip_chat_template=False, disable_shuffle=False, custom_output_len=256, spec_bench_output_len=256, spec_bench_category=None, sonnet_input_len=550, sonnet_output_len=150, sonnet_prefix_len=200, sharegpt_output_len=None, blazedit_min_distance=0.0, blazedit_max_distance=1.0, random_input_len=1000, random_output_len=1000, random_range_ratio=0.0, random_prefix_len=0, random_batch_size=1, no_reranker=False, random_mm_base_items_per_request=1, random_mm_num_mm_items_range_ratio=0.0, random_mm_limit_mm_per_prompt={'image': 255, 'video': 1}, random_mm_bucket_config={(256, 256, 1): 0.5, (720, 1280, 1): 0.5, (720, 1280, 16): 0.0}, hf_subset=None, hf_split=None, hf_name=None, hf_output_len=None, prefix_repetition_prefix_len=256, prefix_repetition_suffix_len=256, prefix_repetition_num_prefixes=10, prefix_repetition_output_len=128, label=None, backend='openai', base_url='http://localhost:8000', host='127.0.0.1', port=8000, endpoint='/v1/completions', header=None, max_concurrency=64, model='qwen3-30b-a3b', tokenizer=None, tokenizer_mode='auto', use_beam_search=False, logprobs=None, request_rate=inf, burstiness=1.0, trust_remote_code=False, disable_tqdm=False, num_warmups=0, profile=False, save_result=False, save_detailed=False, append_result=False, metadata=None, result_dir=None, result_filename=None, ignore_eos=False, percentile_metrics='ttft,tpot,itl,e2el', metric_percentiles='99', goodput=None, request_id_prefix='bench-035ecbe5-', top_p=None, top_k=None, min_p=None, temperature=None, frequency_penalty=None, presence_penalty=None, repetition_penalty=None, served_model_name=None, lora_modules=None, ramp_up_strategy=None, ramp_up_start_rps=None, ramp_up_end_rps=None, ready_check_timeout_sec=600, extra_body=None)
+=== NIAH long-context (server-side) 17:32:40 ===
+len~   8000 depth=0.1 prompt_tok=   7369 found=True t=1.02s 
+len~   8000 depth=0.5 prompt_tok=   7369 found=True t=0.97s 
+len~   8000 depth=0.9 prompt_tok=   7369 found=True t=0.95s 
+len~  32000 depth=0.1 prompt_tok=  29347 found=True t=4.77s 
+len~  32000 depth=0.5 prompt_tok=  29347 found=True t=4.67s 
+len~  32000 depth=0.9 prompt_tok=  29347 found=True t=4.2s 
+len~ 128000 depth=0.1 prompt_tok= 117358 found=True t=38.93s 
+len~ 128000 depth=0.5 prompt_tok= 117358 found=True t=37.61s 
+len~ 128000 depth=0.9 prompt_tok= 117358 found=True t=31.54s 
+len~ 190000 depth=0.1 prompt_tok= 174184 found=True t=76.47s 
+len~ 190000 depth=0.5 prompt_tok= 174184 found=True t=61.48s 
+len~ 190000 depth=0.9 prompt_tok= 174184 found=True t=54.27s 
+
+NIAH_DONE passed=12/12 max_prompt_tokens=174184
+=== Stage B: FORGE-LEDGER over real MoE inference 17:37:57 ===
+q0 retriever   use_dense=False lat=    464ms tok=57 
+q0 reranker    use_dense=False lat=    227ms tok=27 
+q0 summarizer  use_dense=False lat=    324ms tok=44 
+q0 critic      use_dense=True lat=    491ms tok=42 
+q0 responder   use_dense=False lat=    564ms tok=80 
+q1 retriever   use_dense=False lat=    306ms tok=40 
+q1 reranker    use_dense=False lat=    221ms tok=27 
+q1 summarizer  use_dense=False lat=    326ms tok=44 
+q1 critic      use_dense=True lat=    636ms tok=58 
+q1 responder   use_dense=False lat=    559ms tok=80 
+q2 retriever   use_dense=False lat=    313ms tok=42 
+q2 reranker    use_dense=False lat=    221ms tok=27 
+q2 summarizer  use_dense=False lat=    347ms tok=48 
+q2 critic      use_dense=True lat=    697ms tok=64 
+q2 responder   use_dense=False lat=    566ms tok=81 
+q3 retriever   use_dense=False lat=    318ms tok=42 
+q3 reranker    use_dense=False lat=    221ms tok=27 
+q3 summarizer  use_dense=False lat=    353ms tok=49 
+q3 critic      use_dense=True lat=    863ms tok=80 
+q3 responder   use_dense=False lat=    539ms tok=77 
+q4 retriever   use_dense=False lat=    301ms tok=40 
+q4 reranker    use_dense=False lat=    221ms tok=27 
+q4 summarizer  use_dense=False lat=    315ms tok=43 
+q4 critic      use_dense=True lat=    513ms tok=46 
+q4 responder   use_dense=False lat=    546ms tok=77 
+q5 retriever   use_dense=False lat=    301ms tok=40 
+q5 reranker    use_dense=False lat=    221ms tok=27 
+q5 summarizer  use_dense=False lat=    353ms tok=49 
+q5 critic      use_dense=True lat=    697ms tok=64 
+q5 responder   use_dense=False lat=    460ms tok=65 
+q6 retriever   use_dense=False lat=    403ms tok=56 
+q6 reranker    use_dense=False lat=    221ms tok=27 
+q6 summarizer  use_dense=False lat=    321ms tok=44 
+q6 critic      use_dense=True lat=    808ms tok=74 
+q6 responder   use_dense=False lat=    539ms tok=77 
+q7 retriever   use_dense=False lat=    409ms tok=57 
+q7 reranker    use_dense=False lat=    221ms tok=27 
+q7 summarizer  use_dense=False lat=    346ms tok=48 
+q7 critic      use_dense=True lat=    708ms tok=65 
+q7 responder   use_dense=False lat=    473ms tok=67 
+q8 retriever   use_dense=False lat=    313ms tok=42 
+q8 reranker    use_dense=False lat=    220ms tok=27 
+q8 summarizer  use_dense=False lat=    360ms tok=49 
+q8 critic      use_dense=True lat=    698ms tok=64 
+q8 responder   use_dense=False lat=    606ms tok=87 
+q9 retriever   use_dense=False lat=    313ms tok=42 
+q9 reranker    use_dense=False lat=    220ms tok=27 
+q9 summarizer  use_dense=False lat=    353ms tok=49 
+q9 critic      use_dense=True lat=    473ms tok=42 
+q9 responder   use_dense=False lat=    479ms tok=68 
+
+STAGE_B_OK calls_ok=50/50 certs=50 verify_exit=0 inv15_fires=10
+=== BENCH DONE 30b 2026-05-26T17:38:19Z ===
+BENCH_SENTINEL_30b

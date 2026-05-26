@@ -1,0 +1,118 @@
+rocm7.0.0_vllm_0.11.2_20251210: Pulling from rocm/vllm
+60d98d907669: Pulling fs layer
+2f4c517abc68: Pulling fs layer
+7aca9073787e: Pulling fs layer
+0a5af9a4b9c5: Pulling fs layer
+e6c35fc73eee: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+f266edb3fb7b: Pulling fs layer
+e04e560bce06: Pulling fs layer
+88ddc6e870e1: Pulling fs layer
+97533cbd0ca9: Pulling fs layer
+0f5a7ffa0aa4: Pulling fs layer
+d752a0417e72: Pulling fs layer
+760d3c5e9fea: Pulling fs layer
+0a5af9a4b9c5: Waiting
+e6c35fc73eee: Waiting
+f266edb3fb7b: Waiting
+4f4fb700ef54: Waiting
+59447ea85444: Pulling fs layer
+ac31d9ccd4dd: Pulling fs layer
+e2af1241cb5e: Pulling fs layer
+e04e560bce06: Waiting
+88ddc6e870e1: Waiting
+97533cbd0ca9: Waiting
+59447ea85444: Waiting
+ac31d9ccd4dd: Waiting
+0f5a7ffa0aa4: Waiting
+34f4f2508e73: Pulling fs layer
+e2af1241cb5e: Waiting
+760d3c5e9fea: Waiting
+5f7ba66a2f93: Pulling fs layer
+34f4f2508e73: Waiting
+8bb378335b99: Pulling fs layer
+49e71c3327ec: Pulling fs layer
+5f7ba66a2f93: Waiting
+8bb378335b99: Waiting
+2abe3f72dd87: Pulling fs layer
+49e71c3327ec: Waiting
+47304323a98c: Pulling fs layer
+2abe3f72dd87: Waiting
+233a1f2765f4: Pulling fs layer
+47304323a98c: Waiting
+2a29e7225cb2: Pulling fs layer
+d752a0417e72: Waiting
+233a1f2765f4: Waiting
+2a29e7225cb2: Waiting
+2f4c517abc68: Verifying Checksum
+2f4c517abc68: Download complete
+60d98d907669: Verifying Checksum
+60d98d907669: Download complete
+0a5af9a4b9c5: Verifying Checksum
+0a5af9a4b9c5: Download complete
+e6c35fc73eee: Verifying Checksum
+e6c35fc73eee: Download complete
+4f4fb700ef54: Verifying Checksum
+4f4fb700ef54: Download complete
+60d98d907669: Pull complete
+2f4c517abc68: Pull complete
+f266edb3fb7b: Verifying Checksum
+f266edb3fb7b: Download complete
+e04e560bce06: Verifying Checksum
+e04e560bce06: Download complete
+88ddc6e870e1: Verifying Checksum
+88ddc6e870e1: Download complete
+0f5a7ffa0aa4: Verifying Checksum
+0f5a7ffa0aa4: Download complete
+d752a0417e72: Verifying Checksum
+d752a0417e72: Download complete
+760d3c5e9fea: Verifying Checksum
+760d3c5e9fea: Download complete
+59447ea85444: Download complete
+ac31d9ccd4dd: Verifying Checksum
+ac31d9ccd4dd: Download complete
+e2af1241cb5e: Verifying Checksum
+e2af1241cb5e: Download complete
+34f4f2508e73: Download complete
+5f7ba66a2f93: Verifying Checksum
+5f7ba66a2f93: Download complete
+7aca9073787e: Download complete
+49e71c3327ec: Verifying Checksum
+49e71c3327ec: Download complete
+2abe3f72dd87: Verifying Checksum
+2abe3f72dd87: Download complete
+47304323a98c: Verifying Checksum
+47304323a98c: Download complete
+233a1f2765f4: Verifying Checksum
+233a1f2765f4: Download complete
+2a29e7225cb2: Verifying Checksum
+2a29e7225cb2: Download complete
+8bb378335b99: Verifying Checksum
+8bb378335b99: Download complete
+97533cbd0ca9: Verifying Checksum
+97533cbd0ca9: Download complete
+7aca9073787e: Pull complete
+0a5af9a4b9c5: Pull complete
+e6c35fc73eee: Pull complete
+4f4fb700ef54: Pull complete
+f266edb3fb7b: Pull complete
+e04e560bce06: Pull complete
+88ddc6e870e1: Pull complete
+97533cbd0ca9: Pull complete
+0f5a7ffa0aa4: Pull complete
+d752a0417e72: Pull complete
+760d3c5e9fea: Pull complete
+59447ea85444: Pull complete
+ac31d9ccd4dd: Pull complete
+e2af1241cb5e: Pull complete
+34f4f2508e73: Pull complete
+5f7ba66a2f93: Pull complete
+8bb378335b99: Pull complete
+49e71c3327ec: Pull complete
+2abe3f72dd87: Pull complete
+47304323a98c: Pull complete
+233a1f2765f4: Pull complete
+2a29e7225cb2: Pull complete
+Digest: sha256:e7f02dd2ce3824959658bc0391296f6158638e3ebce164f6c019c4eca8150ec7
+Status: Downloaded newer image for rocm/vllm:rocm7.0.0_vllm_0.11.2_20251210
+docker.io/rocm/vllm:rocm7.0.0_vllm_0.11.2_20251210
