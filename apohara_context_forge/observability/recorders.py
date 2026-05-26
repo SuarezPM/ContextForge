@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 _exporter: Optional[PrometheusExporter] = None
 _audit_log: Optional[AuditLog] = None
 _otlp: Optional[OTLPExporter] = None
+_ledger: Optional["Ledger"] = None
 
 
 def _get_exporter() -> PrometheusExporter:
@@ -32,6 +33,24 @@ def _get_audit_log() -> AuditLog:
         ).expanduser().resolve()
         _audit_log = AuditLog(str(audit_dir / "inv15.jsonl"))
     return _audit_log
+
+
+def _get_ledger():
+    global _ledger
+    if _ledger is None:
+        import pathlib
+        from apohara_context_forge.observability.ledger import Ledger
+        audit_dir = pathlib.Path(
+            os.environ.get("APOHARA_OBSERVABILITY_DIR", "./.apohara/audit")
+        ).expanduser().resolve()
+        _ledger = Ledger(str(audit_dir / "inv15_ledger.jsonl"))
+    return _ledger
+
+
+def _reset_singletons() -> None:
+    """Test hook: drop all cached observability singletons so env changes take effect."""
+    global _exporter, _audit_log, _otlp, _ledger
+    _exporter = _audit_log = _otlp = _ledger = None
 
 
 def _get_otlp() -> Optional[OTLPExporter]:
@@ -85,3 +104,48 @@ def record_inv15_decision(
         )
         if lmcache_hit:
             otlp.record_lmcache_hit()
+
+
+def record_certified_inv15_decision(
+    *,
+    agent_id: str,
+    anchor_hash: str,
+    risk_score: float,
+    gate_action: str,
+    predicted_jcr_delta: float,
+    candidate_count: int,
+    reuse_rate: float,
+    layout_shuffled: bool,
+    use_dense: bool,
+    lmcache_consulted: bool = False,
+    lmcache_hit: bool = False,
+) -> dict:
+    """Certify the gate decision (Z3) + append to the hash-chained ledger, then fan out
+    the decision to Prometheus/AuditLog/OTLP via record_inv15_decision. Returns the cert."""
+    from apohara_context_forge.safety.inv15_certifier import certify_decision
+
+    cert = certify_decision(
+        agent_role=agent_id,
+        candidate_count=candidate_count,
+        reuse_rate=reuse_rate,
+        layout_shuffled=layout_shuffled,
+        use_dense=use_dense,
+    )
+    _get_ledger().append({
+        "kind": "inv15_certificate",
+        "agent_id": agent_id,
+        "anchor_hash": anchor_hash,
+        "risk_score": risk_score,
+        "gate_action": gate_action,
+        **cert,
+    })
+    record_inv15_decision(
+        agent_id=agent_id,
+        anchor_hash=anchor_hash,
+        risk_score=risk_score,
+        gate_action=gate_action,
+        predicted_jcr_delta=predicted_jcr_delta,
+        lmcache_consulted=lmcache_consulted,
+        lmcache_hit=lmcache_hit,
+    )
+    return cert
