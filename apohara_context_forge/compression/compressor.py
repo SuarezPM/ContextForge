@@ -1,6 +1,7 @@
 """LLMLingua-2 async wrapper - runs in ThreadPoolExecutor."""
 import asyncio
 import logging
+import os
 from typing import Literal
 
 from llmlingua import PromptCompressor
@@ -11,8 +12,14 @@ logger = logging.getLogger(__name__)
 class ContextCompressor:
     """Async wrapper for LLMLingua-2 compression."""
 
-    def __init__(self, model_name: str = "microsoft/llmlingua-2-xlm-roberta-large-meetingbank"):
+    def __init__(self, model_name: str = "microsoft/llmlingua-2-xlm-roberta-large-meetingbank",
+                 device_map: str | None = None):
         self._model_name = model_name
+        # LLMLingua's PromptCompressor defaults to CUDA. When ContextForge's
+        # coordinator runs on a host without an NVIDIA GPU (e.g. alongside an
+        # AMD model server, or CPU-only), that raises "Found no NVIDIA driver".
+        # Default to CPU; override via CONTEXTFORGE_COMPRESSOR_DEVICE.
+        self._device_map = device_map or os.environ.get("CONTEXTFORGE_COMPRESSOR_DEVICE", "cpu")
         self._model: PromptCompressor | None = None
         self._lock = asyncio.Lock()
 
@@ -21,8 +28,8 @@ class ContextCompressor:
         if self._model is None:
             async with self._lock:
                 if self._model is None:
-                    logger.info(f"Loading compressor: {self._model_name}")
-                    self._model = PromptCompressor(self._model_name)
+                    logger.info(f"Loading compressor: {self._model_name} (device={self._device_map})")
+                    self._model = PromptCompressor(self._model_name, device_map=self._device_map)
 
     async def compress(self, context: str, rate: float = 0.5) -> tuple[str, float]:
         """
