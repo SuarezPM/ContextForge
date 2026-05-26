@@ -690,4 +690,37 @@ hardware (single command per the snippet above).
 
 ---
 
-*Last updated: 2026-05-16 · maintained by the same person who wrote the lies.*
+## 15. 🟢 FORGE-LEDGER: per-decision INV-15 certifier + tamper-evident ledger
+
+Continuous formal-invariant auditing for the JCR gate. Opt-in, default
+off (set `APOHARA_FORGE_LEDGER` to enable; certification costs ~ms of Z3
+per gate decision).
+
+| Component | File | What it does, honestly |
+|-----------|------|------------------------|
+| Per-decision certifier | `apohara_context_forge/safety/inv15_certifier.py` | `certify_decision(...)` asks Z3 whether the observed `use_dense` could differ from the mandate at that input point; UNSAT ⇒ they match. Reuses `build_inv15_constraints` from `z3_inv15_proof`. Fails closed on out-of-domain inputs so a pinned-UNSAT case can't become a vacuous false-green. |
+| Hash-chained ledger | `apohara_context_forge/observability/ledger.py` | Real SHA-256 chain `entry_hash = sha256(prev_hash + canonical(payload))`, append-only. `verify()` reports the first mis-hashed/malformed/unparseable line. |
+| Certified recorder | `apohara_context_forge/observability/recorders.py` | `record_certified_inv15_decision(...)` certifies + appends the cert to the ledger, then does the normal Prometheus/AuditLog/OTLP fan-out. |
+| Verify CLI | `apohara_context_forge/observability/ledger_cli.py` | `verify <path>` → exit `0` intact / `2` tampered / `64` usage. |
+| Gate wiring | `apohara_context_forge/safety/jcr_gate.py` | `gate_decision()` emits a certified entry only when `APOHARA_FORGE_LEDGER` is set; best-effort (try/except, never raises into the gate path). |
+
+**Scope caveat (no overclaim).** The certifier verifies the **modeled
+domain** — the closed-form INV-15 decision logic encoded in
+`build_inv15_constraints` — and confirms each observed decision matches
+that model. This is the *same* caveat as the general `prove_inv15`
+theorem (see `z3_inv15_proof.py` docstring: "valid over the modeled
+domain"): it verifies the gate's closed-form logic, **NOT** the LLM's
+semantics, the JCR risk-model coefficients themselves, or whether dense
+prefill actually improves judge consistency. The ledger guarantees the
+*record* of decisions is tamper-evident; it does not vouch for the
+correctness of the world outside the model.
+
+**Status: 🟢 PRODUCTION** — certifier, ledger, recorder, CLI, and the
+env-gated gate wiring all do what they claim. Covered by
+`tests/test_inv15_certifier.py`, `tests/test_ledger.py`,
+`tests/test_certified_recorder.py`, `tests/test_ledger_cli.py`,
+`tests/test_gate_ledger_wiring.py`.
+
+---
+
+*Last updated: 2026-05-26 · maintained by the same person who wrote the lies.*

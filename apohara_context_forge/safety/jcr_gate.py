@@ -19,6 +19,7 @@ should_use_dense_prefill().
 """
 from __future__ import annotations
 
+import os
 import time
 from dataclasses import dataclass, field
 from typing import Optional
@@ -159,9 +160,8 @@ class JCRSafetyGate:
         )
         self.gate_log.append(decision)
 
-        # Late import avoids circular dependency; best-effort telemetry.
+        # Late import of recorders avoids a load-time cycle; best-effort telemetry.
         try:
-            import os
             from apohara_context_forge.observability import recorders
             gate_action = "block" if use_dense else "allow"
             if os.environ.get("APOHARA_FORGE_LEDGER"):

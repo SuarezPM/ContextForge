@@ -1,5 +1,59 @@
 # Changelog
 
+## Unreleased — FORGE-LEDGER: continuous formal-invariant auditing
+
+Per-decision INV-15 auditing layer that complements the general Z3
+theorem (`safety/z3_inv15_proof.prove_inv15`) with a tamper-evident
+record of what the JCR gate actually decided at runtime. Opt-in,
+default off.
+
+### Added
+
+- **`apohara_context_forge/safety/inv15_certifier.py`** —
+  `certify_decision(...)` builds a per-decision Z3 proof that one
+  observed JCR-gate decision matches what INV-15 mandates for that exact
+  input point. Reuses `build_inv15_constraints` from `z3_inv15_proof`, so
+  it certifies against the same modeled closed-form gate logic (UNSAT on
+  the refutation ⇒ observed `use_dense` equals the mandate). Fails closed
+  on out-of-domain inputs (mirrors `compute_jcr_risk`'s `ValueError`
+  contract) to avoid a vacuous false-green.
+- **`apohara_context_forge/observability/ledger.py`** — `Ledger`, a
+  SHA-256 hash-chained, append-only, tamper-evident ledger. Each line is
+  `{prev_hash, entry_hash=sha256(prev_hash+canonical(payload)), payload}`.
+  `verify()` walks the chain and reports the first break (mis-hash,
+  malformed, or unparseable line).
+- **`apohara_context_forge/observability/recorders.py`** —
+  `record_certified_inv15_decision(...)` certifies the decision (Z3) +
+  appends the certificate to the hash-chained ledger, then fans out the
+  decision to Prometheus/AuditLog/OTLP via `record_inv15_decision`.
+- **`apohara_context_forge/observability/ledger_cli.py`** — verify CLI:
+  `python -m apohara_context_forge.observability.ledger_cli verify <path>`.
+  Exit codes: `0` chain intact, `2` tampered/broken, `64` usage error.
+- **`apohara_context_forge/safety/jcr_gate.py`** — `gate_decision()` emits
+  a certified ledger entry when the `APOHARA_FORGE_LEDGER` env var is set,
+  falling back to the plain `record_inv15_decision` fan-out otherwise.
+  Opt-in (default off): certification adds ~ms of Z3 per gate decision, so
+  it stays behind the flag. Telemetry remains best-effort (wrapped in
+  try/except — never raises into the gate path).
+
+### Tests
+
+- New: `tests/test_inv15_certifier.py`, `tests/test_ledger.py`,
+  `tests/test_certified_recorder.py`, `tests/test_ledger_cli.py`,
+  `tests/test_gate_ledger_wiring.py`. Cover certificate correctness +
+  fail-closed inputs, hash-chain append/verify + tamper/corruption
+  detection, the certify-then-fan-out recorder path, CLI exit codes, and
+  the env-gated gate wiring.
+
+### Scope note
+
+The certifier verifies the **modeled** gate domain — the closed-form
+INV-15 decision logic encoded in `build_inv15_constraints` — exactly like
+`prove_inv15`. It does **not** verify the LLM's semantics. See AUDIT.md
+item 15.
+
+---
+
 ## V7.0.0-rc.1 — Sprint 4 ships substrate optimizations + paper v2.0 · 2026-05-12
 
 Sprint 4 code optimizations from MI300X evidence (W1 + W2) + paper
