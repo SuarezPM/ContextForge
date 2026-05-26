@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 _exporter: Optional[PrometheusExporter] = None
 _audit_log: Optional[AuditLog] = None
 _otlp: Optional[OTLPExporter] = None
-_ledger: Optional["Ledger"] = None
+_ledger = None  # Ledger is imported lazily inside _get_ledger to keep this module import-clean
 
 
 def _get_exporter() -> PrometheusExporter:

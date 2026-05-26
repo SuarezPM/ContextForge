@@ -25,3 +25,15 @@ def test_reset_singletons_resets_ledger(monkeypatch, tmp_path):
     monkeypatch.setenv("APOHARA_OBSERVABILITY_DIR", str(tmp_path))
     recorders._reset_singletons()
     assert recorders._ledger is None
+
+
+def test_out_of_domain_writes_nothing(tmp_path, monkeypatch):
+    monkeypatch.setenv("APOHARA_OBSERVABILITY_DIR", str(tmp_path))
+    recorders._reset_singletons()
+    with pytest.raises(ValueError):
+        recorders.record_certified_inv15_decision(
+            agent_id="critic", anchor_hash="x", risk_score=0.9,
+            gate_action="block", predicted_jcr_delta=0.0,
+            candidate_count=5, reuse_rate=1.5,  # out of [0,1]
+            layout_shuffled=False, use_dense=True)
+    assert not (tmp_path / "inv15_ledger.jsonl").exists()
