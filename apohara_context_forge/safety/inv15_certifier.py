@@ -7,6 +7,15 @@ from apohara_context_forge.safety.z3_inv15_proof import build_inv15_constraints
 
 def certify_decision(*, agent_role: str, candidate_count: int, reuse_rate: float,
                      layout_shuffled: bool, use_dense: bool) -> dict:
+    # Validate inputs BEFORE building constraints. build_inv15_constraints adds
+    # domain bounds (candidate_count >= 0, 0 <= reuse_rate <= 1); pinning an
+    # out-of-domain value makes the solver UNSAT for EVERY assignment, which our
+    # UNSAT->satisfies_inv15=True mapping would turn into a vacuous false-green.
+    # Fail closed instead, mirroring jcr_gate.compute_jcr_risk's contract.
+    if int(candidate_count) < 0:
+        raise ValueError("candidate_count must be non-negative")
+    if not (0.0 <= float(reuse_rate) <= 1.0):
+        raise ValueError("reuse_rate must be in [0, 1]")
     import z3
     solver = z3.Solver()
     (agent_role_judge, candidate_count_v, reuse_rate_v, layout_shuffled_v,
