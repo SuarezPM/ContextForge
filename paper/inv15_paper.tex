@@ -66,8 +66,10 @@
              {10.5281/zenodo.20277875} (Zenodo, indexed by Google Scholar).}\\
         APOHARA \textperiodcentered{} ContextForge}
 
-\date{May 25, 2026 \textperiodcentered{} v3.1 with judge-class \textsc{Inv}-15
-      extension and scaling-model alignment (extends v3.0)
+\date{May 26, 2026 \textperiodcentered{} v4.2\textemdash honesty corrections
+      (\textsc{Inv}-15 gate results scoped as model-independent; codec measured
+      on synthetic tensors; local demo distinguished from real-model inference;
+      235B single-card only at INT4) over the v3.1 judge-class extension
       \textperiodcentered{}
       \href{https://doi.org/10.5281/zenodo.20277875}%
            {DOI: 10.5281/zenodo.20277875} (v3 predecessor)}
@@ -97,10 +99,10 @@
     rate, and candidate-layout shuffling. We implement \INV{15} as the
     \emph{JCR Safety Gate} in ContextForge, an AMD-native KV-coordination
     layer running on Instinct MI300X (ROCm 7.x) through the vLLM V1 ATOM
-    plugin. On an end-to-end 15-scenario benchmark with the
-    Qwen3.6-235B-A22B mixture-of-experts model on AMD DevCloud ATL1, we
+    plugin. On AMD Instinct MI300X (ROCm 7.2) we
     observe \textbf{zero \INV{15} violations across an exhaustive
-    $1{,}210$-point Cartesian sweep} (five agent roles $\times$ eleven
+    $1{,}210$-point Cartesian sweep of the gate's closed-form input
+    space} (five agent roles $\times$ eleven
     candidate counts $\times$ eleven reuse rates $\times$ two shuffle
     flags), a critic dense-prefill rate of $0.851$ over the Critic's
     input space, and full compatibility with $10.81\times$ TokenDance
@@ -619,18 +621,22 @@ prefill on the same scheduler step.
 \subsection{Experimental Setup}
 \label{sec:eval:setup}
 
-We run all experiments on AMD DevCloud ATL1, on a single Instinct MI300X
-($192\,\mathrm{GB}$ HBM3, ROCm 7.x). The inference engine is vLLM V1 with
-the ContextForge ATOM plugin enabled. The model under test is
-Qwen3.6-235B-A22B, a $235$B-parameter mixture-of-experts decoder with
-$22$B active parameters per token; this is the largest open MoE that fits
-end-to-end on a single MI300X with sufficient headroom for the
-$5$-agent pipeline. The reference pipeline is
+We run all experiments on a single AMD Instinct MI300X
+($192\,\mathrm{GB}$ HBM3, ROCm 7.2). We separate two measurement classes
+explicitly. \textbf{(i)~The \INV{15} gate results are model-independent:}
+the gate decision is a closed-form function of four input features (the
+risk score), so the $1{,}210$-point sweep, the Z3 proof, and the
+gate-latency figures are exact and load no model. \textbf{(ii)~The KV-codec
+results} are measured on synthetic key/value tensors of the stated shapes on
+the MI300X. The reference deployment pipeline is
 $\textsc{Retriever} \to \textsc{Reranker} \to \textsc{Summarizer} \to
 \textsc{Critic} \to \textsc{Responder}$, with the Critic in
-$\Judge = \{\textsc{critic}, \textsc{judge}\}$. All measurements are from
-a single benchmark run completed on 2026-05-10; the full log is reproducible
-from the repository's \code{logs/benchmark\_v6\_final.txt}.
+$\Judge = \{\textsc{critic}, \textsc{judge}\}$. For memory context, the
+$192\,\mathrm{GB}$ HBM3 holds frontier MoE that an $80\,\mathrm{GB}$ card
+cannot: Qwen3-30B-A3B and Qwen3-Coder-Next (FP8) serve single-card with full
+headroom, and Qwen3-235B-A22B serves single-card at INT4 (its FP8 checkpoint,
+$\approx\!221\,\mathrm{GB}$, exceeds one card). The gate and codec results
+below are reproducible from the committed logs.
 
 \subsection{Benchmark Sweep}
 \label{sec:eval:sweep}
@@ -860,11 +866,14 @@ service-time distributions) shipped alongside V6.1 reports the
 controller within $1.6\,\%\!-\!29.9\,\%$ of the theoretical
 $\lambda_{\text{crit}} = 905.8\,\mathrm{req/s}$ derived from the
 simulation parameters themselves\textemdash $\mathbf{6/6}$ adversarial
-scenarios PASS. The live $5$-agent demo on the same hardware reports
-\textbf{$79.85\,\%$ token savings} ($263 \to 53$ tokens), an average
-TTFT of $23.78\,\mathrm{ms}$ per agent, and the Critic correctly
-routed through dense prefill. The unit test suite of ContextForge
-passes with zero failures ($423$ passed, $0$ failed), including the rewritten suite
+scenarios PASS. A \emph{local} $5$-agent demo (synthetic pipeline, local tokenizer, no
+frontier model loaded) reports \textbf{$79.85\,\%$ token savings}
+($263 \to 53$ tokens) with the Critic correctly routed through dense
+prefill\textemdash an upper-bound illustration of the coordination logic,
+\emph{not} real-model inference. On real frontier-MoE serving, ContextForge's
+LLMLingua-2 compression measures $\sim\!44\,\%$ prompt-token savings over a
+$5$-agent workload (repository evidence). The unit test suite of ContextForge
+passes with zero failures ($441$ passed, $0$ failed), including the rewritten suite
 for the speculative coordinator after the V6.1 INV-12 restoration
 (an early V6.0 implementation fabricated $q_i$ from a calibration
 knob, breaking INV-12 mathematically; V6.1 added a
