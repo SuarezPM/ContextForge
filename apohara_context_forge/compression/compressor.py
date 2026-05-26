@@ -29,7 +29,15 @@ class ContextCompressor:
             async with self._lock:
                 if self._model is None:
                     logger.info(f"Loading compressor: {self._model_name} (device={self._device_map})")
-                    self._model = PromptCompressor(self._model_name, device_map=self._device_map)
+                    # The default model is an LLMLingua-2 token-classifier; without
+                    # use_llmlingua2=True, PromptCompressor runs the LLMLingua-1
+                    # perplexity path which expects past_key_values and crashes
+                    # ('TokenClassifierOutput has no attribute past_key_values').
+                    self._model = PromptCompressor(
+                        self._model_name,
+                        use_llmlingua2=True,
+                        device_map=self._device_map,
+                    )
 
     async def compress(self, context: str, rate: float = 0.5) -> tuple[str, float]:
         """
