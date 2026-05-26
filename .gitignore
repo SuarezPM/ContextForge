@@ -83,5 +83,6 @@ paper/*.toc
 *.code-workspace
 
 # Maintainer-only private notes (NEVER commit)
+CLAUDE.md
 CLAUDE.local.md
 CLAUDE.local.*
