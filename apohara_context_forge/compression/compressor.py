@@ -41,12 +41,21 @@ class ContextCompressor:
         
         def sync_compress():
             assert self._model is not None
-            result = self._model.compress_prompt(
-                context,
-                rate=rate,
-                force_tokens=[".", "!", "?", ",", "\n"],
-            )
-            return result["compressed_prompt"]
+            # LLMLingua-2 (xlm-roberta) caps at 512 tokens; chunk long inputs
+            # (~300 words < 512 tokens) and compress each chunk, else it raises
+            # an index error on sequences beyond the model maximum.
+            words = context.split()
+            if len(words) <= 300:
+                chunks = [context]
+            else:
+                chunks = [" ".join(words[i:i + 300]) for i in range(0, len(words), 300)]
+            parts = []
+            for ch in chunks:
+                res = self._model.compress_prompt(
+                    ch, rate=rate, force_tokens=[".", "!", "?", ",", "\n"]
+                )
+                parts.append(res["compressed_prompt"])
+            return " ".join(parts)
 
         compressed = await loop.run_in_executor(None, sync_compress)
         original_tokens = len(context.split())
