@@ -733,4 +733,47 @@ env-gated gate wiring all do what they claim. Covered by
 
 ---
 
+## 16. 🔴→🟢 LLMLingua-2 compressor never actually compressed (fixed 2026-05-26)
+
+**The overclaim.** The README listed LLMLingua-2 as an implemented mechanism
+("8× memory reduction") and the live demo implied real compression. **The code
+never compressed anything.** `ContextCompressor` loaded the LLMLingua-2
+token-classifier checkpoint but constructed `PromptCompressor(...)` **without
+`use_llmlingua2=True`**, so it ran the LLMLingua-1 perplexity path (which
+expects a causal LM) and raised `AttributeError: 'TokenClassifierOutput' has no
+attribute past_key_values` on every `compress()`. Any path reaching compression
+got the 503 passthrough.
+
+**The fix.** `use_llmlingua2=True` + CPU-default device
+(`CONTEXTFORGE_COMPRESSOR_DEVICE`; LLMLingua defaulted to CUDA and crashed on a
+GPU-less coordinator host) + input chunking for the 512-token model limit. After
+the fix: **2.23× on a probe and 44.4% prompt-token savings end-to-end on live
+frontier-MoE inference (MI300X)**. Commits `476df4b`, `5d1e7d9`, `95e1756`.
+- **Status: 🟢 PRODUCTION** — compression runs and is measured on real inference.
+
+## 17. 🔴→🟢 README/paper honesty pass + repo cleanup (2026-05-26)
+
+Triggered by the first real end-to-end coordinator test against live frontier
+MoE on MI300X.
+- **"79.85% live token savings"** was the **local synthetic demo** (263→53
+  tokens, local tokenizer, no model loaded), shown as a headline/hardware
+  metric. Relabeled as a demo upper-bound; the **real-model figure is ~44%**.
+- **"235B fits single-card" / "model under test"** — FP8 (~221 GB) does **not**
+  fit 192 GB; only **INT4** fits one card. The INV-15 gate results are
+  model-independent (closed-form) and the codec results are synthetic-tensor
+  measurements — neither needed a 235B end-to-end run.
+- **Cross-agent KV-block sharing (ATOM plugin)** computes reuse decisions but
+  does **not** physically share blocks in vLLM yet → the "68% VRAM" projection
+  is unbuilt; marked 🔬 in-progress, no VRAM number quoted until measured.
+- **Semantic dedup** falls back to pseudo-embeddings (`qwen3-embed` absent) → 🔬.
+- **Codec 3.97× → 3.55×** synced in the README mechanism table.
+- **Repo cleanup**: removed `hf_spaces/`, stale `papers/` v2 dup, `docs/legacy/`,
+  untracked `CLAUDE.md`.
+- **New honest evidence**: 3 frontier MoE serve single-card on MI300X;
+  FORGE-LEDGER over real inference; NIAH 174K. Paper **v4.2**; companion systems
+  paper planned for the MoE evidence.
+- **Status: 🟢 RESOLVED** — README + paper v4.2 match runtime reality.
+
+---
+
 *Last updated: 2026-05-26 · maintained by the same person who wrote the lies.*
