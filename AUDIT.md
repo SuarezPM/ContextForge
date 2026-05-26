@@ -715,6 +715,16 @@ prefill actually improves judge consistency. The ledger guarantees the
 *record* of decisions is tamper-evident; it does not vouch for the
 correctness of the world outside the model.
 
+**Hardware-validated (2026-05-26, MI300X / ROCm 7.2, torch 2.9.1+rocm6.3).**
+Driven over the full 1,210-point input sweep (5 roles × 11 candidate
+counts × 11 reuse rates × 2 layouts) with `APOHARA_FORGE_LEDGER=1`, the
+production gate produced **1210/1210 INV-15-satisfying** certificates
+(Z3 unsat); the hash chain verified (exit 0, 0.24 s) and a one-byte
+tamper was caught (exit 2, `broken_at=719`). Within-model claim only
+(the scope caveat above still holds). Evidence:
+`scripts/mi300x_forge_ledger_proof.py` →
+`logs_mi300x_p2/mi300x_p2_forge_ledger.json`.
+
 **Status: 🟢 PRODUCTION** — certifier, ledger, recorder, CLI, and the
 env-gated gate wiring all do what they claim. Covered by
 `tests/test_inv15_certifier.py`, `tests/test_ledger.py`,

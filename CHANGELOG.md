@@ -52,6 +52,21 @@ INV-15 decision logic encoded in `build_inv15_constraints` — exactly like
 `prove_inv15`. It does **not** verify the LLM's semantics. See AUDIT.md
 item 15.
 
+### Hardware validation (MI300X)
+
+Validated on a Hot Aisle AMD Instinct MI300X (ROCm 7.2,
+torch 2.9.1+rocm6.3) — evidence committed under `logs_mi300x_p2/`:
+
+- Full pytest suite: **441 passed, 25 skipped** on AMD/ROCm.
+- FORGE-LEDGER full 1,210-point sweep (5 roles × 11 candidate counts ×
+  11 reuse rates × 2 layouts) driven through the production gate:
+  **1210/1210 INV-15-satisfying** (Z3 unsat), chain `verify` exit 0
+  (0.24 s, 507 B/entry), live one-byte tamper → exit 2
+  (`broken_at=719`); Z3 cert latency p99 0.25 ms, 243 certs/s
+  (`scripts/mi300x_forge_ledger_proof.py`,
+  `logs_mi300x_p2/mi300x_p2_forge_ledger.json`).
+- Codec: INT4 **3.55×** reduction (fwht=False); HBM3 triad **3.79 TB/s**.
+
 ---
 
 ## V7.0.0-rc.1 — Sprint 4 ships substrate optimizations + paper v2.0 · 2026-05-12
