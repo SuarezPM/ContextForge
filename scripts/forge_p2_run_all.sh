@@ -17,18 +17,19 @@ log() { echo "$@" | tee -a "$L"; }
 
 log "=== RUN_ALL START $(S) on $(hostname) ==="
 
-# --- ensure suite deps (idempotent; fast if already in ~/.local) ---
-$PY -m pip install --user --quiet \
-  z3-solver pytest pytest-asyncio pytest-json-report \
-  numpy pydantic-settings faiss-cpu prometheus-client aiofiles \
-  >>"$L" 2>&1 && log "[deps] suite deps OK" || log "[deps] WARN install returned nonzero"
+# --- full suite deps. --no-cache-dir avoids the pip-22 "Memoryview is too
+#     large" crash when caching >2GB wheels (torch / transformers). ---
+log "[deps] installing requirements.txt + test deps $(S)"
+$PY -m pip install --user --no-cache-dir -r requirements.txt >>"$L" 2>&1 \
+  && log "[deps] requirements.txt OK" || log "[deps] requirements.txt WARN nonzero"
+$PY -m pip install --user --no-cache-dir pytest pytest-asyncio pytest-json-report z3-solver \
+  >>"$L" 2>&1 && log "[deps] test deps OK" || log "[deps] test deps WARN nonzero"
 
-# --- ensure torch ROCm (VM->pytorch.org, independent of the SSH link) ---
-if ! $PY -c "import torch" 2>/dev/null; then
-  log "[torch] installing --user rocm6.3 $(S)"
-  $PY -m pip install --user --quiet torch --index-url https://download.pytorch.org/whl/rocm6.3 \
-    >>logs/torch_install.log 2>&1 && log "[torch] install OK" || log "[torch] install FAILED"
-fi
+# --- override torch with the ROCm build for real MI300X GPU steps (S4).
+#     requirements.txt pins CPU torch <2.6; this installs 2.x+rocm6.3. ---
+log "[torch] installing ROCm build (--no-cache-dir) $(S)"
+$PY -m pip install --user --no-cache-dir torch --index-url https://download.pytorch.org/whl/rocm6.3 \
+  >>logs/torch_install.log 2>&1 && log "[torch] ROCm install OK" || log "[torch] ROCm install FAILED"
 $PY -c "import torch; print('torch', torch.__version__, 'hip', getattr(torch.version,'hip',None), 'devs', torch.cuda.device_count())" \
   2>&1 | tee -a "$L" || log "[torch] still unavailable — GPU steps will skip"
 
