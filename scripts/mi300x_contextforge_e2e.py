@@ -89,8 +89,18 @@ async def run(args):
     from apohara_context_forge.compression.compressor import ContextCompressor
     from apohara_context_forge.compression.coordinator import CompressionCoordinator
     from apohara_context_forge.safety.jcr_gate import JCRSafetyGate
+    from apohara_context_forge.normalization.prefix_normalizer import PrefixNormalizer
+    from apohara_context_forge.metrics.vram_monitor import VRAMMonitor
     from apohara_context_forge.observability import recorders
     recorders._reset_singletons()
+
+    # PrefixNormalizer enforces a byte-identical shared system prefix across all
+    # agents (the cross-agent reusable prefix); SHARED is the canonical prompt.
+    normalizer = PrefixNormalizer(canonical_system_prompt=SHARED)
+    # HBM instrumentation: sample steady-state used VRAM before/during/after.
+    vram = VRAMMonitor()
+    hbm_start_gb = vram.get_used_gb()
+    vram_source = vram.get_vram_source()
 
     registry = ContextRegistry()
     await registry.start()
@@ -111,8 +121,15 @@ async def run(args):
     base_tok_total = cf_tok_total = 0
     prefix_reused_total = 0
     inv15_fires = 0
-    for aid, role in AGENTS:
-        full = SHARED + "\n\nTask: " + role
+    hbm_mid_gb = None
+    for idx, (aid, role) in enumerate(AGENTS):
+        # PrefixNormalizer assembles the prompt with a byte-identical SHARED
+        # system prefix across agents (the cross-agent reusable prefix), instead
+        # of the prior hand-assembly. The per-agent task is the user segment.
+        full = normalizer.normalize(agent_id=aid, user_prompt=role, agent_role_prompt="Task:")
+        if idx == 0:
+            # "during" sample: HBM after the first agent's context is in flight.
+            hbm_mid_gb = vram.get_used_gb()
         # ContextForge coordinator decision (dedup + compression)
         strat, otok, ftok, saved, pct, prefix_tok, final_ctx, derr = \
             "error", 0, 0, 0, 0.0, 0, full, None
@@ -171,6 +188,7 @@ async def run(args):
                           "verify", str(ledger)], capture_output=True, text=True)
     verify = json.loads(cli.stdout) if cli.stdout.strip() else {}
 
+    hbm_end_gb = vram.get_used_gb()
     server_savings = (base_tok_total - cf_tok_total) / max(base_tok_total, 1) * 100
     out = {
         "artifact": "ContextForge end-to-end over live MoE (registry+dedup+compression+gate+ledger)",
@@ -182,6 +200,13 @@ async def run(args):
         "server_token_savings_pct": round(server_savings, 1),
         "shared_prefix_words_reused_total": prefix_reused_total,
         "inv15_dense_fires": inv15_fires,
+        # HBM used (GB) sampled in-process before / during / after the run, plus
+        # the honest backend label. NOTE: VRAMMonitor reads this PROCESS's host
+        # GPU, not the remote vLLM server's GPU; treat as local instrumentation.
+        "hbm_used_gb_start": round(hbm_start_gb, 3),
+        "hbm_used_gb_during": (round(hbm_mid_gb, 3) if hbm_mid_gb is not None else None),
+        "hbm_used_gb_end": round(hbm_end_gb, 3),
+        "vram_source": vram_source,
         "ledger_verify": {"exit": cli.returncode, "result": verify},
         "strategies": {s: sum(1 for r in records if r["strategy"] == s)
                        for s in {r["strategy"] for r in records}},
