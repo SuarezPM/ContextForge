@@ -43,9 +43,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Bring in vLLM only when the user wants the actual platform hooks.
-# The plugin still works without this group (constructed at startup,
-# but the kernel-level interception is skipped — see register()).
+# Bring in vLLM only when you want to serve through it. The plugin still
+# works without this group: it is constructed at worker startup, and the
+# real cross-worker KV path is config-driven via --kv-transfer-config
+# (LMCache), not via this package — see register().
 vllm = ["vllm>=0.9.0"]
 test = ["pytest>=8.3", "pytest-asyncio>=0.24", "numpy>=1.26"]
 
@@ -62,9 +63,9 @@ Issues        = "https://github.com/SuarezPM/Apohara_Context_Forge/issues"
 # THIS is the line that makes vLLM discover and load the plugin at
 # worker startup. vLLM V1 walks the `vllm.general_plugins` entry-point
 # group and invokes each callable once per worker. Our callable is
-# `apohara_vllm_plugin:register`, which returns an initialised
-# vLLMAtomPlugin and (when running inside vLLM) registers its pre/post
-# attention hooks against `vllm.platforms.current_platform`.
+# `apohara_vllm_plugin:register`, which constructs and initialises a
+# vLLMAtomPlugin. Cross-worker KV interception is NOT wired here — it is
+# config-driven via --kv-transfer-config (LMCache); see register().
 # ----------------------------------------------------------------------------
 [project.entry-points."vllm.general_plugins"]
 apohara_contextforge = "apohara_vllm_plugin:register"

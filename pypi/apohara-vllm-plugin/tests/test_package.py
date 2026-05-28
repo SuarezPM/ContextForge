@@ -53,8 +53,8 @@ def test_version_is_pep440():
 
 def test_register_returns_plugin():
     """The entry-point callable returns a constructed plugin without
-    requiring vLLM. The vLLM-side hook installation is silently
-    skipped — see register()'s late-import branch."""
+    requiring vLLM. Cross-worker KV interception is config-driven via
+    --kv-transfer-config (LMCache), not installed by register()."""
     from apohara_vllm_plugin import register
     plugin = register()
     stats = plugin.get_stats()

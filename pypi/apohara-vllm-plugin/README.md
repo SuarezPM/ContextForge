@@ -38,8 +38,11 @@ You should see in the vLLM startup log:
 
 ```
 ATOM plugin initialised: worker=… deps={…}
-ATOM plugin: vLLM platform hooks registered
 ```
+
+Cross-worker KV reuse is wired separately, config-driven via
+`--kv-transfer-config` (LMCache) — not by this plugin. See
+[`LMCACHE.md`](https://github.com/SuarezPM/Apohara_Context_Forge/blob/main/LMCACHE.md).
 
 ### Manually (for tests / inspection)
 
@@ -51,8 +54,7 @@ assert plugin.is_initialized()
 print(plugin.get_stats())
 ```
 
-The plugin is constructible without vLLM installed; the kernel-level
-hook installation is silently skipped in that case.
+The plugin is constructible without vLLM installed.
 
 ### Wiring real ContextForge dependencies
 
@@ -79,9 +81,11 @@ plugin = vLLMAtomPlugin(
 plugin.initialize("worker_0", vllm_config={})
 ```
 
-Pass that plugin's `pre_attention_hook` / `post_attention_hook` to
-your custom vLLM platform if you're not relying on the entry-point
-auto-discovery.
+`pre_attention_hook` / `post_attention_hook` are unit-tested,
+importable utilities for inspecting reuse/quantization decisions; they
+are NOT cabled to the vLLM runtime (no such vLLM platform attention-hook
+API exists). The runtime cross-worker KV path is config-driven via
+`--kv-transfer-config` (LMCache).
 
 ## Honest semantics
 

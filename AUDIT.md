@@ -776,4 +776,44 @@ MoE on MI300X.
 
 ---
 
-*Last updated: 2026-05-26 · maintained by the same person who wrote the lies.*
+## 18. 🔴→🟢 ATOM `register()` pointed at a vLLM hook API that never existed (fixed 2026-05-28)
+
+**The overclaim.** `apohara_context_forge/serving/atom_plugin.py` `register()`
+did a late `from vllm.platforms import current_platform` and then probed
+`getattr(current_platform, "register_pre_attention_hook"/"register_post_attention_hook", None)`
+to "install" the ATOM pre/post attention hooks. **No vLLM platform has ever
+exposed such an attention-hook registry** — the getattr always returned None,
+so the branch was a permanent no-op dressed up as "kernel-level interception
+until the API stabilises." The probe implied a runtime wiring path that does
+not and never did exist.
+
+**The fix (Fase 0).**
+- `register()` now just constructs `vLLMAtomPlugin()`, calls
+  `plugin.initialize(...)`, and returns it. The phantom getattr probe and the
+  late `vllm.platforms` import are removed.
+- `register()`'s docstring (and the module docstring) now state plainly:
+  KV interception lives in the config-driven `--kv-transfer-config` path
+  (LMCache), NOT in attention hooks — that platform API never existed in vLLM.
+  The real cross-worker KV path is config-driven and documented in
+  [`LMCACHE.md`](LMCACHE.md) (Fase 1+).
+- `PreAttentionHook` / `PostAttentionHook` are **kept** (19 tests depend on
+  them) but their docstrings now say they are unit-tested, importable
+  utilities that are **NOT cabled to the vLLM runtime**.
+
+**Verification:**
+- `grep -rn "register_pre_attention_hook\|register_post_attention_hook" apohara_context_forge/`
+  → **0 matches** (the phantom API is gone from `apohara_context_forge/`; the
+  PyPI shim under `pypi/apohara-vllm-plugin/` was cleaned of its lingering
+  attention-hook references in the same truth-up pass).
+- `tests/test_atom_plugin.py` → **19 passed** (count unchanged; the
+  `test_register_returns_initialised_plugin` docstring was re-aimed at the new
+  honest reality — no assertions weakened).
+- Full suite: **441 passed, 25 skipped** was the post-F0 baseline measured in
+  isolation; after F1-F3 landed the total is **487 passed, 25 skipped** (no
+  regressions).
+- **Status: 🟢 RESOLVED** — `register()` no longer references a nonexistent
+  vLLM API; the real KV-interception path is config-driven (Fase 1+).
+
+---
+
+*Last updated: 2026-05-28 · maintained by the same person who wrote the lies.*
