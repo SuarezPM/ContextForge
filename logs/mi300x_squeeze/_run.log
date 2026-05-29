@@ -52,3 +52,5 @@ ERROR tests/test_integration.py
 3 skipped, 80 warnings, 1 error in 3.35s
 [04:53:46] pushed logs -> mi300x-evidence (pytest rocm)
 [04:53:46] === HBM3 bandwidth ===
+[04:53:48] pushed logs -> mi300x-evidence (hbm3)
+[04:53:48] === ALL_DONE_SENTINEL ===
