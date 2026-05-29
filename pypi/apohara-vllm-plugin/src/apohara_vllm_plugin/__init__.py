@@ -30,9 +30,10 @@ Usage from outside vLLM (manual, for tests)
 >>> plugin.is_initialized()
 True
 
-The plugin is constructed even when vLLM is not importable — the
-kernel-level hook installation is silently skipped in that case so the
-import is safe in pure-Python test environments.
+The plugin is constructed even when vLLM is not importable, so the
+import is safe in pure-Python test environments. Cross-worker KV
+interception is not wired by this package; it is config-driven via
+vLLM's --kv-transfer-config (LMCache) — see register().
 """
 from __future__ import annotations
 

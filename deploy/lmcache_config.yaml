@@ -1,0 +1,39 @@
+# LMCache backend config for cross-worker KV sharing (ATOM Fase 3).
+#
+# This file is consumed by LMCache itself (the OFFICIAL built-in
+# integration), NOT by any ContextForge-owned connector. vLLM is told
+# to load LMCache via --kv-transfer-config (see
+# apohara_context_forge/serving/vllm_launch_config.py); LMCache then
+# reads its own config from the LMCACHE_CONFIG_FILE env var pointing
+# here. We do not subclass or wrap LMCache's connector.
+#
+# HONESTY: none of these values are validated against a live cluster in
+# this repo. The real cross-worker VRAM number requires MI300X + Redis +
+# qwen3-embed and is GATED outside this workflow. What IS verified here
+# (by tests/test_vllm_launch_config.py) is that chunk_size below MUST
+# equal vLLM's block_size so LMCache chunk boundaries line up with
+# PagedAttention block boundaries.
+
+# Redis backend shared by every worker in the cluster. One Redis per
+# cluster; point this at a reachable host. Set to null for a local-only
+# (single-node) engine where the cache dies with the worker.
+remote_url: "redis://lmcache-redis:6379"
+
+# LMCache chunk size in TOKENS. MUST equal vLLM --block-size (16). If
+# these disagree, LMCache chunks straddle PagedAttention block
+# boundaries and cross-worker reuse silently degrades. The Python
+# builder (build_kv_transfer_config) asserts chunk_size == block_size
+# over ITS OWN args and fails loud — it does NOT parse this YAML, and
+# these values are NOT checked against a live cluster. Keep this file in
+# sync with the args you pass the builder by hand.
+chunk_size: 16
+
+# Stage chunks in CPU RAM before DMA to/from Redis. "cpu" keeps GPU HBM
+# free for the model; flip to a cuda device only if you have measured
+# that on-GPU staging helps on your hardware.
+local_cpu: true
+
+# Max bytes LMCache may use for the local CPU staging buffer. 5 GB is
+# LMCache's own documented default for a single worker; tune per host
+# RAM. This is NOT a measured value for our workload.
+max_local_cpu_size: 5.0

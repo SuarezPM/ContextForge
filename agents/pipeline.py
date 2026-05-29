@@ -9,9 +9,11 @@ from agents.demo_agents import create_agents
 from apohara_context_forge.dedup.faiss_index import FAISSContextIndex
 from apohara_context_forge.dedup.lsh_engine import LSHTokenMatcher
 from apohara_context_forge.metrics.vram_monitor import VRAMMonitor
+from apohara_context_forge.normalization.prefix_normalizer import PrefixNormalizer
 from apohara_context_forge.pipeline_config import PipelineConfig
 from apohara_context_forge.registry.context_registry import ContextRegistry
 from apohara_context_forge.registry.vram_aware_cache import VRAMAwareCache
+from apohara_context_forge.serving.prefix_salt_planner import PrefixSaltPlanner
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +50,17 @@ class Pipeline:
 
         # Create demo agents
         self.agents = create_agents()
+
+        # Prefix-caching wiring (ATOM Fase 1): a single normalizer assembles a
+        # byte-identical system prefix across all agents, and the salt planner
+        # decides each agent's vLLM cache_salt. The anchor for the shared prefix
+        # is the normalizer's canonical system-prompt hash (identical for every
+        # agent → same salt → shared KV blocks), except for judge agents that
+        # trip INV-15, which the planner isolates with a unique salt.
+        self._prefix_normalizer = PrefixNormalizer(
+            canonical_system_prompt=self._get_system_prompt()
+        )
+        self._salt_planner = PrefixSaltPlanner()
 
         # Metrics collection
         self.metrics = {
@@ -109,6 +122,29 @@ class Pipeline:
         for i, agent in enumerate(self.agents):
             agent_start = time.time()
 
+            # Assemble the byte-identical prefix and pick this agent's salt.
+            # This runs regardless of ContextForge: the prefix + salt are the
+            # serving-side artefacts vLLM needs for Automatic Prefix Caching.
+            normalized_prompt = self._prefix_normalizer.normalize(
+                agent_id=agent.agent_id,
+                user_prompt=query,
+                agent_role_prompt=self._build_role_prompt(agent),
+            )
+            # Anchor = canonical system-prompt hash (identical across agents →
+            # shared salt). cla_group is a SINGLE shared cohort id ("pipeline")
+            # so every non-judge agent lands on the SAME shared salt and they
+            # actually share prefix KV blocks. The JCR gate keys "judge-ness"
+            # off agent_id (JUDGE_ROLES = {"critic", "judge"}), NOT the
+            # descriptive role string, so we pass agent_id there. request_id is
+            # unique per (agent, step) so INV-15 isolation is per-request.
+            salt_plan = self._salt_planner.plan(
+                agent_role=agent.agent_id,
+                anchor_hash=self._prefix_normalizer.get_canonical_hash(),
+                cla_group="pipeline",
+                request_id=f"{agent.agent_id}:{i}",
+                candidate_count=len(self.agents),
+            )
+
             # Build context for this agent
             if self.enable_contextforge and self._registry:
                 shared_context = self._build_shared_context(input_data, agent)
@@ -150,6 +186,12 @@ class Pipeline:
                 "strategy": result["strategy"],
                 "tokens_before": result["tokens_before"],
                 "tokens_after": result["tokens_after"],
+                # APC serving artefacts (computed above; ready for vLLM).
+                "prompt_hash": self._prefix_normalizer.compute_prompt_hash(
+                    normalized_prompt
+                ),
+                "cache_salt": salt_plan.cache_salt,
+                "salt_shared": salt_plan.shared,
             }
 
             self.metrics["total_tokens_before"] += result["tokens_before"]

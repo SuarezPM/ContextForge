@@ -42,8 +42,13 @@ group. The standalone PyPI package (``apohara_vllm_plugin``) declares::
     apohara_contextforge = "apohara_vllm_plugin:register"
 
 The ``register()`` callable below is what vLLM invokes once per worker;
-it constructs an ATOM plugin and (in a real vLLM environment) registers
-its hooks against the platform's attention layer hooks.
+it constructs an ATOM plugin and (optionally) installs telemetry.
+
+KV interception lives in the config-driven ``--kv-transfer-config`` path
+(LMCache), NOT in attention hooks — that platform API never existed in
+vLLM. The ``PreAttentionHook`` / ``PostAttentionHook`` classes below are
+unit-tested utilities that are NOT cabled to the vLLM runtime; the real
+cross-worker KV path is documented in ``LMCACHE.md`` (Fase 1+).
 """
 from __future__ import annotations
 
@@ -109,12 +114,18 @@ class _Metrics(Protocol):
 # ---------------------------------------------------------------------------
 
 class PreAttentionHook:
-    """Called before attention computation on a KV block.
+    """Pre-attention KV-block utility (unit-tested, NOT cabled to vLLM).
 
     Returns metadata describing what actually happened — flags reflect
     state (not configuration). When dependencies are unwired, the hook
     is a documented no-op that returns ``quantization_applied=False``,
     ``anchor_match=None``, ``jcr_dense=None``.
+
+    This class is NOT invoked by the vLLM runtime: there is no
+    attention-layer hook registry in vLLM (that platform API never
+    existed). It is kept as a tested, importable utility; the real
+    KV interception path is config-driven (``--kv-transfer-config`` +
+    LMCache, see ``LMCACHE.md``).
     """
 
     def __init__(
@@ -310,7 +321,12 @@ class PreAttentionHook:
 
 
 class PostAttentionHook:
-    """Called after attention computation on a KV block."""
+    """Post-attention telemetry utility (unit-tested, NOT cabled to vLLM).
+
+    Like ``PreAttentionHook``, this is a tested, importable utility and
+    is NOT invoked by the vLLM runtime (no attention-layer hook registry
+    exists in vLLM). The real KV path is config-driven (see ``LMCACHE.md``).
+    """
 
     def __init__(
         self,
@@ -448,45 +464,19 @@ def register() -> vLLMAtomPlugin:
     """Entry-point for the ``vllm.general_plugins`` group.
 
     vLLM V1 invokes every entry point in that group once per worker on
-    startup. We return the configured plugin instance and (when running
-    inside a real vLLM process) install its hooks onto the platform's
-    attention layer.
+    startup. We construct the plugin, initialise it, and return it.
+
+    KV interception lives in the config-driven ``--kv-transfer-config``
+    path (LMCache), NOT in attention hooks — that platform API never
+    existed in vLLM. No vLLM platform exposes a pre/post attention-hook
+    registry to call, so this entry point does NOT wire the
+    ``PreAttentionHook`` / ``PostAttentionHook`` utilities into the
+    runtime. The real cross-worker KV path is documented in
+    ``LMCACHE.md`` (Fase 1+).
 
     The function is safe to call even when vLLM is not installed: it
-    constructs the plugin (which is just data) and skips the
-    platform-registration step that requires vLLM.
+    constructs the plugin (which is just data) and returns it.
     """
     plugin = vLLMAtomPlugin()
     plugin.initialize(worker_id="default", vllm_config={})
-
-    try:
-        # Late, optional import — the plugin module must remain importable
-        # without vLLM so unit tests and dev environments still work.
-        from vllm.platforms import current_platform  # type: ignore
-
-        # vLLM V1 exposes an attention-layer hook registry. The exact
-        # symbol has been moving (V1 plugin API is unstable); we probe
-        # for the common name and fall back to a no-op so users on
-        # a slightly different vLLM version still get the plugin
-        # constructed (and visible via /metrics) — they just don't get
-        # the kernel-level interception until the API stabilises.
-        register_pre = getattr(current_platform, "register_pre_attention_hook", None)
-        register_post = getattr(current_platform, "register_post_attention_hook", None)
-        if register_pre is not None:
-            register_pre(plugin.pre_attention_hook)
-        if register_post is not None:
-            register_post(plugin.post_attention_hook)
-        logger.info("ATOM plugin: vLLM platform hooks registered")
-    except ImportError:
-        logger.info(
-            "ATOM plugin: vLLM not importable; plugin constructed but "
-            "no platform hooks registered (this is normal outside vLLM)"
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.warning(
-            "ATOM plugin: vLLM hook registration failed (%s: %s); "
-            "plugin remains active for telemetry only",
-            type(exc).__name__, exc,
-        )
-
     return plugin

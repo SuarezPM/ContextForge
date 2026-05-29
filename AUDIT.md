@@ -776,4 +776,104 @@ MoE on MI300X.
 
 ---
 
-*Last updated: 2026-05-26 · maintained by the same person who wrote the lies.*
+## 18. 🔴→🟢 ATOM `register()` pointed at a vLLM hook API that never existed (fixed 2026-05-28)
+
+**The overclaim.** `apohara_context_forge/serving/atom_plugin.py` `register()`
+did a late `from vllm.platforms import current_platform` and then probed
+`getattr(current_platform, "register_pre_attention_hook"/"register_post_attention_hook", None)`
+to "install" the ATOM pre/post attention hooks. **No vLLM platform has ever
+exposed such an attention-hook registry** — the getattr always returned None,
+so the branch was a permanent no-op dressed up as "kernel-level interception
+until the API stabilises." The probe implied a runtime wiring path that does
+not and never did exist.
+
+**The fix (Fase 0).**
+- `register()` now just constructs `vLLMAtomPlugin()`, calls
+  `plugin.initialize(...)`, and returns it. The phantom getattr probe and the
+  late `vllm.platforms` import are removed.
+- `register()`'s docstring (and the module docstring) now state plainly:
+  KV interception lives in the config-driven `--kv-transfer-config` path
+  (LMCache), NOT in attention hooks — that platform API never existed in vLLM.
+  The real cross-worker KV path is config-driven and documented in
+  [`LMCACHE.md`](LMCACHE.md) (Fase 1+).
+- `PreAttentionHook` / `PostAttentionHook` are **kept** (19 tests depend on
+  them) but their docstrings now say they are unit-tested, importable
+  utilities that are **NOT cabled to the vLLM runtime**.
+
+**Verification:**
+- `grep -rn "register_pre_attention_hook\|register_post_attention_hook" apohara_context_forge/`
+  → **0 matches** (the phantom API is gone from `apohara_context_forge/`; the
+  PyPI shim under `pypi/apohara-vllm-plugin/` was cleaned of its lingering
+  attention-hook references in the same truth-up pass).
+- `tests/test_atom_plugin.py` → **19 passed** (count unchanged; the
+  `test_register_returns_initialised_plugin` docstring was re-aimed at the new
+  honest reality — no assertions weakened).
+- Full suite: **441 passed, 25 skipped** was the post-F0 baseline measured in
+  isolation; after F1-F3 landed the total is **487 passed, 25 skipped** (no
+  regressions).
+- **Status: 🟢 RESOLVED** — `register()` no longer references a nonexistent
+  vLLM API; the real KV-interception path is config-driven (Fase 1+).
+
+## 19. 🟢 ATOM F1-F3 validated on hardware + the honest scope (full-attention) (2026-05-29)
+
+**What we built and measured (F1-F3 — the real KV-sharing lever).** ATOM's
+serving path — `PrefixSaltPlanner` → byte-identical prefix via
+`PrefixNormalizer` → vLLM Automatic Prefix Caching, plus the config-driven
+LMCache `--kv-transfer-config` for cross-worker — was validated end-to-end:
+
+- **`cache_salt` drives KV-block sharing, measured on a real MI300X**
+  (Qwen3-32B, dense full-attention, `rocm/vllm`): SHARED salt → **84.7 %** vLLM
+  prefix-cache hit-rate vs ISOLATED salt → **0.0 %** (judges physically isolated
+  via the block hash — INV-15 realised on the serving side). Shared-prefix
+  **TTFT 0.058 s vs 0.135 s** distinct (−57 %). Model+KV footprint **175 GB / 192**,
+  64 concurrent sustained. Raw: `logs/mi300x_squeeze/qwen3-32b_measure.json`.
+- **Cross-worker KV reuse via LMCache+Redis** proven locally (RTX 2060, CUDA):
+  worker-2 with an empty local cache pulled prefix KV from Redis that worker-1
+  stored — vLLM `external_prefix_cache_hits` **0 → 240**,
+  `prompt_tokens_by_source{external_kv_transfer}=240`. Raw:
+  `logs/local_cross_worker_result.json`.
+- Suite **487 passed, 25 skipped** (+46 over the F0 baseline).
+
+**Honest non-results from the 2026-05-29 MI300X run (NOT reported as wins):**
+- `qwen3-32b` token savings read **0 %** — the LLMLingua-2 compressor **did not
+  run** in that VM (it failed to load; identical baseline==contextforge token
+  counts confirm no compression happened). The **44.4 %** figure stands on its
+  own from the 2026-05-26 `logs_moe_run/` run (compressor active). Not
+  double-counted.
+- `qwen3-32b` NIAH read **0/12** — a *script artifact*, not a recall failure:
+  Qwen3 answers in `<think>` mode (the probe truncates before the code is
+  emitted) and prompts > the configured `max_model_len` (16384) returned HTTP
+  400. The real **NIAH 12/12 → 174K** stands from the 2026-05-26 run. We do not
+  cite the 0/12.
+- The three Gated-DeltaNet hybrids (Coder-Next, Qwen3.5-122B, Qwen3.6-35B)
+  failed to start on the `rocm/vllm:latest` image: its **Transformers does not
+  recognize the `qwen3_5_moe` architecture** (today's BLOCKER logs). The
+  2026-05-26 evidence separately records Coder-Next serving cleanly on a 0.19.1
+  image — so this is an image/environment miss on our side, not a model
+  limitation. (We did not pin today's exact vLLM/Transformers version string.)
+
+**The honest scope — why full-attention, and where it stops.** ContextForge has
+two independent levers:
+1. **Token compression (LLMLingua-2, ~44 %)** — *architecture-agnostic*; shrinks
+   the prompt pre-serving and applies to full, sparse, linear and sliding-window
+   models alike. The **durable** lever.
+2. **KV-block sharing (the 84.7 % above)** — its win scales with KV-cache size,
+   so it is **largest on full-attention**, which is the bulk of today's
+   *installed* production fleet (Llama 3.x, Qwen2.5/3-dense, Mistral).
+
+We measured the KV lever on full-attention **on purpose**. The honest limit,
+stated plainly: the **2026 frontier is moving away from full attention** —
+DeepSeek-V4 / GLM-5 (sparse DSA), Qwen3-Next/3.5/3.6 (linear-hybrid), Gemma 4 /
+OLMo 3 / MiMo (sliding-window) — *precisely to shrink the KV-cache bottleneck the
+sharing lever optimises*. On those architectures the KV win is smaller by
+design. ContextForge's KV lever is for the large full-attention fleet that
+exists now; its compression lever is for everything. We do **not** claim
+KV-sharing relevance on sparse/linear frontier models.
+
+- **Status: 🟢 VALIDATED + SCOPED** — both levers measured on real MI300X
+  hardware (44 % tokens, 2026-05-26; 84.7 % KV-sharing, 2026-05-29), full-attention
+  scope and frontier limit stated honestly.
+
+---
+
+*Last updated: 2026-05-29 · maintained by the same person who wrote the lies.*

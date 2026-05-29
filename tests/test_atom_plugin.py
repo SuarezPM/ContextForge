@@ -275,8 +275,9 @@ class TestPostAttentionHook:
 class TestEntryPoint:
     def test_register_returns_initialised_plugin(self):
         """register() is what vllm.general_plugins invokes. It must
-        return an initialised plugin and must not raise even when vLLM
-        is unavailable (which is the case in this test environment)."""
+        return an initialised plugin and must not touch vLLM at all:
+        KV interception is config-driven (--kv-transfer-config + LMCache),
+        not attention hooks (that platform API never existed)."""
         plugin = register()
         assert isinstance(plugin, vLLMAtomPlugin)
         assert plugin.is_initialized() is True

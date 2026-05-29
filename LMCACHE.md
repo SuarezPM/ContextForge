@@ -124,6 +124,8 @@ plugin.pre_attention_hook(...).get("anchor_match")
 
 ```python
 lmcache.get_stats()
+# ILLUSTRATIVE example output — not a captured measurement; the
+# connector is not yet on the hot path.
 # {"active": True, "instance_id": "apohara-w1", "remote_url":
 #  "redis://lmcache-redis:6379", "stores": 12, "retrieves_hit": 8,
 #  "retrieves_miss": 4, "lookups": 12, ...}
@@ -196,3 +198,17 @@ The connector talks to LMCache; it does **not** yet:
 
 The V2 connector is the substrate. Each of those follow-ups is one
 PR away from being honest about the existing data flow.
+
+## The real KV-interception path is config-driven (2026-05-28)
+
+KV interception in vLLM is **config-driven** via `--kv-transfer-config`
+(LMCache), **NOT** attention hooks. vLLM never exposed a pre/post
+attention-hook registry — so the ATOM plugin's `register()` no longer
+probes for one (see [AUDIT.md](AUDIT.md) item 18). `register()` now just
+constructs and initialises the plugin; the `PreAttentionHook` /
+`PostAttentionHook` classes are unit-tested utilities, not runtime-cabled.
+
+Wiring LMCache into a real worker therefore happens through vLLM's
+`--kv-transfer-config` (Fase 1+), not by hand inside `register()`. The
+setup snippet above shows the connector object; landing it on the real
+config-driven path is the next phase of this track.
