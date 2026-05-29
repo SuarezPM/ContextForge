@@ -35,3 +35,12 @@ critic      strat=error                tok 0->0 (0% saved) srv_tok 1063->1063 us
 responder   strat=error                tok 0->0 (0% saved) srv_tok 1052->1052 use_dense=False base=1325ms cf=1325ms
 
 E2E_DONE model=qwen3-32b server_savings=0.0% baseline_tok=5260 cf_tok=5260 inv15_fires=1 ledger_verify_exit=0 certs=5
+[04:53:30] pushed logs -> mi300x-evidence (qwen3-32b tokens)
+len~ 128000 depth=0.1 prompt_tok=      0 found=False t=0.39s ERR
+len~ 128000 depth=0.5 prompt_tok=      0 found=False t=0.4s ERR
+len~ 128000 depth=0.9 prompt_tok=      0 found=False t=0.38s ERR
+len~ 190000 depth=0.1 prompt_tok=      0 found=False t=0.57s ERR
+len~ 190000 depth=0.5 prompt_tok=      0 found=False t=0.59s ERR
+len~ 190000 depth=0.9 prompt_tok=      0 found=False t=0.58s ERR
+
+NIAH_DONE passed=0/12 max_prompt_tokens=7369
