@@ -814,6 +814,62 @@ not and never did exist.
 - **Status: 🟢 RESOLVED** — `register()` no longer references a nonexistent
   vLLM API; the real KV-interception path is config-driven (Fase 1+).
 
+## 19. 🟢 ATOM F1-F3 validated on hardware + the honest scope (full-attention) (2026-05-29)
+
+**What we built and measured (F1-F3 — the real KV-sharing lever).** ATOM's
+serving path — `PrefixSaltPlanner` → byte-identical prefix via
+`PrefixNormalizer` → vLLM Automatic Prefix Caching, plus the config-driven
+LMCache `--kv-transfer-config` for cross-worker — was validated end-to-end:
+
+- **`cache_salt` drives KV-block sharing, measured on a real MI300X**
+  (Qwen3-32B, dense full-attention, `rocm/vllm`): SHARED salt → **84.7 %** vLLM
+  prefix-cache hit-rate vs ISOLATED salt → **0.0 %** (judges physically isolated
+  via the block hash — INV-15 realised on the serving side). Shared-prefix
+  **TTFT 0.058 s vs 0.135 s** distinct (−57 %). Model+KV footprint **175 GB / 192**,
+  64 concurrent sustained. Raw: `logs/mi300x_squeeze/qwen3-32b_measure.json`.
+- **Cross-worker KV reuse via LMCache+Redis** proven locally (RTX 2060, CUDA):
+  worker-2 with an empty local cache pulled prefix KV from Redis that worker-1
+  stored — vLLM `external_prefix_cache_hits` **0 → 240**,
+  `prompt_tokens_by_source{external_kv_transfer}=240`. Raw:
+  `logs/local_cross_worker_result.json`.
+- Suite **487 passed, 25 skipped** (+46 over the F0 baseline).
+
+**Honest non-results from the 2026-05-29 MI300X run (NOT reported as wins):**
+- `qwen3-32b` token savings read **0 %** — the LLMLingua-2 compressor was not
+  installed in that VM. The **44.4 %** figure stands on its own from the
+  2026-05-26 `logs_moe_run/` run (compressor active). Not double-counted.
+- `qwen3-32b` NIAH read **0/12** — a *script artifact*, not a recall failure:
+  Qwen3 answers in `<think>` mode (the probe truncates before the code is
+  emitted) and prompts > the configured `max_model_len` (16384) returned HTTP
+  400. The real **NIAH 12/12 → 174K** stands from the 2026-05-26 run. We do not
+  cite the 0/12.
+- The three Gated-DeltaNet hybrids (Coder-Next, Qwen3.5-122B, Qwen3.6-35B)
+  failed to start **only because the container shipped vLLM 0.11.2.dev**; the
+  2026-05-26 evidence already records Coder-Next needs vLLM ≥ 0.17 (served
+  cleanly on 0.19.1). An image-version miss on our side, not a model limitation.
+
+**The honest scope — why full-attention, and where it stops.** ContextForge has
+two independent levers:
+1. **Token compression (LLMLingua-2, ~44 %)** — *architecture-agnostic*; shrinks
+   the prompt pre-serving and applies to full, sparse, linear and sliding-window
+   models alike. The **durable** lever.
+2. **KV-block sharing (the 84.7 % above)** — its win scales with KV-cache size,
+   so it is **largest on full-attention**, which is the bulk of today's
+   *installed* production fleet (Llama 3.x, Qwen2.5/3-dense, Mistral).
+
+We measured the KV lever on full-attention **on purpose**. The honest limit,
+stated plainly: the **2026 frontier is moving away from full attention** —
+DeepSeek-V4 / GLM-5 (sparse DSA), Qwen3-Next/3.5/3.6 (linear-hybrid), Gemma 4 /
+OLMo 3 / MiMo (sliding-window) — *precisely to shrink the KV-cache bottleneck the
+sharing lever optimises*. On those architectures the KV win is smaller by
+design. ContextForge's KV lever is for the large full-attention fleet that
+exists now; its compression lever is for everything. We do **not** claim
+KV-sharing relevance on sparse/linear frontier models.
+
+- **Status: 🟢 VALIDATED + SCOPED** — both levers measured on real MI300X
+  hardware (44 % tokens, 2026-05-26; 84.7 % KV-sharing, 2026-05-29), full-attention
+  scope and frontier limit stated honestly.
+
 ---
 
-*Last updated: 2026-05-28 · maintained by the same person who wrote the lies.*
+*Last updated: 2026-05-29 · maintained by the same person who wrote the lies.*
