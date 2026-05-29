@@ -54,7 +54,7 @@ run_model(){
 
   docker run -d --name vllm_run --network host \
     --device /dev/kfd --device /dev/dri --group-add video --ipc host --shm-size 32g \
-    -v "$HF_CACHE":/root/.cache/huggingface -e VLLM_USE_AITER=1 -e PYTHONHASHSEED=0 -e HF_HUB_ENABLE_HF_TRANSFER=1 \
+    -v "$HF_CACHE":/root/.cache/huggingface -e VLLM_USE_AITER=1 -e PYTHONHASHSEED=0 -e HF_HUB_ENABLE_HF_TRANSFER=0 \
     "$IMG" vllm serve "$model" --served-model-name "$served" --port "$port" \
     --enable-prefix-caching --kv-cache-dtype "$kv" --max-model-len "$maxlen" \
     --gpu-memory-utilization 0.90 --trust-remote-code "$@" >/dev/null 2>&1 || { log "docker run failed for $served"; return 1; }
