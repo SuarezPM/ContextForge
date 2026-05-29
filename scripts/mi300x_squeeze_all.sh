@@ -93,13 +93,12 @@ log "results branch: ${RESULTS_BRANCH} (push=${GITHUB_TOKEN:+on}${GITHUB_TOKEN:-
 
 # 3 PUBLIC models (no HF gating). Coder-Next = hybrid baseline; 72B = dense
 # full-attention; 235B = frontier MoE full-attention. fp8 KV on the FP8 weights.
-# All modern (Qwen3 2025-2026), all fit one MI300X (192GB). Hybrid baselines
-# (coder-next, 3.5-122B, 3.6-35B) show ContextForge's LIMIT on linear-attention
-# frontier models; Qwen3-32B (dense full-attention) is where KV-sharing shines.
-run_model "Qwen/Qwen3-Coder-Next-FP8"  "coder-next"  "fp8"  16384 8001 || true
-run_model "Qwen/Qwen3.5-122B-A10B-FP8" "qwen35-122b" "fp8"  16384 8002 || true
-run_model "Qwen/Qwen3.6-35B-A3B"       "qwen36-35b"  "auto" 16384 8003 || true
-run_model "Qwen/Qwen3-32B"             "qwen3-32b"   "auto" 16384 8004 || true
+# Qwen3-235B-A22B (full-attention GQA, frontier 2025) at INT4 (~118GB): the
+# heaviest full-attention frontier model that fits ONE MI300X (192GB), ~70GB for
+# KV. INT4 on ROCm is the risk — GPTQ first, AWQ as automatic fallback; whichever
+# loads, measures. (qwen3-32b already proved the mechanism on MI300X: 84.7% vs 0%.)
+run_model "Qwen/Qwen3-235B-A22B-GPTQ-Int4"              "qwen235b-gptq" "auto" 16384 8001 || true
+run_model "QuantTrio/Qwen3-235B-A22B-Instruct-2507-AWQ" "qwen235b-awq"  "auto" 16384 8002 || true
 
 log "=== suite (ROCm cross-check) ==="
 python3 -m pytest -q > "$LOGDIR/_pytest_rocm.txt" 2>&1; tail -3 "$LOGDIR/_pytest_rocm.txt" | tee -a "$LOGDIR/_run.log" || true
