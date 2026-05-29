@@ -11,3 +11,7 @@ host repo deps OK
 [04:48:16] === MODEL qwen35-122b (img=rocm/vllm:latest kv=fp8 maxlen=16384) ===
 [04:48:32] container EXITED — logs:
 [04:48:32] qwen35-122b NOT ready — recording blocker, skipping
+[04:48:33] pushed logs -> mi300x-evidence (qwen35-122b BLOCKED)
+[04:48:33] === MODEL qwen36-35b (img=rocm/vllm:latest kv=auto maxlen=16384) ===
+[04:48:48] container EXITED — logs:
+[04:48:48] qwen36-35b NOT ready — recording blocker, skipping
