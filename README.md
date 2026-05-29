@@ -46,7 +46,7 @@ Multi-agent LLM systems — retriever → reranker → summarizer → **critic**
 | | |
 |---|---|
 | 🛡️ **A guarantee, not a heuristic** | `INV-15`: judge-class agents fall back to dense prefill when KV-reuse risk crosses threshold — **machine-checked by a Z3 SMT proof**, with **zero violations across all 1,210 input points**, and a **tamper-evident certified ledger** of every decision. The first formal safety contract for cross-agent KV reuse. |
-| ✂️ **Real efficiency, measured on silicon** | **44 % fewer prompt tokens** on live frontier-MoE inference (LLMLingua-2) · **3.55× KV-cache VRAM reduction** at INT4 (RotateKV), constant from 4K to 262K context. |
+| ✂️ **Real efficiency, measured on silicon** | **44 % fewer prompt tokens** on live frontier-MoE inference (LLMLingua-2) · **84.7 % cross-agent prefix-KV reuse** (`cache_salt`, full-attention, MI300X) · **3.55× KV-cache VRAM reduction** at INT4 (RotateKV). |
 | 🚀 **The 192 GB memory moat** | Three frontier MoE models served on **one MI300X** — including an 80B hybrid-attention MoE and a 235B at INT4 — with **needle-in-a-haystack recall to 174K tokens**. Footprints we measured ourselves. |
 | 🔍 **Radical transparency** | Every number traces to a committed log on real hardware. We even publish [`AUDIT.md`](AUDIT.md) — our own ledger of past overclaims and their fixes. In a field drowning in inflated benchmarks, that *is* the differentiator. |
 
@@ -70,6 +70,7 @@ Multi-agent LLM systems — retriever → reranker → summarizer → **critic**
 | Metric | Result |
 |---|---|
 | **ContextForge prompt compression on live MoE** | **44.4 %** fewer prompt tokens (5 265 → 2 926), 5-agent workload |
+| **Cross-agent KV-block sharing** (`cache_salt`) | **84.7 %** prefix-cache hit shared vs **0 %** isolated · **TTFT −57 %** (0.058 s vs 0.135 s) — Qwen3-32B full-attention, MI300X |
 | INT4 RotateKV KV-cache reduction | **3.55×**, length-invariant 4K → 262K (`use_fwht=False`) |
 | HBM3 effective bandwidth | **3.79 TB/s** (72 % of peak), STREAM-triad fp16 |
 
@@ -82,6 +83,15 @@ Multi-agent LLM systems — retriever → reranker → summarizer → **critic**
 | **Qwen3-235B-A22B** | 235B / 22B MoE | INT4 | ✅ ~181 GiB | served single-card |
 
 > An 80 GB GPU cannot hold these. A 192 GB MI300X can. That gap is the moat — and these are *our* measured footprints, not a datasheet.
+
+### 🎯 Where ContextForge applies — and where it doesn't
+
+Two independent levers, measured separately and honestly:
+
+- **Token compression (44.4 %)** is *architecture-agnostic* — it shrinks the prompt **before** serving, so it helps full-attention, sparse, linear-hybrid and sliding-window models alike. The **durable** win.
+- **Cross-agent KV-block sharing (84.7 %)** scales with KV-cache size, so it is **largest on full-attention** models — Llama 3.x, Qwen2.5/3-dense, Mistral: the bulk of the *installed* production fleet today.
+
+**The honest limit:** the 2026 frontier is moving *away* from full attention — DeepSeek-V4 / GLM-5 (sparse), Qwen3-Next/3.5/3.6 (linear-hybrid), Gemma 4 / OLMo 3 / MiMo (sliding-window) — **precisely to shrink the KV-cache bottleneck the sharing lever optimises.** On those architectures the KV-sharing win is smaller by design; we don't claim otherwise. ContextForge's KV lever is for the large full-attention fleet that exists now; its compression lever is for everything. (Scope & raw evidence: [`AUDIT.md` §19](AUDIT.md).)
 
 ---
 
