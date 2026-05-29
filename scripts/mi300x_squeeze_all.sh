@@ -49,6 +49,7 @@ preflight(){
 run_model(){
   local model="$1" served="$2" kv="$3" maxlen="$4" port="$5"; shift 5
   local safe; safe="$(echo "$served" | tr '/:.' '___')"
+  if [ -f "$LOGDIR/${safe}_measure.json" ]; then log "$served already measured — skipping (resume)"; return 0; fi
   log "=== MODEL $served (img=$IMG kv=$kv maxlen=$maxlen) ==="
   docker rm -f vllm_run >/dev/null 2>&1
 
@@ -92,9 +93,13 @@ log "results branch: ${RESULTS_BRANCH} (push=${GITHUB_TOKEN:+on}${GITHUB_TOKEN:-
 
 # 3 PUBLIC models (no HF gating). Coder-Next = hybrid baseline; 72B = dense
 # full-attention; 235B = frontier MoE full-attention. fp8 KV on the FP8 weights.
-run_model "Qwen/Qwen3-Coder-Next-FP8"           "coder-next" "fp8"  16384 8001 || true
-run_model "Qwen/Qwen2.5-72B-Instruct"           "qwen72b"    "auto" 16384 8002 || true
-run_model "Qwen/Qwen3-235B-A22B-Instruct-2507"  "qwen235b"   "fp8"  16384 8003 || true
+# All modern (Qwen3 2025-2026), all fit one MI300X (192GB). Hybrid baselines
+# (coder-next, 3.5-122B, 3.6-35B) show ContextForge's LIMIT on linear-attention
+# frontier models; Qwen3-32B (dense full-attention) is where KV-sharing shines.
+run_model "Qwen/Qwen3-Coder-Next-FP8"  "coder-next"  "fp8"  16384 8001 || true
+run_model "Qwen/Qwen3.5-122B-A10B-FP8" "qwen35-122b" "fp8"  16384 8002 || true
+run_model "Qwen/Qwen3.6-35B-A3B"       "qwen36-35b"  "auto" 16384 8003 || true
+run_model "Qwen/Qwen3-32B"             "qwen3-32b"   "auto" 16384 8004 || true
 
 log "=== suite (ROCm cross-check) ==="
 python3 -m pytest -q > "$LOGDIR/_pytest_rocm.txt" 2>&1; tail -3 "$LOGDIR/_pytest_rocm.txt" | tee -a "$LOGDIR/_run.log" || true
