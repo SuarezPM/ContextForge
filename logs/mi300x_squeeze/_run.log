@@ -44,3 +44,9 @@ len~ 190000 depth=0.5 prompt_tok=      0 found=False t=0.59s ERR
 len~ 190000 depth=0.9 prompt_tok=      0 found=False t=0.58s ERR
 
 NIAH_DONE passed=0/12 max_prompt_tokens=7369
+[04:53:40] pushed logs -> mi300x-evidence (qwen3-32b niah)
+[04:53:40] qwen3-32b DONE; container removed
+[04:53:40] === suite (ROCm cross-check) ===
+ERROR tests/test_integration.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+3 skipped, 80 warnings, 1 error in 3.35s
