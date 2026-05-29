@@ -26,3 +26,12 @@ host repo deps OK
     }
   }
 }
+[04:53:08] pushed logs -> mi300x-evidence (qwen3-32b measure)
+WARNING:apohara_context_forge.embeddings.embedding_engine:EmbeddingEngine: qwen3-embed ONNX model unavailable. Falling back to xorshift pseudo-embeddings (V3 compatibility). VRAM savings and semantic match quality will be reduced.
+retriever   strat=error                tok 0->0 (0% saved) srv_tok 1051->1051 use_dense=False base=2278ms cf=1322ms
+reranker    strat=error                tok 0->0 (0% saved) srv_tok 1050->1050 use_dense=False base=1320ms cf=1319ms
+summarizer  strat=error                tok 0->0 (0% saved) srv_tok 1044->1044 use_dense=False base=1313ms cf=1328ms
+critic      strat=error                tok 0->0 (0% saved) srv_tok 1063->1063 use_dense=True base=1317ms cf=1254ms
+responder   strat=error                tok 0->0 (0% saved) srv_tok 1052->1052 use_dense=False base=1325ms cf=1325ms
+
+E2E_DONE model=qwen3-32b server_savings=0.0% baseline_tok=5260 cf_tok=5260 inv15_fires=1 ledger_verify_exit=0 certs=5
