@@ -1,0 +1,9 @@
+[04:44:37] === PREFLIGHT ===
+GPU[0]		: Card Series: 		AMD Instinct MI300X VF
+[04:44:37] image rocm/vllm:latest present
+host repo deps OK
+[04:44:37] pyrsmi OK (device-wide HBM)
+[04:44:37] results branch: mi300x-evidence (push=on)
+[04:44:38] === MODEL coder-next (img=rocm/vllm:latest kv=fp8 maxlen=16384) ===
+[04:48:15] container EXITED — logs:
+[04:48:15] coder-next NOT ready — recording blocker, skipping
