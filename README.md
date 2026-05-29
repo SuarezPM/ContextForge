@@ -80,7 +80,7 @@ Multi-agent LLM systems — retriever → reranker → summarizer → **critic**
 |---|---|---|---|---|
 | **Qwen3-30B-A3B-2507** | 30B / 3B MoE | FP8 | ✅ ~186 GB | **NIAH 12/12 → 174K tok** · 2 667 tok/s |
 | **Qwen3-Coder-Next** (hybrid) | 80B / 3B MoE | FP8 | ✅ ~175 GiB | **NIAH 12/12 → 174K tok** · 2 149 tok/s |
-| **Qwen3-235B-A22B** | 235B / 22B MoE | INT4 | ✅ ~181 GiB | served single-card |
+| **Qwen3-235B-A22B** | 235B / 22B MoE | INT4 | ✅ ~181 GiB | single-card **+ ~56 GB CPU offload** |
 
 > An 80 GB GPU cannot hold these. A 192 GB MI300X can. That gap is the moat — and these are *our* measured footprints, not a datasheet.
 

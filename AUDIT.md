@@ -835,18 +835,22 @@ LMCache `--kv-transfer-config` for cross-worker — was validated end-to-end:
 - Suite **487 passed, 25 skipped** (+46 over the F0 baseline).
 
 **Honest non-results from the 2026-05-29 MI300X run (NOT reported as wins):**
-- `qwen3-32b` token savings read **0 %** — the LLMLingua-2 compressor was not
-  installed in that VM. The **44.4 %** figure stands on its own from the
-  2026-05-26 `logs_moe_run/` run (compressor active). Not double-counted.
+- `qwen3-32b` token savings read **0 %** — the LLMLingua-2 compressor **did not
+  run** in that VM (it failed to load; identical baseline==contextforge token
+  counts confirm no compression happened). The **44.4 %** figure stands on its
+  own from the 2026-05-26 `logs_moe_run/` run (compressor active). Not
+  double-counted.
 - `qwen3-32b` NIAH read **0/12** — a *script artifact*, not a recall failure:
   Qwen3 answers in `<think>` mode (the probe truncates before the code is
   emitted) and prompts > the configured `max_model_len` (16384) returned HTTP
   400. The real **NIAH 12/12 → 174K** stands from the 2026-05-26 run. We do not
   cite the 0/12.
 - The three Gated-DeltaNet hybrids (Coder-Next, Qwen3.5-122B, Qwen3.6-35B)
-  failed to start **only because the container shipped vLLM 0.11.2.dev**; the
-  2026-05-26 evidence already records Coder-Next needs vLLM ≥ 0.17 (served
-  cleanly on 0.19.1). An image-version miss on our side, not a model limitation.
+  failed to start on the `rocm/vllm:latest` image: its **Transformers does not
+  recognize the `qwen3_5_moe` architecture** (today's BLOCKER logs). The
+  2026-05-26 evidence separately records Coder-Next serving cleanly on a 0.19.1
+  image — so this is an image/environment miss on our side, not a model
+  limitation. (We did not pin today's exact vLLM/Transformers version string.)
 
 **The honest scope — why full-attention, and where it stops.** ContextForge has
 two independent levers:
