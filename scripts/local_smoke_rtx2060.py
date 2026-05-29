@@ -215,8 +215,12 @@ def read_vram() -> dict:
     try:
         from apohara_context_forge.metrics.vram_monitor import VRAMMonitor
         mon = VRAMMonitor(device_id=0)
-        out["vram_source"] = mon.get_vram_source()
+        # Read used FIRST: get_vram_source() reflects the backend of the last
+        # actual read; reading the source before any byte read would report the
+        # pre-read placeholder ("unknown"), not the real backend (cuda_nvml).
         out["used_gb"] = round(mon.get_used_gb(), 3)
+        out["total_gb"] = round(mon.get_total_gb(), 3)
+        out["vram_source"] = mon.get_vram_source()
     except Exception as e:
         out["vram_monitor_error"] = repr(e)
     try:

@@ -14,9 +14,10 @@
     "hit_rate": 0.0
   },
   "vram": {
-    "vram_source": "cuda_unavailable",
-    "used_gb": 7.793,
-    "second_source_used_gb": 7.397,
+    "used_gb": 7.754,
+    "total_gb": 8.0,
+    "vram_source": "cuda_nvml",
+    "second_source_used_gb": 7.358,
     "second_source": "nvidia-smi"
   },
   "verdict": {

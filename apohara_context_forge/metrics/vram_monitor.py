@@ -104,7 +104,12 @@ class VRAMMonitor:
         # AMD 192 GB default on a CUDA box.
         if self._detect_cuda():
             self._is_cuda = True
-            self._vram_source = SOURCE_CUDA_UNAVAILABLE
+            # Do NOT claim cuda_unavailable yet: no read has been attempted, and
+            # the CUDA readers (nvml/nvidia-smi/torch) generally work. The read
+            # path sets the real source on first read (cuda_nvml/smi/torch), or
+            # cuda_unavailable ONLY if every reader actually fails. Leaving it
+            # UNKNOWN here avoids a misleading "unavailable" label before any read.
+            self._vram_source = SOURCE_UNKNOWN
             logger.info(
                 "NVIDIA/CUDA detected; VRAMMonitor will read via the CUDA path "
                 "(nvml/nvidia-smi/torch). AMD 192 GB default is disabled."
