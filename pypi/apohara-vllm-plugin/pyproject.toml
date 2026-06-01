@@ -64,7 +64,7 @@ Issues        = "https://github.com/SuarezPM/Apohara_Context_Forge/issues"
 # worker startup. vLLM V1 walks the `vllm.general_plugins` entry-point
 # group and invokes each callable once per worker. Our callable is
 # `apohara_vllm_plugin:register`, which constructs and initialises a
-# vLLMAtomPlugin. Cross-worker KV interception is NOT wired here — it is
+# vLLMRomyPlugin. Cross-worker KV interception is NOT wired here — it is
 # config-driven via --kv-transfer-config (LMCache); see register().
 # ----------------------------------------------------------------------------
 [project.entry-points."vllm.general_plugins"]

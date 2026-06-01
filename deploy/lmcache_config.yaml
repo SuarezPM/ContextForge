@@ -1,4 +1,4 @@
-# LMCache backend config for cross-worker KV sharing (ATOM Fase 3).
+# LMCache backend config for cross-worker KV sharing (ROMY Fase 3).
 #
 # This file is consumed by LMCache itself (the OFFICIAL built-in
 # integration), NOT by any ContextForge-owned connector. vLLM is told

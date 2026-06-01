@@ -1,6 +1,6 @@
 """Confirms vLLMClient forwards cache_salt as an extra request-body field.
 
-ATOM Fase 1 relies on vLLM Automatic Prefix Caching, which keys prefix blocks
+ROMY Fase 1 relies on vLLM Automatic Prefix Caching, which keys prefix blocks
 by ``cache_salt``. The salt reaches vLLM as a top-level field of the JSON body.
 vLLMClient already merges arbitrary ``**kwargs`` into the payload (see
 ``vllm_client.py`` ``complete``/``chat``), so no client change is needed — this

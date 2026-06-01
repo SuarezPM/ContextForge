@@ -1,4 +1,4 @@
-"""Tests for vLLMAtomPlugin.
+"""Tests for vLLMRomyPlugin.
 
 V6.1+ semantics: the plugin's metadata flags are honest. ``quantized``
 (and the new ``quantization_applied`` alias) is True iff a quantizer
@@ -9,22 +9,22 @@ wired-with-fakes happy path.
 import numpy as np
 import pytest
 
-from apohara_context_forge.serving.atom_plugin import (
-    ATOMConfig,
+from apohara_context_forge.serving.romy_plugin import (
+    ROMYConfig,
     PostAttentionHook,
     PreAttentionHook,
     register,
-    vLLMAtomPlugin,
+    vLLMRomyPlugin,
 )
 
 
 # ---------------------------------------------------------------------------
-# ATOMConfig                                                                 #
+# ROMYConfig                                                                 #
 # ---------------------------------------------------------------------------
 
-class TestATOMConfig:
-    def test_atom_config_defaults(self):
-        config = ATOMConfig()
+class TestROMYConfig:
+    def test_romy_config_defaults(self):
+        config = ROMYConfig()
         assert config.enable_quantization is True
         assert config.enable_anchor_routing is True
         assert config.enable_cla_injection is True
@@ -82,15 +82,15 @@ class _FakeMetrics:
 # Plugin lifecycle                                                           #
 # ---------------------------------------------------------------------------
 
-class TestvLLMAtomPlugin:
+class TestvLLMRomyPlugin:
     def test_plugin_initialization(self):
-        config = ATOMConfig()
-        plugin = vLLMAtomPlugin(config)
+        config = ROMYConfig()
+        plugin = vLLMRomyPlugin(config)
         assert plugin._config is config
         assert plugin.is_initialized() is False
 
     def test_initialize_sets_worker_id(self):
-        plugin = vLLMAtomPlugin(ATOMConfig())
+        plugin = vLLMRomyPlugin(ROMYConfig())
         plugin.initialize("worker_0", {})
         assert plugin.is_initialized() is True
         stats = plugin.get_stats()
@@ -98,13 +98,13 @@ class TestvLLMAtomPlugin:
         assert stats["initialized"] is True
 
     def test_dependency_status_reflects_construction(self):
-        bare = vLLMAtomPlugin(ATOMConfig())
+        bare = vLLMRomyPlugin(ROMYConfig())
         assert bare.get_stats()["dependencies"] == {
             "quantizer": False, "lsh_matcher": False,
             "jcr_gate": False, "metrics": False,
         }
-        wired = vLLMAtomPlugin(
-            ATOMConfig(),
+        wired = vLLMRomyPlugin(
+            ROMYConfig(),
             quantizer=_FakeQuantizer(),
             jcr_gate=_FakeJCRGate(),
             metrics=_FakeMetrics(),
@@ -116,21 +116,21 @@ class TestvLLMAtomPlugin:
         assert deps["lsh_matcher"] is False
 
     def test_plugin_pre_attention_hook_property(self):
-        plugin = vLLMAtomPlugin(ATOMConfig())
+        plugin = vLLMRomyPlugin(ROMYConfig())
         assert callable(plugin.pre_attention_hook)
 
     def test_plugin_post_attention_hook_property(self):
-        plugin = vLLMAtomPlugin(ATOMConfig())
+        plugin = vLLMRomyPlugin(ROMYConfig())
         assert callable(plugin.post_attention_hook)
 
     def test_get_stats_returns_config_and_state(self):
-        config = ATOMConfig(
+        config = ROMYConfig(
             enable_quantization=True,
             enable_anchor_routing=False,
             enable_cla_injection=True,
             quantization_mode="rotate_kv",
         )
-        plugin = vLLMAtomPlugin(config)
+        plugin = vLLMRomyPlugin(config)
         plugin.initialize("worker_test", {})
         stats = plugin.get_stats()
         assert stats["config"]["enable_quantization"] is True
@@ -147,7 +147,7 @@ class TestPreAttentionHookHonest:
         """No quantizer wired → quantization_applied=False even with
         enable_quantization=True. This is the truth-up: the old hook
         always returned quantized=True regardless."""
-        hook = PreAttentionHook(ATOMConfig(enable_quantization=True))
+        hook = PreAttentionHook(ROMYConfig(enable_quantization=True))
         result = hook(["b0", "b1"], [101, 2003], layer_idx=0)
         assert result["quantization_attempted"] is False
         assert result["quantization_applied"] is False
@@ -159,7 +159,7 @@ class TestPreAttentionHookHonest:
     def test_quantization_applied_when_quantizer_wired_and_invoked(self):
         """A wired quantizer with valid pre-RoPE tensors → True."""
         q = _FakeQuantizer()
-        hook = PreAttentionHook(ATOMConfig(enable_quantization=True), quantizer=q)
+        hook = PreAttentionHook(ROMYConfig(enable_quantization=True), quantizer=q)
         keys = np.zeros((4, 64), dtype=np.float32)
         values = np.zeros((4, 64), dtype=np.float32)
         positions = np.arange(4, dtype=np.float32)
@@ -174,7 +174,7 @@ class TestPreAttentionHookHonest:
         """Quantizer wired but caller didn't hand us pre-RoPE tensors
         → quantization_applied=False (we refuse to invent inputs)."""
         q = _FakeQuantizer()
-        hook = PreAttentionHook(ATOMConfig(), quantizer=q)
+        hook = PreAttentionHook(ROMYConfig(), quantizer=q)
         result = hook(["b0"], [101], layer_idx=0)  # no keys/values/positions
         assert result["quantization_attempted"] is True
         assert result["quantization_applied"] is False
@@ -183,7 +183,7 @@ class TestPreAttentionHookHonest:
     def test_quantization_failure_reported_truthfully(self):
         """Quantizer raises → applied=False, hook does not propagate."""
         q = _RaisingQuantizer()
-        hook = PreAttentionHook(ATOMConfig(), quantizer=q)
+        hook = PreAttentionHook(ROMYConfig(), quantizer=q)
         result = hook(
             ["b0"], [101], layer_idx=0,
             keys=np.zeros((1, 4), dtype=np.float32),
@@ -194,7 +194,7 @@ class TestPreAttentionHookHonest:
 
     def test_jcr_gate_fires_on_critic_role(self):
         gate = _FakeJCRGate(fire_on_role="critic")
-        hook = PreAttentionHook(ATOMConfig(), jcr_gate=gate)
+        hook = PreAttentionHook(ROMYConfig(), jcr_gate=gate)
         result = hook(
             ["b0"], [101], layer_idx=0,
             agent_role="critic", candidate_count=5,
@@ -205,7 +205,7 @@ class TestPreAttentionHookHonest:
 
     def test_jcr_gate_passes_through_for_non_judge(self):
         gate = _FakeJCRGate(fire_on_role="critic")
-        hook = PreAttentionHook(ATOMConfig(), jcr_gate=gate)
+        hook = PreAttentionHook(ROMYConfig(), jcr_gate=gate)
         result = hook(
             ["b0"], [101], layer_idx=0,
             agent_role="retriever", candidate_count=2,
@@ -223,7 +223,7 @@ class TestPreAttentionHookHonest:
                 raise AssertionError("LSH must not be queried when JCR dense fires")
 
         hook = PreAttentionHook(
-            ATOMConfig(),
+            ROMYConfig(),
             lsh_matcher=_LSHThatShouldNotBeCalled(),
             jcr_gate=_FakeJCRGate(fire_on_role="critic"),
         )
@@ -238,7 +238,7 @@ class TestPreAttentionHookHonest:
     def test_pre_rope_invariant_always_true(self):
         """INV-10: this hook never quantises post-RoPE tensors. The
         contract surfaces in the result dict as pre_rope=True."""
-        hook = PreAttentionHook(ATOMConfig())
+        hook = PreAttentionHook(ROMYConfig())
         assert hook(["b0"], [1], layer_idx=0)["pre_rope"] is True
 
 
@@ -248,20 +248,20 @@ class TestPreAttentionHookHonest:
 
 class TestPostAttentionHook:
     def test_returns_processed_block_count(self):
-        result = PostAttentionHook(ATOMConfig())(["b0", "b1"], [], layer_idx=0)
+        result = PostAttentionHook(ROMYConfig())(["b0", "b1"], [], layer_idx=0)
         assert result["processed_blocks"] == 2
         assert result["layer_idx"] == 0
         assert result["matched"] is False
 
     def test_matched_flag_propagates_to_metrics(self):
         metrics = _FakeMetrics()
-        hook = PostAttentionHook(ATOMConfig(), metrics=metrics)
+        hook = PostAttentionHook(ROMYConfig(), metrics=metrics)
         hook(["b0"], [], layer_idx=0, matched=True)
         hook(["b1"], [], layer_idx=1, matched=False)
         assert metrics.records == [True, False]
 
     def test_stats_accumulate_across_calls(self):
-        hook = PostAttentionHook(ATOMConfig())
+        hook = PostAttentionHook(ROMYConfig())
         hook(["b0"], [], layer_idx=0)
         hook(["b1", "b2"], [], layer_idx=1, matched=True)
         result = hook(["b3"], [], layer_idx=2)
@@ -279,6 +279,6 @@ class TestEntryPoint:
         KV interception is config-driven (--kv-transfer-config + LMCache),
         not attention hooks (that platform API never existed)."""
         plugin = register()
-        assert isinstance(plugin, vLLMAtomPlugin)
+        assert isinstance(plugin, vLLMRomyPlugin)
         assert plugin.is_initialized() is True
         assert plugin.get_stats()["worker_id"] == "default"

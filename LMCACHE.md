@@ -15,7 +15,7 @@ for backwards compatibility but new code should target V2.
 |-------------------------------------------------------------|--------------------------------------------------------------------|
 | `on_save_kv_layer` and `on_load_kv_layer` logged but never called any LMCache API. | `store()` / `retrieve()` / `lookup()` invoke the real `LMCacheEngine` methods. |
 | `is_active()` returned False whenever `lmcache_client=None`, but no path to make it True. | Connector builds the engine itself from `LMCacheConnectorConfig`, OR accepts a pre-built `engine=…`. |
-| No prefetch logic.                                          | `prefetch()` returns per-block `cached_tokens` + `retrieved` so the ATOM pre-attention hook can decide whether to fetch or materialise. |
+| No prefetch logic.                                          | `prefetch()` returns per-block `cached_tokens` + `retrieved` so the ROMY pre-attention hook can decide whether to fetch or materialise. |
 | Silent on errors.                                           | Every API method logs a single WARNING on failure and returns the documented null value — no exceptions ever propagate to the caller. |
 
 ## Architecture (multi-node story)
@@ -36,7 +36,7 @@ for backwards compatibility but new code should target V2.
    │ MI300X  │              │ MI300X  │             │ MI300X  │         │ MI300X  │
    │         │              │         │             │         │         │         │
    │ Apohara │              │ Apohara │             │ Apohara │         │ Apohara │
-   │ ATOM    │              │ ATOM    │             │ ATOM    │         │ ATOM    │
+   │ ROMY    │              │ ROMY    │             │ ROMY    │         │ ROMY    │
    │ plugin  │              │ plugin  │             │ plugin  │         │ plugin  │
    │  └─ LMCacheConnectorV2 wires each plugin to the shared engine ──────────────┘
    └─────────┘              └─────────┘             └─────────┘         └─────────┘
@@ -80,11 +80,11 @@ materialises locally without crashing.
 ### 3. Wire ContextForge to LMCache
 
 In your worker's startup code (e.g. inside the vLLM plugin's
-`register()` callable, or wherever `vLLMAtomPlugin(...)` is
+`register()` callable, or wherever `vLLMRomyPlugin(...)` is
 constructed):
 
 ```python
-from apohara_vllm_plugin import vLLMAtomPlugin, ATOMConfig
+from apohara_vllm_plugin import vLLMRomyPlugin, ROMYConfig
 from apohara_context_forge.serving.lmcache_connector import (
     LMCacheConnectorConfig,
     LMCacheConnectorV2,
@@ -101,8 +101,8 @@ lmcache = LMCacheConnectorV2(config=LMCacheConnectorConfig(
 # Pass it to the plugin via the lsh_matcher slot or a custom
 # adapter. The plugin's anchor-routing path then consults LMCache
 # before falling back to local materialisation.
-plugin = vLLMAtomPlugin(
-    ATOMConfig(),
+plugin = vLLMRomyPlugin(
+    ROMYConfig(),
     lsh_matcher=lmcache,   # honest no-op without LMCache; real with
     jcr_gate=...,
     metrics=...,
@@ -190,7 +190,7 @@ The connector talks to LMCache; it does **not** yet:
 * RoPE-derotate retrieved KV blocks. The V2 returns whatever
   LMCache hands back; the caller is responsible for applying the
   AnchorPool offset hint. This is intentional — we want one place
-  in the pipeline to own that math, and that's the ATOM plugin's
+  in the pipeline to own that math, and that's the ROMY plugin's
   pre-attention hook.
 * register itself as the vLLM-side `KVConnector`. That requires
   vLLM ≥ 0.10 and the upstream connector ABI to stabilise; it lands
@@ -203,7 +203,7 @@ PR away from being honest about the existing data flow.
 
 KV interception in vLLM is **config-driven** via `--kv-transfer-config`
 (LMCache), **NOT** attention hooks. vLLM never exposed a pre/post
-attention-hook registry — so the ATOM plugin's `register()` no longer
+attention-hook registry — so the ROMY plugin's `register()` no longer
 probes for one (see [AUDIT.md](AUDIT.md) item 18). `register()` now just
 constructs and initialises the plugin; the `PreAttentionHook` /
 `PostAttentionHook` classes are unit-tested utilities, not runtime-cabled.

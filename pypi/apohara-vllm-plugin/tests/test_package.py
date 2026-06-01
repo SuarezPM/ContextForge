@@ -4,7 +4,7 @@ These tests verify the *packaging* contract — that the entry-point is
 discoverable, that the re-exports work, and that the plugin
 constructs cleanly without vLLM installed. The behavioural tests for
 the hook semantics live in the main repo's
-tests/test_atom_plugin.py (single source of truth).
+tests/test_romy_plugin.py (single source of truth).
 
 Run with::
 
@@ -34,8 +34,8 @@ def test_module_imports():
     """The package is importable without vLLM."""
     mod = importlib.import_module("apohara_vllm_plugin")
     assert hasattr(mod, "register")
-    assert hasattr(mod, "ATOMConfig")
-    assert hasattr(mod, "vLLMAtomPlugin")
+    assert hasattr(mod, "ROMYConfig")
+    assert hasattr(mod, "vLLMRomyPlugin")
     assert hasattr(mod, "PreAttentionHook")
     assert hasattr(mod, "PostAttentionHook")
 
@@ -62,10 +62,10 @@ def test_register_returns_plugin():
     assert stats["worker_id"] == "default"
 
 
-def test_atomconfig_default_flags():
-    """The re-exported ATOMConfig still has the V6.1 defaults."""
-    from apohara_vllm_plugin import ATOMConfig
-    cfg = ATOMConfig()
+def test_romyconfig_default_flags():
+    """The re-exported ROMYConfig still has the V6.1 defaults."""
+    from apohara_vllm_plugin import ROMYConfig
+    cfg = ROMYConfig()
     assert cfg.enable_quantization is True
     assert cfg.enable_jcr_gate is True
     assert cfg.quantization_mode == "rotate_kv"

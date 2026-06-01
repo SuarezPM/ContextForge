@@ -111,16 +111,16 @@ flowchart TB
     end
     subgraph Serving["AMD MI300X · ROCm 7.2 · vLLM"]
         VLLM["vLLM V1 endpoint"]
-        ATOM["ATOM plugin · cross-agent<br/>KV-block sharing · 🔬 in progress"]
+        ROMY["ROMY plugin · cross-agent<br/>KV-block sharing · 🔬 in progress"]
     end
     A1 & A2 & A3 & A5 --> REG --> COMP --> VLLM
     A4 --> JCR -->|risk > 0.7| VLLM
     JCR --> LEDGER
     REG -.-> DEDUP
-    VLLM -.-> ATOM
+    VLLM -.-> ROMY
     style JCR fill:#FF6B00,stroke:#fff,color:#fff
     style LEDGER fill:#FF6B00,stroke:#fff,color:#fff
-    style ATOM fill:#555,stroke:#fff,color:#fff,stroke-dasharray:4
+    style ROMY fill:#555,stroke:#fff,color:#fff,stroke-dasharray:4
     style DEDUP fill:#555,stroke:#fff,color:#fff,stroke-dasharray:4
 ```
 
@@ -139,7 +139,7 @@ We refuse to claim a paper's number as our own. Each mechanism is graded by **wh
 | **LLMLingua-2 compression** | ACL 2024 | ✅ **Validated** — 44 % on live MoE |
 | **FORGE-LEDGER** certified audit | this work | ✅ **Validated** on-hardware |
 | TokenDance · KVCOMM · KVFlow · PBKV · CLA · VisualKVCache · Queueing | various | 🟡 Implemented + unit-tested (synthetic) |
-| **Cross-agent KV-block sharing** (ATOM) | — | 🔬 **In progress** — the moat we're building next |
+| **Cross-agent KV-block sharing** (ROMY) | — | 🔬 **In progress** — the moat we're building next |
 | Semantic dedup on `qwen3-embed` · LMCache ROCm bridge | various | 🔬 In progress |
 
 ---
@@ -198,7 +198,7 @@ If a number is here, it ran on real silicon and there's a log to prove it. If it
 ## 🗺️ Roadmap
 
 **Now — building the efficiency moat (and we'll quote VRAM only once it's measured):**
-🔬 Physical cross-agent KV-block sharing inside vLLM (ATOM plugin) · 🔬 real-embedding semantic dedup (`qwen3-embed`) · 🔬 needle-in-a-haystack under INT4 at 200K.
+🔬 Physical cross-agent KV-block sharing inside vLLM (ROMY plugin) · 🔬 real-embedding semantic dedup (`qwen3-embed`) · 🔬 needle-in-a-haystack under INT4 at 200K.
 
 **Next — safety & audit depth (the differentiator):** adaptive INV-15 thresholds · Z3 extended to INV-10…INV-14 · OTLP compliance export.
 

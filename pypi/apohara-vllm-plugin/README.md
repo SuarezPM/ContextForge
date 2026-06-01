@@ -21,7 +21,7 @@ The plugin's job inside vLLM is:
    state (what actually ran), not intent (what the config asked for).
 
 This is the thin published shim over the in-tree implementation at
-[`apohara_context_forge.serving.atom_plugin`](https://github.com/SuarezPM/Apohara_Context_Forge/blob/main/apohara_context_forge/serving/atom_plugin.py).
+[`apohara_context_forge.serving.romy_plugin`](https://github.com/SuarezPM/Apohara_Context_Forge/blob/main/apohara_context_forge/serving/romy_plugin.py).
 
 ## Quick usage
 
@@ -37,7 +37,7 @@ python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen3-235B-A22B
 You should see in the vLLM startup log:
 
 ```
-ATOM plugin initialised: worker=… deps={…}
+ROMY plugin initialised: worker=… deps={…}
 ```
 
 Cross-worker KV reuse is wired separately, config-driven via
@@ -60,10 +60,10 @@ The plugin is constructible without vLLM installed.
 
 By default the plugin runs as a no-op telemetry surface (every flag in
 the metadata dict reports `False` / `None` honestly). Inject the real
-subsystems through `vLLMAtomPlugin(...)`:
+subsystems through `vLLMRomyPlugin(...)`:
 
 ```python
-from apohara_vllm_plugin import vLLMAtomPlugin, ATOMConfig
+from apohara_vllm_plugin import vLLMRomyPlugin, ROMYConfig
 from apohara_context_forge.quantization.rotate_kv import (
     RotateKVConfig, RotateKVQuantizer,
 )
@@ -71,8 +71,8 @@ from apohara_context_forge.dedup.lsh_engine import LSHTokenMatcher
 from apohara_context_forge.safety.jcr_gate import JCRSafetyGate
 from apohara_context_forge.metrics.collector import MetricsCollector
 
-plugin = vLLMAtomPlugin(
-    ATOMConfig(),
+plugin = vLLMRomyPlugin(
+    ROMYConfig(),
     quantizer=RotateKVQuantizer(RotateKVConfig()),
     lsh_matcher=LSHTokenMatcher(),
     jcr_gate=JCRSafetyGate(),

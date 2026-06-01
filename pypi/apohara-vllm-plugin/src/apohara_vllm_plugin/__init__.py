@@ -1,7 +1,7 @@
 """Apohara ContextForge plugin for vLLM V1.
 
 This is a thin shim over the in-tree implementation at
-:mod:`apohara_context_forge.serving.atom_plugin`. It exists so we can
+:mod:`apohara_context_forge.serving.romy_plugin`. It exists so we can
 publish a small, focused PyPI distributable whose only job is to be
 discoverable through the ``vllm.general_plugins`` entry-point group.
 
@@ -10,9 +10,9 @@ Public surface
 
 ``register``         Entry-point callable invoked by vLLM at worker
                      startup. Returns a configured plugin instance.
-``ATOMConfig``       Re-export, for users who want to construct a
+``ROMYConfig``       Re-export, for users who want to construct a
                      custom-configured plugin.
-``vLLMAtomPlugin``   Re-export of the plugin class itself.
+``vLLMRomyPlugin``   Re-export of the plugin class itself.
 
 Usage from vLLM (automatic)
 ---------------------------
@@ -40,21 +40,21 @@ from __future__ import annotations
 # Re-export the canonical implementations. Keeping the wire-level
 # implementation in apohara_context_forge means there is exactly one
 # source of truth for the hook semantics, and the same code is
-# exercised by the main repo's 19 unit tests in tests/test_atom_plugin.py.
-from apohara_context_forge.serving.atom_plugin import (
-    ATOMConfig,
+# exercised by the main repo's 19 unit tests in tests/test_romy_plugin.py.
+from apohara_context_forge.serving.romy_plugin import (
+    ROMYConfig,
     PostAttentionHook,
     PreAttentionHook,
     register,
-    vLLMAtomPlugin,
+    vLLMRomyPlugin,
 )
 
 __all__ = [
-    "ATOMConfig",
+    "ROMYConfig",
     "PostAttentionHook",
     "PreAttentionHook",
     "register",
-    "vLLMAtomPlugin",
+    "vLLMRomyPlugin",
 ]
 
 # Version mirrors apohara-context-forge's V6.1 baseline. Bumped

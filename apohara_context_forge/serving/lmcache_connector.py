@@ -15,7 +15,7 @@ What it actually does
   returns ``(kv_tensors, mask)`` if the lookup hit, else ``None``.
 * On ``lookup``: invokes ``engine.lookup(tokens)`` and returns the
   number of tokens already cached (engine's contract). Used by the
-  ATOM plugin's pre-attention hook to decide whether to read or
+  ROMY plugin's pre-attention hook to decide whether to read or
   materialise.
 * On ``prefetch``: a thin convenience that calls ``lookup`` and then
   ``retrieve`` for every block in ``token_id_blocks``, returning the
