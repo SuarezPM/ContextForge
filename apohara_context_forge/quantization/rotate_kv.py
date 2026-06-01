@@ -331,32 +331,35 @@ class RotateKVQuantizer:
         zero_points: np.ndarray,
         group_size: int,
     ) -> np.ndarray:
-        """Dequantize INT4 block back to FP32."""
+        """Dequantize INT4 block back to FP32.
+
+        Vectorized equivalent of the former quadruple Python loop. Both
+        nibbles of each packed byte share one (scale, zero_point) — the V7
+        per-byte codec. seq_len == n_blocks * group_size, so the original
+        per-row bound check never fired; the whole grid is filled.
+        """
         n_blocks, _, num_heads, packed_head_dim = packed_int4.shape
         seq_len = n_blocks * group_size
-        
-        output = np.zeros((1, seq_len, num_heads, packed_head_dim * 2), dtype=np.float32)
-        
-        for blk in range(n_blocks):
-            start = blk * group_size
-            for h in range(num_heads):
-                for d in range(packed_head_dim):
-                    scale = scales[blk, h, d]
-                    zp = zero_points[blk, h, d]
-                    
-                    for i in range(group_size):
-                        if start + i >= seq_len:
-                            break
-                        # Unpack 2 values per byte
-                        byte = packed_int4[blk, i, h, d]
-                        val1 = byte & 0x0F
-                        val2 = (byte >> 4) & 0x0F
-                        
-                        # Dequantize
-                        output[0, start + i, h, d * 2] = (val1 - zp) * scale
-                        output[0, start + i, h, d * 2 + 1] = (val2 - zp) * scale
-        
-        return output
+
+        # Unpack the two INT4 nibbles of every byte.
+        val_lo = (packed_int4 & 0x0F).astype(np.float32)
+        val_hi = ((packed_int4 >> 4) & 0x0F).astype(np.float32)
+
+        # scales / zero_points are per (block, head, packed_dim); broadcast
+        # over the group_size axis inserted at position 1.
+        scale_b = scales[:, None, :, :].astype(np.float32)
+        zp_b = zero_points[:, None, :, :].astype(np.float32)
+
+        deq_lo = (val_lo - zp_b) * scale_b
+        deq_hi = (val_hi - zp_b) * scale_b
+
+        # Interleave back into head_dim: position d*2 = lo nibble, d*2+1 = hi.
+        stacked = np.stack([deq_lo, deq_hi], axis=-1)
+        body = stacked.reshape(n_blocks, group_size, num_heads, packed_head_dim * 2)
+
+        # Flatten (n_blocks, group_size) -> seq_len row-major, matching the
+        # original output[0, blk*group_size + i, ...] indexing.
+        return body.reshape(1, seq_len, num_heads, packed_head_dim * 2)
     
     @property
     def is_calibrated(self) -> bool:

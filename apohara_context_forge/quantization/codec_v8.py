@@ -168,27 +168,21 @@ class CodecV8Quantizer(RotateKVQuantizer):
         n_blocks, _, num_heads, packed_head_dim = packed_int4.shape
         seq_len = n_blocks * group_size
 
-        output = np.zeros(
-            (1, seq_len, num_heads, packed_head_dim * 2), dtype=np.float32
-        )
+        # Unpack the two INT4 nibbles of every byte.
+        val_lo = (packed_int4 & 0x0F).astype(np.float32)
+        val_hi = ((packed_int4 >> 4) & 0x0F).astype(np.float32)
 
-        for blk in range(n_blocks):
-            start = blk * group_size
-            for h in range(num_heads):
-                for d in range(packed_head_dim):
-                    scale_lo = scales[blk, h, d, 0]
-                    scale_hi = scales[blk, h, d, 1]
-                    zp_lo = zero_points[blk, h, d, 0]
-                    zp_hi = zero_points[blk, h, d, 1]
+        # scales / zero_points carry a trailing pair axis (lower, upper).
+        # Split it and broadcast each nibble's (scale, zp) over group_size.
+        scale_lo = scales[:, None, :, :, 0].astype(np.float32)
+        scale_hi = scales[:, None, :, :, 1].astype(np.float32)
+        zp_lo = zero_points[:, None, :, :, 0].astype(np.float32)
+        zp_hi = zero_points[:, None, :, :, 1].astype(np.float32)
 
-                    for i in range(group_size):
-                        if start + i >= seq_len:
-                            break
-                        byte = packed_int4[blk, i, h, d]
-                        val_lo = byte & 0x0F
-                        val_hi = (byte >> 4) & 0x0F
+        deq_lo = (val_lo - zp_lo) * scale_lo
+        deq_hi = (val_hi - zp_hi) * scale_hi
 
-                        output[0, start + i, h, d * 2] = (val_lo - zp_lo) * scale_lo
-                        output[0, start + i, h, d * 2 + 1] = (val_hi - zp_hi) * scale_hi
-
-        return output
+        # Interleave back into head_dim: position d*2 = lo nibble, d*2+1 = hi.
+        stacked = np.stack([deq_lo, deq_hi], axis=-1)
+        body = stacked.reshape(n_blocks, group_size, num_heads, packed_head_dim * 2)
+        return body.reshape(1, seq_len, num_heads, packed_head_dim * 2)
