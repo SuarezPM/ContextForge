@@ -86,3 +86,6 @@ paper/*.toc
 CLAUDE.md
 CLAUDE.local.md
 CLAUDE.local.*
+
+# Internal strategy/research docs — never published to the public repo
+docs/research/_internal/
