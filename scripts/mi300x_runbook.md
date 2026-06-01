@@ -1,17 +1,17 @@
-# MI300X Wave B Runbook — Sprint 3
+# MI300X Runbook
 
-One-page guide for running the Wave B smoke tests on the AMD AI Dev Cloud droplet.
+One-page guide for running the MI300X smoke tests on a remote GPU host.
 
 ## Prerequisites
 
-- AMD AI Dev Cloud droplet with MI300X GPU ($30 remaining @ $1.99/hr)
-- SSH access configured: `ssh user@<droplet-ip>`
-- Git, Python 3.10+, pip, and ROCm 6.x pre-installed on the droplet
+- A remote host with an MI300X GPU
+- SSH access configured: `ssh user@<host-ip>`
+- Git, Python 3.10+, pip, and ROCm 6.x pre-installed on the host
 
-## Step 1 — Connect to the droplet
+## Step 1 — Connect to the host
 
 ```bash
-ssh user@<droplet-ip>
+ssh user@<host-ip>
 ```
 
 ## Step 2 — Clone the repo and install
@@ -66,15 +66,15 @@ Output: `logs/mi300x_v62_<timestamp>.json`
 
 ```bash
 # From your laptop:
-scp -r user@<droplet-ip>:~/Apohara_Context_Forge/logs ./mi300x_wave_b_logs/
+scp -r user@<host-ip>:~/Apohara_Context_Forge/logs ./mi300x_logs/
 ```
 
-## Step 6 — Stop the droplet
+## Step 6 — Stop the host
 
-After results are copied, stop the droplet to avoid burning the remaining credit:
+After results are copied, power off or release the GPU host:
 
 ```bash
-# In the AMD AI Dev Cloud console — power off or delete the instance.
+# In your provider's console — power off or delete the instance.
 ```
 
 ## Expected outputs
@@ -86,6 +86,6 @@ After results are copied, stop the droplet to avoid burning the remaining credit
 | `logs/mi300x_vram_*.json` | `with_fwht.reduction_factor` > 1.0 |
 | `logs/mi300x_v62_*.json` | No Python exceptions in benchmark |
 
-## Budget
+## Runtime
 
-$30 remaining @ $1.99/hr ≈ 15 hrs. All four scripts above finish in < 30 min total.
+All four scripts above finish in < 30 min total.

@@ -11,14 +11,14 @@ Architecture:
 
 INVARIANT 10: Only pre-RoPE tensors are quantized/shared.
 
-DEPRECATED (US-002 bug 6): ``LMCacheConnectorV1`` is a stub — its
+DEPRECATED: ``LMCacheConnectorV1`` is a stub — its
 ``on_save_kv_layer`` constructs ``LMCacheMeta`` and logs a debug line
 but never calls ``self._client.put``, so no KV bytes were ever
 written to LMCache through this class.  The production path is
 ``apohara_context_forge.serving.lmcache_connector.LMCacheConnectorV2``
-(see also ``README``).  V1 is retained because tests and demo
-scripts still import its no-op surface; any active call now raises
-``NotImplementedError`` to surface the lie at the source.
+(see also ``README``).  V1 is retained because tests still import its
+no-op surface; any active call now raises ``NotImplementedError`` to
+surface the lie at the source.
 """
 from __future__ import annotations
 
@@ -53,15 +53,14 @@ class LMCacheConnectorV1:
     - Loading with offset_hint injection for RoPE de-rotation
     - Cross-worker block sharing with prefix anchoring
 
-    .. deprecated:: US-002 (bug 6)
+    .. deprecated::
         ``on_save_kv_layer`` never invoked ``self._client.put`` even when
         ``self._active`` was True — it logged a debug line and returned.
         The production code path is
         :class:`apohara_context_forge.serving.lmcache_connector.LMCacheConnectorV2`.
-        This class is retained because the legacy unit tests and demo
-        scripts (``demo/benchmark_v4.py``, ``demo/benchmark_v5.py``) still
-        import its no-op surface.  Constructing it with an active client
-        now emits a ``DeprecationWarning``; any active save attempt raises
+        This class is retained because the legacy unit tests still import
+        its no-op surface.  Constructing it with an active client now
+        emits a ``DeprecationWarning``; any active save attempt raises
         ``NotImplementedError`` so the previously-silent stub surfaces
         loudly.
     """
@@ -82,7 +81,7 @@ class LMCacheConnectorV1:
                 "LMCacheConnectorV1 is deprecated and was always a stub; "
                 "use LMCacheConnectorV2 from "
                 "apohara_context_forge.serving.lmcache_connector instead. "
-                "See AUDIT.md item 12 (US-002 bug 6).",
+                "See AUDIT.md item 12.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -117,7 +116,7 @@ class LMCacheConnectorV1:
     ) -> None:
         """Called when ContextForge saves a KV layer to LMCache.
 
-        .. deprecated:: US-002 (bug 6)
+        .. deprecated::
             This method previously constructed an ``LMCacheMeta`` and
             emitted a debug log, but never called ``self._client.put``.
             No KV bytes were ever written through this class.  An
@@ -148,7 +147,7 @@ class LMCacheConnectorV1:
             "LMCacheConnectorV1.on_save_kv_layer is a stub; use "
             "LMCacheConnectorV2 from "
             "apohara_context_forge.serving.lmcache_connector. "
-            "See AUDIT.md item 12 (US-002 bug 6)."
+            "See AUDIT.md item 12."
         )
 
     async def on_load_kv_layer(

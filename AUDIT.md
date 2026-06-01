@@ -8,7 +8,7 @@
 
 Every research / systems project ships with a gap between *claims in the
 README* and *what the code actually computes*. ContextForge is no exception.
-The hackathon submission and the published paper (DOI
+The V6.0 release and the published paper (DOI
 [10.5281/zenodo.20114594](https://doi.org/10.5281/zenodo.20114594))
 captured the V6.0 state. This document is the public accountability layer:
 it lists, with file:line evidence, the things that **look measured** but
@@ -157,10 +157,10 @@ reader knows where the codebase carries its own weight.
   rotation, 3.97× VRAM reduction".
 - **Original V6.0 reality** *(`apohara_context_forge/quantization/rotate_kv.py:215-247`)*:
   `use_fwht` flag read but never applied — only channel reordering + INT4 quant.
-- **V7.0.0-alpha.1 (Sprint 1):** Real orthonormal FWHT shipped as standalone
+- **V7.0.0-alpha.1:** Real orthonormal FWHT shipped as standalone
   module at `apohara_context_forge/quantization/fwht.py` (112 LOC, 8/8 tests).
   Module itself **🟢**, but `quantize_pre_rope()` still didn't call it → 🟡.
-- **V7.0.0-alpha.2 (Sprint 2):** Wire-up landed at
+- **V7.0.0-alpha.2:** Wire-up landed at
   `apohara_context_forge/quantization/rotate_kv.py:24` (import) +
   lines 162-166 (conditional `fwht(key_states)` + `fwht(value_states)` when
   `cfg.use_fwht=True`, applied after channel reordering and before sink
@@ -225,9 +225,9 @@ reader knows where the codebase carries its own weight.
   pinned in `pyproject.toml`/`requirements.txt` — deferred, those files have
   unrelated uncommitted edits.)
 
-### 9. 🟠→🟢 V6.1 INT4 packing/unpacking asymmetry RESOLVED in V7.0.0-alpha.3 (Sprint 3 Wave A)
+### 9. 🟠→🟢 V6.1 INT4 packing/unpacking asymmetry RESOLVED in V7.0.0-alpha.3
 
-- **Discovered:** Sprint 2 by worker-fwht-wire (Track 2) during
+- **Discovered:** in V7.0.0-alpha.2 by the FWHT wire-up work (Track 2) during
   round-trip validation of FWHT integration
 - **Symptom:** Round-trip `quantize_pre_rope → dequantize_pre_rope` of a
   random KV tensor shows ~6.3 max absolute error — far above the
@@ -245,7 +245,7 @@ reader knows where the codebase carries its own weight.
   is much worse than INT4 theory says it should be. The integration
   test `tests/test_rotate_kv_fwht_integration.py::test_fwht_roundtrip_through_pipeline`
   uses a 3× slack tolerance against this baseline.
-- **Sprint 3 Wave A fix:** `_quantize_block` rewritten to pack along
+- **V7.0.0-alpha.3 fix:** `_quantize_block` rewritten to pack along
   head_dim (not seq) to match the read side's invariant. Single
   `(scale, zero_point)` per packed byte governs both nibbles. Pre-fix
   max round-trip error: ~6.3; post-fix: 0.0332 (well under 0.07 INT4
@@ -255,9 +255,9 @@ reader knows where the codebase carries its own weight.
   regression).
 - **Status:** **🟢 RESOLVED.**
 
-### 10. 🟠→🟢 K8s operator security hardening RESOLVED in V7.0.0-alpha.3 (Sprint 3 Wave A)
+### 10. 🟠→🟢 K8s operator security hardening RESOLVED in V7.0.0-alpha.3
 
-- **Surfaced by:** Sprint 2 Phase 4 security-reviewer
+- **Surfaced by:** V7.0.0-alpha.2 Phase 4 security-reviewer
 - **Concerns** (operator/controllers/apoharacontextforgecluster_controller.go):
   - **No SecurityContext** on worker or Redis pods (`runAsNonRoot`,
     `readOnlyRootFilesystem`, drop ALL capabilities are all unset).
@@ -271,12 +271,12 @@ reader knows where the codebase carries its own weight.
   - **Default image is `:latest`** (mutable tag — supply-chain risk).
 - **Mitigation in V7.0.0-alpha.2:** `operator/README.md` carries a
   prominent ⚠️ NOT PRODUCTION READY warning listing these 5 items as
-  Sprint 3 prerequisites. The operator binary is **not** built or
-  deployed in Sprint 2 — only the reconcile logic + unit tests +
+  prerequisites. The operator binary is **not** built or
+  deployed in V7.0.0-alpha.2 — only the reconcile logic + unit tests +
   integration-test skeleton are shipped. None of these issues are
-  exploitable in the current Sprint 2 state because the operator is
+  exploitable in the current V7.0.0-alpha.2 state because the operator is
   not running anywhere.
-- **Sprint 3 Wave A delivery:**
+- **V7.0.0-alpha.3 delivery:**
   - **SecurityContext** ✅ — both Redis + worker pods get full hardening:
     PodSecurityContext (runAsNonRoot, runAsUser, FSGroup-on-Redis,
     SeccompProfileTypeRuntimeDefault) + per-container SecurityContext
@@ -308,32 +308,32 @@ reader knows where the codebase carries its own weight.
   - **Phase 4.5 additional hardening:** `AutomountServiceAccountToken: false`
     on both Redis + worker pods (neither needs K8s API access); leader-election
     Role `delete` verbs removed (controller never deletes leases/configmaps).
-- **Tracked open items (not Sprint 3 blockers):**
-  - kubebuilder RBAC marker `+kubebuilder:rbac:groups=contextforge.apohara.dev,...,verbs=get;list;watch;create;update;patch;delete` (controller.go:51-56) would regenerate a ClusterRole if `make manifests` is run. The hand-written namespaced role.yaml is currently the source of truth. Sprint 4: align markers with intent.
+- **Tracked open items (not release blockers):**
+  - kubebuilder RBAC marker `+kubebuilder:rbac:groups=contextforge.apohara.dev,...,verbs=get;list;watch;create;update;patch;delete` (controller.go:51-56) would regenerate a ClusterRole if `make manifests` is run. The hand-written namespaced role.yaml is currently the source of truth. Follow-up: align markers with intent.
   - `govulncheck ./operator/...` not yet run in CI. `golang.org/x/net@v0.19.0` may have newer patches; recommend `go get golang.org/x/net@latest && go mod tidy` before V7.0.0 final.
 - **Status:** **🟢 RESOLVED** (5/5 items closed; image pinning at versioned-tag is alpha-acceptable per security-reviewer; production hardening tracked above as known follow-ups for V7.0.0).
 
-### V7.0.0-alpha.5 — Sprint 3 Wave B extended deltas (2026-05-12, real MI300X)
+### V7.0.0-alpha.5 — extended deltas (2026-05-12, real MI300X)
 
 | Finding | Severity | Status |
 |---------|----------|--------|
-| 🚨 **FWHT degrades INT4 quality 200×** under current codec. Measured MSE: use_fwht=False → 1.01e-02; use_fwht=True → 2.01e+00. Paper v2.0 conclusion: use_fwht=False is the recommended config. | High | Sprint 4 candidate: per-nibble independent scales codec rewrite would reclaim FWHT benefit at cost of ~0.5× storage. |
-| 🟡 V6.x #3 `LMCacheConnectorV2` only supports NVIDIA-CUDA LMCache. AMD ROCm fallback (lmcache.non_cuda_equivalents) has a different API. Currently enters honest-fallback on MI300X even with lmcache + redis-server installed. | Medium | Sprint 4 candidate: adapt connector to non-CUDA backend API. |
-| 🟡 FWHT torch path has +700% peak GPU alloc overhead from `.clone()` at each butterfly stage. Throughput 25-33 GB/s vs 3.73 TB/s HBM3 measured. | Medium | Sprint 4 candidate: in-place strided butterfly to drop overhead to ~+10%. |
+| 🚨 **FWHT degrades INT4 quality 200×** under current codec. Measured MSE: use_fwht=False → 1.01e-02; use_fwht=True → 2.01e+00. Paper v2.0 conclusion: use_fwht=False is the recommended config. | High | Follow-up candidate: per-nibble independent scales codec rewrite would reclaim FWHT benefit at cost of ~0.5× storage. |
+| 🟡 V6.x #3 `LMCacheConnectorV2` only supports NVIDIA-CUDA LMCache. AMD ROCm fallback (lmcache.non_cuda_equivalents) has a different API. Currently enters honest-fallback on MI300X even with lmcache + redis-server installed. | Medium | Follow-up candidate: adapt connector to non-CUDA backend API. |
+| 🟡 FWHT torch path has +700% peak GPU alloc overhead from `.clone()` at each butterfly stage. Throughput 25-33 GB/s vs 3.73 TB/s HBM3 measured. | Medium | Follow-up candidate: in-place strided butterfly to drop overhead to ~+10%. |
 | 🟢 HBM3 effective bandwidth measured at **3.73 TB/s = 70.5% of advertised 5.3 TB/s peak** on MI300X VF (SR-IOV slice). Honest paper §3 number. | Info | Promoted in paper v2.0 (replaces "5.3 TB/s peak"). |
 | 🟢 Full pytest regression on MI300X+ROCm: **347/358 pass** (~~11 failures in test_coordinator.py are version-mismatch with newer rich/sentence-transformers/numpy 2.2.6~~ — **CORRECTED 2026-05-25:** the 11 `test_coordinator.py` failures were a `ContextMatch` schema/API drift (model required `tokens_saved`; tests used `shared_prefix_tokens`) compounded by a broken `CompressionCoordinator.decide()`, **not** a dependency-version issue. Fixed on the `rc2-foundation` branch — see item #8). FWHT, observability, INT4 codec, rotate_kv all pass on real ROCm. | Info | V6.1 honesty: substrate works on real AMD hardware. |
 | 🟢 INT4 codec quality at 3.55× reduction: MSE = 1.01e-02 (use_fwht=False), max abs err 0.33. Pareto-acceptable for KV cache. | Info | Paper v2.0 §5 Pareto table. |
 | 🟢 Hardware label honesty: JSON logs now report `rocm-hip:6.2.41133:AMD Instinct MI300X VF`, not just `cuda`. V6.1 discipline applied. | Info | V7.0.0-alpha.5 fix from user catch. |
 
-### V7.0.0-alpha.4 — Sprint 3 Wave B deltas (2026-05-12, real MI300X)
+### V7.0.0-alpha.4 — deltas (2026-05-12, real MI300X)
 
-| Claim | Source | Status post-Wave B |
+| Claim | Source | Status post-measurement |
 |-------|--------|--------------------|
 | **RotateKV pre-RoPE INT4 → 3.97× VRAM reduction** (paper §2 mech #5) | Literature target (RotateKV, IJCAI 2025) | **🟡 NOT measured by Apohara on MI300X.** Real measurement on AMD Instinct MI300X VF (192 GB, gfx942, ROCm 7.2.0, torch 2.5.1+rocm6.2) across 8 shape configs (4K-32K seq × 16-64 heads × 64-256 head_dim): `reduction_factor = 3.55×` essentially constant. Paper v2.0 MUST report 3.55× measured, not 3.97× literature target. |
 | **FWHT integration runs on real MI300X** | V7.0.0-alpha.2 + V7.0.0-alpha.3 wire-up | **🟢** — 9/9 tests pass on MI300X in 1.33 s. Log `logs/mi300x_fwht_*.json`. |
 | **`reduction_factor` scales with sequence length** | Paper assumption | **🟢 CONFIRMED** — constant 3.55× from seq=4K to seq=32K. Per-block scale/zero_point + sink-fp16 overhead amortizes well. |
 | **`reduction_factor` scales with head_dim and num_heads** | Paper assumption | **🟢 CONFIRMED** — same 3.55× across head_dim=64/128/256 and num_heads=16/32/64. |
-| **V6.2 adversarial bench needs MI300X** | Sprint 3 Wave B plan | **🟢→ honest skip.** `demo/benchmark_v62_adversarial.py` is pure NumPy simulation (no torch, no GPU). MI300X execution would have produced identical numbers to laptop. Saved $6 of $30 budget for future sprints. |
+| **V6.2 adversarial bench needs MI300X** | measurement plan | **🟢→ honest skip.** `demo/benchmark_v62_adversarial.py` is pure NumPy simulation (no torch, no GPU). MI300X execution would have produced identical numbers to laptop, so it was skipped. |
 
 The 0.42× gap between literature target (3.97×) and Apohara's measured
 3.55× is the cost of single (scale, zero_point) per packed byte (V7.0.0-alpha.3
@@ -342,17 +342,17 @@ by the read-side byte layout (see #9). Reclaiming the 0.42× would require a
 codec rewrite (per-nibble scales, ~2× metadata overhead) — paper v2.0 reports
 the trade-off honestly rather than chasing the literature number.
 
-### V7.0.0-alpha.3 — Sprint 3 Wave A deltas (2026-05-12)
+### V7.0.0-alpha.3 — deltas (2026-05-12)
 
 | Track | Change | State |
 |-------|--------|-------|
 | 1 | `apohara_context_forge/quantization/rotate_kv.py` `_quantize_block` rewritten (pack along head_dim) | #9 🟠 → 🟢 |
 | 2 | `operator/controllers/apoharacontextforgecluster_controller.go` Pod + container SecurityContext + image versioned-tag + ImagePullPolicy + AutomountServiceAccountToken=false | #10 SecurityContext + image-pin → 🟢 / 🟡 (digest pin V7.0.0 final) |
 | 3 | `operator/config/rbac/` — SA + namespaced Role + RoleBinding + leader-election RBAC (secrets verbs tightened in Phase 4.5) | #10 RBAC → 🟢 |
-| 4 | `operator/controllers/...` Redis auth Secret via crypto/rand + `operator/config/networkpolicy/` (4 policies: default-deny + worker-to-redis + worker-ingress + redis-ingress) + `scripts/mi300x_*` for Wave B | #10 Redis-auth → 🟢, #10 NetworkPolicy → 🟢, Wave B prep ✓ |
+| 4 | `operator/controllers/...` Redis auth Secret via crypto/rand + `operator/config/networkpolicy/` (4 policies: default-deny + worker-to-redis + worker-ingress + redis-ingress) + `scripts/mi300x_*` for MI300X measurement | #10 Redis-auth → 🟢, #10 NetworkPolicy → 🟢, MI300X prep ✓ |
 | Phase 4.5 fixes | mi300x_vram_measurement.py rewritten with honest CPU-NumPy bridge protocol; CRD Phase enum trimmed to actually-emitted values; malformed `manager/kustomization.yaml` fixed | V6.1 discipline honored |
 
-**Honest measurement protocol for Wave B's `scripts/mi300x_vram_measurement.py`:**
+**Honest measurement protocol for `scripts/mi300x_vram_measurement.py`:**
 The current `RotateKVQuantizer` is NumPy-only (no torch fast path).
 The script now allocates the baseline KV cache as `torch.float16` on
 CUDA (real MI300X allocation footprint = `baseline_fp16_bytes`),
@@ -364,11 +364,11 @@ Redis/LMCache. The `reduction_factor` is honest because both
 numerator and denominator are real. A separate `peak_gpu_alloc_bytes`
 captures CUDA peak during the round-trip (includes the device↔host
 copy — disclosed in the docstring rather than hidden). A future
-sprint can add a torch fast path to RotateKVQuantizer and re-measure
+release can add a torch fast path to RotateKVQuantizer and re-measure
 on-GPU peak without the copy; the CPU bridge protocol is the V6.1
 discipline applied to compute as well as claims.
 
-### V7.0.0-alpha.2 — Sprint 2 deltas (2026-05-12)
+### V7.0.0-alpha.2 — deltas (2026-05-12)
 
 | Change | State delta |
 |--------|-------------|
@@ -376,10 +376,10 @@ discipline applied to compute as well as claims.
 | `agents/base_agent.py` — token-count client fallback for `original_tokens=0` server passthrough | #8 🟠 → 🟢 |
 | `apohara_context_forge/observability/otlp_exporter.py` + recorders OTLP fan-out + `dashboards/inv15.json` | 🟢 (new) — Track 3 |
 | `operator/controllers/apoharacontextforgecluster_controller.go` 40→453 LOC real reconciler + 4 tests | 🟡 (real logic, not deployed) — Track 4 |
-| (security-reviewer Phase 4) | NEW: #9 INT4 packing bug (pre-existing) + #10 K8s operator hardening (Sprint 3) |
+| (security-reviewer Phase 4) | NEW: #9 INT4 packing bug (pre-existing) + #10 K8s operator hardening (deferred to V7.0.0-alpha.3) |
 | Inline security fixes Phase 4.5 (`raise_for_status()` in base_agent.py, OTLP `insecure=False` default, path canonicalization for `APOHARA_OBSERVABILITY_DIR`) | Security baseline hardened |
 
-### V7.0.0-alpha.1 — Sprint 1 deltas added (2026-05-12)
+### V7.0.0-alpha.1 — deltas added (2026-05-12)
 
 Three new modules entered the audit, all marked at their honest status:
 
@@ -387,7 +387,7 @@ Three new modules entered the audit, all marked at their honest status:
 |--------|-------|-----|
 | `apohara_context_forge/quantization/fwht.py` | 🟢 PRODUCTION | Real butterfly recursion, 8/8 tests, orthonormal, fp16 upcast. Standalone — not yet called by `RotateKVQuantizer` (closing #6 from 🟠 to 🟡 above). |
 | `apohara_context_forge/observability/{prometheus_exporter,audit_log,recorders}.py` | 🟢 PRODUCTION | Real `prometheus_client` Counter/Gauge + real JSONL audit log. Honest-fallback when `prometheus_client` not installed. Smoke wire-up at `safety/jcr_gate.py:159` (late import, best-effort). 6/6 tests. |
-| `operator/` + `charts/apohara-contextforge/` | 🟡 HONEST STUB | CRD + helm chart YAML validate (`bash operator/validate.sh` exits 0). Reconciler logs "reconciled" only — real reconciliation is Sprint 2. README declares this status. |
+| `operator/` + `charts/apohara-contextforge/` | 🟡 HONEST STUB | CRD + helm chart YAML validate (`bash operator/validate.sh` exits 0). Reconciler logs "reconciled" only — real reconciliation lands in V7.0.0-alpha.2. README declares this status. |
 
 The community-policy track (CONTRIBUTING + DCO + CoC + PR template) is
 governance, not a code module, so it does not enter the state table.
@@ -464,13 +464,12 @@ See the V6.x roadmap discussion for the current direction.
 
 ---
 
-## 12. 🟢 7 critical bugs fixed (2026-05-16, Day-6 sprint Phase 0)
+## 12. 🟢 7 critical bugs fixed (2026-05-16)
 
-External strategist review (Perplexity Deep Research + an ex-hackathon
-judge) independently validated seven defects in the codebase that a
+External strategist review (Perplexity Deep Research + an external
+reviewer) independently validated seven defects in the codebase that a
 first-time reader would surface in minutes. They are now all closed.
-Each fix landed as a separate atomic commit on `main` under user story
-**US-002** of the Apohara Inti Fusion sprint.
+Each fix landed as a separate atomic commit on `main`.
 
 | # | Area | File:line | Bug | Commit |
 |---|------|-----------|-----|--------|
@@ -507,13 +506,12 @@ commit:  *(filled in after push)*.
 
 ---
 
-## 13. 🟢 INV-15 paper V2.0 preprint draft committed (2026-05-16, US-013)
+## 13. 🟢 INV-15 paper V2.0 preprint draft committed (2026-05-16)
 
 A V2.0 preprint draft of the INV-15 paper was committed to the
-`papers/` directory as part of **US-013** of the Apohara Inti Fusion
-sprint. The draft refines `paper/inv15_paper.pdf` (V2.0.1, May 13,
+`papers/` directory. The draft refines `paper/inv15_paper.pdf` (V2.0.1, May 13,
 2026, 12-reference graph, DOI [10.5281/zenodo.20114594](https://doi.org/10.5281/zenodo.20114594))
-with three additions specified in the US-013 acceptance criteria.
+with three additions specified in the acceptance criteria.
 
 **Files committed:**
 
@@ -569,124 +567,47 @@ tectonic inv15_v2.tex   # 13-page PDF in ~10 s; warnings about
 
 **Scope disclaimer:** **This is a preprint draft committed to the
 repository only.** Real arXiv submission requires the endorsement
-chain (2--3 days minimum) and is scheduled post-hackathon. The
+chain (2--3 days minimum) and is scheduled for a later milestone. The
 version of record for citation today remains the Zenodo deposit
 ([DOI 10.5281/zenodo.20114594](https://doi.org/10.5281/zenodo.20114594)).
 
-**Status: 🟢 SHIPPED** (US-013 acceptance criteria 1--7 satisfied).
+**Status: 🟢 SHIPPED** (acceptance criteria 1--7 satisfied).
 
 ---
 
-## 14. 🟡 Milan 5-agent benchmark side-by-side: shipped script, CPU-mock numbers (2026-05-16, US-014)
+## 14. 🟡→⬛ 5-agent benchmark side-by-side: scripted, CPU-mock only, never run on GPU (2026-05-16)
 
-US-014 of the Apohara Inti Fusion Sprint asked for a side-by-side
-benchmark of `vllm --enable-prefix-caching` (baseline) vs
+A side-by-side benchmark of `vllm --enable-prefix-caching` (baseline) vs
 `vllm + apohara-context-forge plugin` on the 5-agent shared-context
-workload, executed on GCP H100 (or fallback AMD MI300X). Budget
-ceiling $100. Deliverables: a JSON log, a `BENCHMARKS.md` table, a
-60-second screen capture, and an atomic commit.
+workload was scripted but **only ever ran in CPU-mock mode**. The
+real-GPU side-by-side measurement was never executed — GPU access was
+not available at the time — so **no GPU benchmark numbers exist** for
+this workload.
 
-**What shipped (🟢):**
+**Honesty disclosure (the technical finding worth keeping):**
 
-- `scripts/run_milan_benchmark.sh` — the orchestrator. Runs the
-  workload twice through `scripts/sprint5_head_to_head.py` (once
-  with INV-15 OFF for the baseline, once with INV-15 ON for the
-  contextforge run), then composes the Milan JSON via
-  `scripts/build_milan_benchmark.py`. Works in mock mode by
-  default; flip to a real GPU host by setting `VLLM_ENDPOINT`,
-  `HARDWARE_LABEL`, and `COST_USD` env vars. No script change
-  needed to switch backends — the orchestrator is one command.
-- `scripts/build_milan_benchmark.py` — composes the Milan JSON
-  schema specified by US-014 §3 from the two head-to-head outputs.
-  HBM is modeled, not measured, via the documented closed-form
-  `estimate_hbm_used_gb` (Llama-3-8B; 32 layers × GQA-8 KV heads
-  × fp16; mean reuse rate from the workload YAML). The schema's
-  `honesty_note` field clearly states which fields are real
-  (latency, tokens, JCR — from the workload run) vs modeled (HBM
-  — from the closed-form).
-- `scripts/generate_milan_clip.py` — renders a 60-second GIF
-  replay of the real run output text. No `ffmpeg`, `scrot`,
-  `asciinema`, `gnome-screenshot`, `magick`, `convert`, `import`,
-  or `grim` available on this workstation, so the GIF is a
-  Pillow-rendered 6-frame replay of the real `stdout` text from
-  the run, not a fabricated GPU-utilization graph.
-- `BENCHMARKS.md` — new file with the run table, reproducibility
-  instructions for both CPU-mock and real-GPU paths, and clear
-  honesty disclosure that the row's HBM/TTFT/throughput came
-  from mock mode + closed-form HBM model.
-- `logs/milan_5agent_benchmark_1778943206.json` — the Milan
-  submission JSON for the run committed alongside this entry.
-- `assets/milan_benchmark_clip.gif` — the 60-second visual
-  artifact (6 frames × 10 s = 60 s).
+- The composed JSON's `hardware` field read literally `"CPU-mock
+  fallback"`. No "we ran it on a GPU" claim was ever made.
+- HBM in the mock output was **modeled, not measured**, via a documented
+  closed-form (Llama-3-8B; 32 layers × GQA-8 KV heads × fp16; mean reuse
+  rate from the workload spec). The schema's `honesty_note` field stated
+  which fields were real (latency, tokens, JCR — from the workload run)
+  vs modeled (HBM — from the closed-form).
+- The ~76% HBM-saved figure was a closed-form consequence of the
+  workload's mean reuse rate (0.76) **by construction**, not a measured
+  result.
 
-**What did NOT ship (🟡):**
+**Resolution.** The mock-only benchmark toolchain (orchestrator,
+JSON-composer, GIF-replay generator, the `BENCHMARKS.md` placeholder
+table, and the associated mock JSON logs) carried no real measurement
+and was **removed from the repository** rather than left as a
+GPU-deferred placeholder. The durable, GPU-measured benchmark evidence
+lives in items #16, #18, and #19 (real MI300X runs).
 
-- **The real-GPU side-by-side measurement.** The story called for
-  GCP H100 1x or AMD MI300X. **Both blocked**:
-  1. **GCP**: the configured service account for this workstation
-     is `apohara-aegis-judge@gen-lang-client-0658922897.iam.gserviceaccount.com`,
-     which is a Gemini-judge role for the apohara-aegis project,
-     **not a compute-grant role**. `gcloud services list` returns
-     `SERVICE_DISABLED` on the Service Usage API; the SA cannot
-     self-enable Compute Engine API. A human owner (Pablo) would
-     have to enable it via the web console.
-  2. **AMD MI300X**: SR-IOV credits are exhausted per CLAUDE.md
-     §11 ("Open Items: MI300X access is gated on AMD credits.
-     Sprint 5+ GPU work blocked unless fresh credits arrive via
-     DevRel outreach or out-of-pocket spend").
-- **Therefore**: US-014 §7 fallback path executed verbatim: ship
-  the benchmark SCRIPT and BENCHMARKS.md table with placeholder
-  values + a note that the live run is deferred to Pablo's
-  manual execution. **Cost spent: $0.00** (no compute provisioned).
-
-**Live-GPU run, when Pablo enables it:**
-
-```bash
-# On the GPU host:
-PYTHONPATH=. python3 -m apohara_context_forge.vllm_plugin.serve \
-    --model meta-llama/Llama-3-8B --port 8000 &
-VLLM_ENDPOINT=http://localhost:8000 \
-HARDWARE_LABEL="GCP H100 1x" COST_USD=12.0 \
-bash scripts/run_milan_benchmark.sh
-```
-
-The orchestrator writes the new `logs/milan_5agent_benchmark_<ts>.json`
-and the GIF is regenerable via `generate_milan_clip.py`. After
-the live run, BENCHMARKS.md's first table row should be
-overwritten with the GPU numbers and this AUDIT entry should be
-graduated from 🟡 to 🟢.
-
-**Honesty discipline applied:**
-
-- `hardware` field in the JSON is literally `"CPU-mock fallback
-  (GCP H100 deferred)"`. No "we ran it on H100" anywhere.
-- The `honesty_note` in the JSON names the specific service
-  account and the SERVICE_DISABLED status that blocked GCP.
-- HBM closed-form is documented inline with the constants
-  derived from Llama-3-8B's actual architecture (32 layers,
-  GQA-8 KV heads, fp16, 256 tokens/agent × 5 agents).
-- The 76.0% HBM-saved number falls out of the YAML's mean reuse
-  rate of 0.76 by construction — reviewers can verify with
-  pen-and-paper from `configs/sprint5_5agent.yaml`. A real GPU
-  run will land in this neighborhood ± vLLM-prefix-cache
-  efficiency noise.
-
-**Files:**
-
-| Path | Purpose |
-|------|---------|
-| `scripts/run_milan_benchmark.sh` | One-command orchestrator (mock or real-GPU). |
-| `scripts/build_milan_benchmark.py` | Composes Milan JSON from two head-to-head outputs. |
-| `scripts/generate_milan_clip.py` | Renders the 60-s GIF replay. |
-| `BENCHMARKS.md` | First Milan-sprint benchmark table. |
-| `logs/milan_5agent_benchmark_1778943206.json` | Milan submission JSON (2026-05-16). |
-| `logs/milan_h2h_baseline_1778943206.json` | Source: baseline head-to-head run. |
-| `logs/milan_h2h_contextforge_1778943206.json` | Source: contextforge head-to-head run. |
-| `assets/milan_benchmark_clip.gif` | 60-s visual artifact (6 frames × 10 s). |
-
-**Status: 🟡 PARTIAL** — script + JSON + GIF + BENCHMARKS.md shipped;
-live-GPU row deferred. Graduates to 🟢 when Pablo re-runs on real
-hardware (single command per the snippet above).
+**Status: ⬛ RETIRED** — the only artifact this entry described was a
+CPU-mock benchmark with no measured GPU data; the toolchain was deleted.
+Real side-by-side KV-sharing evidence is item #19 (84.7% prefix-cache
+hit-rate, measured on MI300X).
 
 ---
 

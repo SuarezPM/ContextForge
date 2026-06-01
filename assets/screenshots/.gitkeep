@@ -1,9 +1,0 @@
-# Drop the 5 dashboard / benchmark screenshots in this directory:
-#
-#   dashboard_live_demo.png      — Live Demo tab (With vs Without ContextForge, 79.85% savings)
-#   dashboard_v6_snapshot.png    — Architecture tab V6 Live Snapshot (TokenDance + JCR Safety Gate)
-#   dashboard_aiter_config.png   — AITER ROCm Config table + documented speedups
-#   dashboard_key_stats.png      — Key Statistics panel
-#   benchmark_v6_terminal.png    — V6.0 METRICS terminal output (S-14 + S-15)
-#
-# README.md references them at these exact paths.

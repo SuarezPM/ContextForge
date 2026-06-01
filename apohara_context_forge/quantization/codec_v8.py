@@ -15,7 +15,7 @@ trailing factor of 2 (from ``(n_blocks, num_heads, packed_head_dim)``
 to ``(n_blocks, num_heads, packed_head_dim, 2)``).
 
 Honesty discipline: V8 numbers DO NOT enter paper Table 3 until they
-are measured on real MI300X (Sprint 5). See
+are measured on real MI300X. See
 ``docs/v8-codec-design.md`` § Acceptance criteria.
 
 INVARIANT preservation: V8 inherits INV-10 (pre-RoPE quantization)

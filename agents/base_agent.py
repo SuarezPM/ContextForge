@@ -48,7 +48,7 @@ class BaseAgent(ABC):
             # (e.g. coordinator_unavailable passthrough), fall back to a local
             # count so downstream metrics stay accurate.
             #
-            # Bug fix (US-002): previously ``len(context.split())`` (whitespace
+            # Bug fix: previously ``len(context.split())`` (whitespace
             # word count) was used; that under-counts for code and multibyte
             # text by a factor of ~1.3-3x.  We now route through
             # ``TokenCounter``, which uses the same Qwen3 tokenizer as the
@@ -78,7 +78,7 @@ class BaseAgent(ABC):
             per-token callback.  This method awaits the *full*
             non-streaming response, so the returned latency is the
             request-total wall time, not first-token latency.
-            Renamed in US-002 bug 4 to stop mislabelling the value.
+            Renamed to stop mislabelling the value.
         """
         use_thinking = thinking if thinking is not None else self.thinking
 

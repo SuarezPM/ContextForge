@@ -69,11 +69,10 @@ torch 2.9.1+rocm6.3) — evidence committed under `logs_mi300x_p2/`:
 
 ---
 
-## V7.0.0-rc.1 — Sprint 4 ships substrate optimizations + paper v2.0 · 2026-05-12
+## V7.0.0-rc.1 — substrate optimizations + paper v2.0 · 2026-05-12
 
-Sprint 4 code optimizations from MI300X evidence (W1 + W2) + paper
-v2.0 with MI300X-measured numbers (W3). Cumulative cost since
-V6.0 (hackathon submission): ~$2.05 of AMD AI Dev Cloud credits.
+Code optimizations from MI300X evidence (W1 + W2) + paper
+v2.0 with MI300X-measured numbers (W3).
 
 ### Closed AUDIT items (cumulative)
 - #6 RotateKV FWHT integration: 🟢 (V7.0.0-alpha.2)
@@ -184,18 +183,7 @@ MI300X-class hardware can support natively without compression. With
 Apohara's INT4 codec, the same workload fits in 0.6 GB of KV cache,
 opening the door to running 262K context on much smaller GPUs.
 
-### Cumulative Wave B cost
-
-| Phase | Cost |
-|-------|------|
-| Wave B initial (alpha.4) | $0.51 |
-| Wave B extended (alpha.5) | $0.80 |
-| FWHT optimization experiments (alpha.6) | $0.15 |
-| Extreme-scale validation (alpha.7) | $0.59 |
-| **Total Wave B** | **~$2.05** |
-| **Remaining AMD budget** | **~$27.95 of $30** |
-
-### Sprint 4 backlog (cumulative from all alpha.4-.7 evidence)
+### Backlog (cumulative from all alpha.4-.7 evidence)
 
 1. fp16-only FWHT path (V7.0.0-alpha.6): 2× faster, 60% less peak alloc, no quality loss
 2. `use_fwht=False` as recommended default (V7.0.0-alpha.5): FWHT degrades INT4 quality 200×
@@ -208,7 +196,7 @@ opening the door to running 262K context on much smaller GPUs.
 
 ## V7.0.0-alpha.6 — FWHT optimization experiments on MI300X · 2026-05-12
 
-Sprint 3 Wave B extended continuation. Attacks the +700% peak alloc
+Continuation of the MI300X evidence run. Attacks the +700% peak alloc
 overhead and 25-33 GB/s throughput findings from V7.0.0-alpha.5 with
 two concrete optimization experiments + paper-grade evidence.
 
@@ -255,20 +243,14 @@ V7.0.0-alpha.5 quant quality measurement). **The fp16 FWHT precision
 error is BELOW the INT4 quantization noise floor — quality loss is
 effectively zero in the downstream KV cache use case.**
 
-🚨 **Paper v2.0 + Sprint 4 deliverable:** replace the fp16→fp32
+🚨 **Paper v2.0 + follow-up deliverable:** replace the fp16→fp32
 upcast in `apohara_context_forge/quantization/fwht.py` with the
 fp16-only path. **Net win: 2× faster, 60% less peak GPU alloc, no
 measurable downstream quality loss.**
 
 Log: `logs/mi300x_fwht_fp16_test_*.json` (18 shape configs).
 
-### Cost (this commit only)
-
-- Experiment 1 (in-place bench): ~$0.05
-- Experiment 2 (fp16 vs fp32 sweep): ~$0.10
-- **Cumulative Wave B+extended+optimizations: ~$1.45 of $30**
-
-### Sprint 4 deliverables identified
+### Deliverables identified
 
 From V7.0.0-alpha.5 + V7.0.0-alpha.6 evidence:
 
@@ -287,7 +269,7 @@ From V7.0.0-alpha.5 + V7.0.0-alpha.6 evidence:
 ### Files added
 
 - `apohara_context_forge/quantization/fwht_inplace.py` — in-place
-  butterfly Sprint 4 candidate module (not yet wired into `fwht.py`)
+  butterfly candidate module (not yet wired into `fwht.py`)
 - `scripts/mi300x_fwht_inplace_bench.py` — orig-vs-inplace bench
 - `scripts/mi300x_fwht_fp16_test.py` — fp16 vs fp32-upcast precision/perf
 - `logs/mi300x_fwht_inplace_bench_*.json`
@@ -295,10 +277,9 @@ From V7.0.0-alpha.5 + V7.0.0-alpha.6 evidence:
 
 ---
 
-## V7.0.0-alpha.5 — Sprint 3 Wave B extended: deeper MI300X evidence · 2026-05-12
+## V7.0.0-alpha.5 — deeper MI300X evidence · 2026-05-12
 
-Continuation of Wave B on AMD AI Dev Cloud MI300X droplet. Total Wave B
-+ extended cost: ~$1.20 of $30 budget. Generates the full paper v2.0
+Continuation of the MI300X evidence run. Generates the full paper v2.0
 evidence stack with 4 publication-ready PNG figures.
 
 ### V6.1 honesty discipline fix
@@ -315,7 +296,7 @@ Fix: `scripts/mi300x_vram_measurement.py` now also reports
 alongside `"torch_device": "cuda"`. All re-run logs from V7.0.0-alpha.5
 carry the honest backend label.
 
-### NEW measurements (extended Wave B)
+### NEW measurements (extended run)
 
 #### HBM3 bandwidth probe (`scripts/mi300x_hbm3_bandwidth.py`)
 
@@ -354,11 +335,11 @@ FWHT performance with no bridge:
 **Two findings:**
 1. **FWHT torch path has 7× peak alloc overhead** — the
    `_fwht_butterfly_torch` implementation does a `.clone()` at each
-   stage of the butterfly. Sprint 4 candidate: replace with in-place
+   stage of the butterfly. Follow-up candidate: replace with in-place
    strided ops to drop the overhead to ~+10%.
 2. **Effective throughput 25-33 GB/s** is far below the 3.73 TB/s HBM3
    bandwidth. FWHT is memory-traffic-bound + clone-amplified. A
-   well-tuned kernel should hit ~1 TB/s. Sprint 4 candidate.
+   well-tuned kernel should hit ~1 TB/s. Follow-up candidate.
 3. **Round-trip identity error ≤ 1.95e-3** (fp16 epsilon).
 
 Log: `logs/mi300x_pure_torch_fwht_*.json`.
@@ -413,7 +394,7 @@ Two-stage test:
      Apohara connector imports `lmcache.config.LMCacheEngineConfig`,
      which doesn't exist in the non_cuda_equivalents Python fallback.
 
-**Sprint 4 work item:** adapt `LMCacheConnectorV2` to the LMCache
+**Follow-up work item:** adapt `LMCacheConnectorV2` to the LMCache
 Python fallback API so it works on AMD ROCm machines without
 `libcudart.so.12`. Currently, V6.x #3 only supports NVIDIA-CUDA LMCache.
 
@@ -436,22 +417,6 @@ produces 4 publication-ready PNGs (140 DPI, 6×4 inches each):
 Each figure has source-data overlay (small text in lower-left) so
 reviewers can cross-check against the logged JSON.
 
-### Cost accounting (extended Wave B)
-
-| Stage | Cost |
-|-------|------|
-| Stage A HBM3 bandwidth | ~$0.05 |
-| Stage B pure-torch FWHT | ~$0.05 |
-| Stage C sweep re-run (honest backend labels) | ~$0.25 |
-| Stage D single VRAM re-run | ~$0.10 |
-| Stage E quantization quality | ~$0.10 |
-| Stage F full pytest regression | ~$0.15 |
-| Stage G LMCache smoke (× 2) | ~$0.05 |
-| matplotlib install + figure gen | ~$0.05 |
-| **Extended Wave B total** | **~$0.80** |
-| Combined with Wave B initial ($0.51) | **~$1.31** |
-| Remaining AMD budget | **~$28.69 of $30** |
-
 ### Scripts added
 
 - `scripts/mi300x_pure_torch_fwht.py` — pure-torch GPU FWHT measurement
@@ -465,13 +430,13 @@ reviewers can cross-check against the logged JSON.
 
 - 🚨 FWHT integration **degrades** INT4 quantization quality 200× with
   current codec. `use_fwht=False` is the recommended config. Tracked
-  as Sprint 4 candidate: per-nibble independent scales would reclaim
+  as a follow-up candidate: per-nibble independent scales would reclaim
   quality at cost of ~0.5× storage reduction.
 - 🟡 V6.x #3 `LMCacheConnectorV2` only supports NVIDIA-CUDA LMCache
   backend. AMD ROCm fallback (`lmcache.non_cuda_equivalents`) has a
-  different API and is NOT wired. Sprint 4 candidate.
+  different API and is NOT wired. Follow-up candidate.
 - 🟡 FWHT torch path has 7× peak alloc overhead from
-  `_fwht_butterfly_torch.clone()`. Sprint 4 candidate: in-place strided
+  `_fwht_butterfly_torch.clone()`. Follow-up candidate: in-place strided
   butterfly to drop to ~+10%.
 - 🟢 HBM3 bandwidth 3.73 TB/s measured vs 5.3 TB/s advertised. Honest
   paper §3 number.
@@ -488,12 +453,10 @@ V7.0.0 final release. Paper v2.0 §5 must report:
 
 ---
 
-## V7.0.0-alpha.4 — Sprint 3 Wave B: real MI300X evidence · 2026-05-12
+## V7.0.0-alpha.4 — real MI300X evidence · 2026-05-12
 
-Sprint 3 Wave B execution on AMD AI Dev Cloud MI300X droplet
-(IPv4 129.212.188.18, $1.99/hr). Total cost: ~$0.50 of the $30 budget.
-Saved ~$7 by skipping the V6.2 adversarial benchmark (pure CPU
-simulation — no GPU value) and repurposing the time for a shape-scaling
+MI300X measurement run. Skipped the V6.2 adversarial benchmark (pure CPU
+simulation — no GPU value) and repurposed the time for a shape-scaling
 sweep that gives paper v2.0 the reduction-factor curve.
 
 ### Real MI300X hardware
@@ -532,7 +495,7 @@ NumPy CPU bridge — same algorithmic cost regardless of GPU). Log:
 
 Replaces the original Stage 3 V6.2 adversarial benchmark, which on
 inspection is pure NumPy/Python simulation (no torch, no GPU usage)
-and would have wasted ~$6 of MI300X time. The repurposed sweep is
+and would have wasted MI300X time. The repurposed sweep is
 exactly the data paper v2.0 needs: how does `reduction_factor` scale
 with sequence length, head_dim, and num_heads?
 
@@ -566,19 +529,7 @@ Log: `logs/mi300x_vram_sweep_1778624264.json`.
 `apohara_context_forge.scheduling.queueing_controller` — pure CPU
 simulation, no GPU usage. Running it on MI300X would have produced
 identical numbers to running on the dev laptop. The honest call:
-skip Stage 4 and bank the $6.
-
-### Cost accounting
-
-| Stage | Cost | Wall clock |
-|-------|------|------------|
-| Setup (clone + venvless pip install) | ~$0.15 | ~5 min |
-| Stage 1 smoke FWHT | ~$0.01 | 1.33 s |
-| Stage 2 single VRAM | ~$0.10 | ~3 min |
-| Stage 3 sweep (16 configs) | ~$0.25 | ~13 min |
-| Stage 4 (skipped) | $0 | 0 |
-| **Total Wave B** | **~$0.51** | **~22 min** |
-| Remaining AMD budget | **~$29.49** | for Sprint 4+ |
+skip Stage 4.
 
 ### AUDIT.md deltas
 
@@ -605,13 +556,13 @@ literature target in paper v2.0 §5 (RotateKV mechanism).
 
 ---
 
-## V7.0.0-alpha.3 — Sprint 3 Wave A: Closes AUDIT #9 + #10 · 2026-05-12
+## V7.0.0-alpha.3 — Closes AUDIT #9 + #10 · 2026-05-12
 
-Third sprint on the V7 roadmap. Closes both remaining audit items — #9 V6.1
+Third release on the V7 roadmap. Closes both remaining audit items — #9 V6.1
 INT4 packing asymmetry and all 5 of #10 K8s operator security hardening —
-plus preps Wave B MI300X smoke-test scripts (separate run, ~$15-20 of the
-$30 AMD AI Dev Cloud budget). Executed via `/autopilot` with 4 parallel
-workers + 3 reviewer validators + 8-item Phase 4.5 inline fix pass.
+plus preps the MI300X smoke-test scripts (separate run). Executed via
+`/autopilot` with 4 parallel workers + 3 reviewer validators + 8-item
+Phase 4.5 inline fix pass.
 
 ### Fixed
 
@@ -666,8 +617,8 @@ workers + 3 reviewer validators + 8-item Phase 4.5 inline fix pass.
     → worker:8000
   - `redis_ingress.yaml` — ingress worker → Redis:6379
   Admin-applied; not auto-managed by the operator.
-- **`scripts/mi300x_*`** (Track 4, Wave B prep) — 3 scripts +
-  runbook for the AMD AI Dev Cloud droplet:
+- **`scripts/mi300x_*`** (Track 4, MI300X measurement prep) — 3 scripts +
+  runbook for the MI300X host:
   - `mi300x_smoke_fwht.sh` — pytest invocation for FWHT integration
     + INT4 codec tests with rocm-smi snapshots
   - `mi300x_vram_measurement.py` — Phase 4.5 rewritten with honest
@@ -678,9 +629,8 @@ workers + 3 reviewer validators + 8-item Phase 4.5 inline fix pass.
     `(batch, seq_len, num_heads, head_dim)` layout)
   - `mi300x_v62_adversarial.sh` — V6.2 adversarial benchmark on real MI300X
   - `mi300x_runbook.md` — 6-step ops guide
-- **`.omc/plans/autopilot-impl-sprint3.md`** — Sprint 3 implementation
-  plan with Wave A / Wave B strategic split. Budget-honest:
-  Wave A consumes $0 of AMD credits, Wave B is the ~$15-20 MI300X burn.
+- **`.omc/plans/autopilot-impl-sprint3.md`** — implementation
+  plan with a no-GPU code phase split from the MI300X measurement phase.
 
 ### Tests
 
@@ -695,7 +645,7 @@ workers + 3 reviewer validators + 8-item Phase 4.5 inline fix pass.
   tests + 4 new SecurityContext tests + 4 existing).
 - **`go vet ./operator/...`** — clean.
 - **`bash operator/validate.sh`** — 16 YAML files pass (was 14 in
-  Sprint 2; +2 from new Phase 4.5 NetworkPolicy manifests).
+  V7.0.0-alpha.2; +2 from new Phase 4.5 NetworkPolicy manifests).
 - **`scripts/check_honesty.sh`** — PASS.
 
 ### Phase 4 validation results
@@ -705,7 +655,7 @@ workers + 3 reviewer validators + 8-item Phase 4.5 inline fix pass.
   shape order). Phase 4.5 rewrote the script with honest CPU-NumPy
   bridge protocol.
 - **Security-reviewer (sonnet):** APPROVE with conditions — all 5
-  Sprint 2 CRITICAL concerns resolved. 3 medium + 5 low items
+  V7.0.0-alpha.2 CRITICAL concerns resolved. 3 medium + 5 low items
   surfaced; Phase 4.5 fixed M-1 (worker Ingress + default-deny
   NetworkPolicy), M-2 (secrets RBAC verbs), M-3 (Redis
   ImagePullPolicy), L-2 (leader-election delete), L-3
@@ -742,26 +692,24 @@ workers + 3 reviewer validators + 8-item Phase 4.5 inline fix pass.
 - #9 V6.1 INT4 packing asymmetry: 🟠 → 🟢 (resolved + locked-in tests)
 - #10 K8s operator hardening: 🟠 → 🟢 (all 5 items closed + Phase 4.5
   additional hardening)
-- Tracked open (not Sprint 3 blockers):
-  - kubebuilder RBAC marker / hand-written role.yaml drift (Sprint 4)
+- Tracked open (not release blockers):
+  - kubebuilder RBAC marker / hand-written role.yaml drift (follow-up)
   - `golang.org/x/net` dependency audit via govulncheck
   - Full @sha256: digest pinning (V7.0.0 final)
 
-### Wave B handoff
+### MI300X measurement handoff
 
-When the user powers the AMD droplet and provides the SSH IP, the lead
-will:
-1. Connect via ssh, clone repo + checkout V7.0.0-alpha.3 tag
-2. `pip install -e . pytest pytest-json-report torch` (~5 mins, ~$0.20)
-3. Run `bash scripts/mi300x_smoke_fwht.sh` (~10 min, ~$0.30) →
-   validates FWHT integration on real KV tensors
-4. Run `python3 scripts/mi300x_vram_measurement.py` (~3 min, ~$0.10)
-   → real `reduction_factor` measurement for paper v2.0
-5. Run `bash scripts/mi300x_v62_adversarial.sh` (~3 hrs, ~$6) → V6.2
-   adversarial bench on real MI300X for paper v2.0 promotion
-6. Copy `logs/mi300x_*.json` back, commit as `V7.0.0-alpha.4 (Sprint 3 Wave B)`,
+On the MI300X host:
+1. Clone repo + checkout the V7.0.0-alpha.3 tag
+2. `pip install -e . pytest pytest-json-report torch`
+3. Run `bash scripts/mi300x_smoke_fwht.sh` → validates FWHT
+   integration on real KV tensors
+4. Run `python3 scripts/mi300x_vram_measurement.py` → real
+   `reduction_factor` measurement for paper v2.0
+5. Run `bash scripts/mi300x_v62_adversarial.sh` → V6.2 adversarial
+   bench on real MI300X for paper v2.0 promotion
+6. Copy `logs/mi300x_*.json` back, commit as `V7.0.0-alpha.4`,
    update paper draft with measured numbers
-Total estimated Wave B burn: ~$8-10. Reserve: $20-22 for Sprint 4+.
 
 ### Citation
 
@@ -770,9 +718,9 @@ V7.0.0 final release.
 
 ---
 
-## V7.0.0-alpha.2 — Sprint 2: Closes AUDIT #6 + #8, real K8s reconciler · 2026-05-12
+## V7.0.0-alpha.2 — Closes AUDIT #6 + #8, real K8s reconciler · 2026-05-12
 
-Second sprint on the V7 roadmap. Closes two AUDIT items (🟡→🟢 for #6 RotateKV
+Second release on the V7 roadmap. Closes two AUDIT items (🟡→🟢 for #6 RotateKV
 FWHT wire-up; 🟠→🟢 for #8 pipeline regression), ships a real K8s reconciler,
 extends observability with Grafana dashboard + OTLP. All 4 tracks ran via
 `/autopilot` with parallel workers and 3 reviewer validators.
@@ -837,25 +785,25 @@ extends observability with Grafana dashboard + OTLP. All 4 tracks ran via
   hand-authored) — DeepCopyObject/DeepCopyInto for both types (would
   normally come from `controller-gen`).
 - **`operator/api/v1alpha1/groupversion_info.go`** (rewritten) — fixed
-  Sprint 1 bug where `SchemeBuilder` was zero-valued; now uses
+  V7.0.0-alpha.1 bug where `SchemeBuilder` was zero-valued; now uses
   `runtime.NewSchemeBuilder` with `addKnownTypes`. Required for
   `go vet` cleanness.
 - **`operator/go.mod`** — added `k8s.io/api`, `k8s.io/apimachinery`,
   `sigs.k8s.io/controller-runtime` v0.17.0 deps.
-- **`.omc/plans/autopilot-impl-sprint2.md`** — Sprint 2 implementation
+- **`.omc/plans/autopilot-impl-sprint2.md`** — V7.0.0-alpha.2 implementation
   plan (auto-approved by `/autopilot`).
 
 ### Updated
 
 - **`operator/README.md`** — prominent ⚠️ NOT PRODUCTION READY warning
-  listing the 5 Sprint 3 prerequisites: SecurityContext, ServiceAccount
+  listing the 5 hardening prerequisites: SecurityContext, ServiceAccount
   + RBAC, Redis authentication, NetworkPolicy, image digest pinning.
-  Operator binary is NOT built or deployed in Sprint 2 — only reconcile
+  Operator binary is NOT built or deployed in V7.0.0-alpha.2 — only reconcile
   logic + unit tests + integration-test skeleton.
 
 ### Tests
 
-- **`tests/test_pipeline.py`** — 6/6 PASS (was 4/6 in Sprint 1).
+- **`tests/test_pipeline.py`** — 6/6 PASS (was 4/6 in V7.0.0-alpha.1).
 - **`tests/test_rotate_kv_fwht_integration.py`** — 5/5 PASS (new).
 - **`tests/test_otlp_exporter.py`** — 3 PASS + 1 SKIP (new).
 - **`tests/test_observability.py`** — 6/6 PASS (regression — recorders.py changed).
@@ -871,7 +819,7 @@ extends observability with Grafana dashboard + OTLP. All 4 tracks ran via
 - **Security-reviewer (sonnet):** REQUEST CHANGES — 7 issues. Easy fixes
   applied in Phase 4.5 (raise_for_status, OTLP TLS default, path
   canonicalization). Operator-deployment-scope issues (SecurityContext,
-  RBAC, Redis auth, NetworkPolicy, image pinning) deferred to Sprint 3
+  RBAC, Redis auth, NetworkPolicy, image pinning) deferred to V7.0.0-alpha.3
   and documented as hard prerequisites in `operator/README.md` + AUDIT.md
   #10.
 - **Code-reviewer (opus):** APPROVE with low nitpicks. Unused
@@ -881,8 +829,8 @@ extends observability with Grafana dashboard + OTLP. All 4 tracks ran via
 
 - #6 RotateKV FWHT: 🟡 → 🟢 (fully wired)
 - #8 pipeline regression: 🟠 → 🟢 (resolved)
-- #9 NEW: V6.1 INT4 packing asymmetry (pre-existing, tracked for Sprint 3)
-- #10 NEW: K8s operator security hardening (Sprint 3 scope, blocks deployment)
+- #9 NEW: V6.1 INT4 packing asymmetry (pre-existing, tracked for V7.0.0-alpha.3)
+- #10 NEW: K8s operator security hardening (V7.0.0-alpha.3 scope, blocks deployment)
 
 ### Citation
 
@@ -891,11 +839,11 @@ V7.0.0 final release.
 
 ---
 
-## V7.0.0-alpha.1 — Sprint 1: Quad-track kickoff · 2026-05-12
+## V7.0.0-alpha.1 — Quad-track kickoff · 2026-05-12
 
 First commit on the V7 roadmap (`.omc/plans/v7-roadmap.md`). V7 thesis:
 **real KV-cache reuse end-to-end**, building on the V6.1 honesty
-discipline and the V6.2 adversarial validation. Sprint 1 lands a
+discipline and the V6.2 adversarial validation. This release lands a
 first-commit MVP on each of the four parallel tracks:
 
 ### Added
@@ -908,7 +856,7 @@ first-commit MVP on each of the four parallel tracks:
   inputs upcast to fp32 for the butterfly to avoid catastrophic
   precision loss, then cast back. Closes the V6.1 AUDIT.md item #6
   (RotateKV FWHT). Module-only; integration with
-  `RotateKVQuantizer.quantize_pre_rope()` lands in Sprint 2.
+  `RotateKVQuantizer.quantize_pre_rope()` lands in V7.0.0-alpha.2.
 
 - **`apohara_context_forge/observability/`** (Track 2 — audit-grade INV-15 telemetry):
   - `prometheus_exporter.py` — per-instance `CollectorRegistry` exporter
@@ -930,7 +878,7 @@ first-commit MVP on each of the four parallel tracks:
   CRD at `contextforge.apohara.dev/v1alpha1` with 5 spec fields
   (workerCount, model, lmcacheRedisUrl, gpuType, image) and 3 status
   fields (readyWorkers, phase, conditions). Reconciler skeleton logs
-  "reconciled" only — real reconciliation logic is Sprint 2.
+  "reconciled" only — real reconciliation logic lands in V7.0.0-alpha.2.
   Helm chart with worker Deployment, headless Service, optional Redis
   sidecar, ConfigMap. `bash operator/validate.sh` exits 0 with all 5
   user-facing YAML files passing `yaml.safe_load`.
@@ -945,8 +893,8 @@ first-commit MVP on each of the four parallel tracks:
 
 - **`.omc/plans/v7-roadmap.md`** — 12-month V7 strategic plan with
   per-candidate breakdown (effort × leverage × dependencies × DoD),
-  sequencing diagram, triage protocol, AMD AI Dev Cloud $100 credit
-  burn plan, ADR, RALPLAN-DR summary.
+  sequencing diagram, triage protocol, MI300X compute plan, ADR,
+  RALPLAN-DR summary.
 
 ### Tests
 
@@ -963,11 +911,11 @@ first-commit MVP on each of the four parallel tracks:
 
 - `tests/test_pipeline.py::test_pipeline_run` and
   `tests/test_pipeline.py::test_pipeline_metrics_tracking` fail on this
-  branch's HEAD **before** any Sprint 1 change (`total_tokens_before == 0`).
+  branch's HEAD **before** any V7.0.0-alpha.1 change (`total_tokens_before == 0`).
   Verified by git-stashing the only modified prod file
   (`apohara_context_forge/safety/jcr_gate.py`) and re-running the test
   — same failure. Tracked under AUDIT.md as a pre-existing 🟠 item;
-  not introduced by Sprint 1. Sprint 2 will investigate.
+  not introduced by V7.0.0-alpha.1. V7.0.0-alpha.2 will investigate.
 
 ### Citation
 
@@ -1054,9 +1002,9 @@ The V6.0 deposit remains accessible but is now superseded.
 
 ---
 
-## V6.0.0 — Initial hackathon submission · 2026-05-10
+## V6.0.0 — Initial release · 2026-05-10
 
-Initial release for the AMD AI Hackathon. 10 mechanisms wired,
+Initial public release. 10 mechanisms wired,
 15/15 benchmark PASS (subsequently audited and partly revised in V6.1
 — see AUDIT.md), 310/310 unit tests passing, INV-15 enforcement,
 TokenDance master-mirror storage, JCR Safety Gate, AITER ROCm config,

@@ -1,6 +1,6 @@
-"""In-place torch FWHT — Sprint 4 candidate optimization.
+"""In-place torch FWHT — candidate optimization.
 
-Sprint 3 Wave B extended found that the current `_fwht_butterfly_torch`
+Profiling found that the current `_fwht_butterfly_torch`
 has +700% peak alloc overhead due to `.clone()` at each butterfly stage.
 This module implements an in-place version using strided views and
 `torch.where` for the additive/subtractive lanes — no clones, no extra
