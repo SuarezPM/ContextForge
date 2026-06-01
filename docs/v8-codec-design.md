@@ -160,7 +160,7 @@ Three minimum tests:
 
 ### Phase 3 — MI300X validation (Sprint 5, on droplet)
 
-Script: `scripts/sprint5_v8_codec.py`
+Reference: `scripts/capture_kv_snapshots.py` (standalone runner removed in cleanup)
 
 Compares V7 vs V8 on real Llama-3-8B KV cache snapshots:
 

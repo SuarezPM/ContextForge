@@ -14,12 +14,11 @@
 #   * The Chinese-character rocm-smi flag.
 #
 # Allowlist:
-#   * V4 benchmarks (`demo/benchmark.py`, `demo/benchmark_v4.py`) keep
-#     their per-scenario `vram_peak_gb` floats — they were never claimed
-#     to be measured. We only forbid duration_ms in those files.
-#   * The cleanup branch at benchmark_v5.py that returns
-#     ScenarioResult(duration_ms=0, ...) on exception is a sentinel,
-#     not a measurement, and is excluded.
+#   * demo/benchmark.py keeps its per-scenario `vram_peak_gb` floats —
+#     they were never claimed to be measured. We only forbid duration_ms
+#     in that file.
+#   * A `duration_ms=0` sentinel returned on the exception path is not a
+#     measurement, and is excluded.
 
 set -euo pipefail
 
@@ -35,7 +34,7 @@ echo
 #    sentinel `duration_ms=0` exception path).
 echo "▸ hardcoded duration_ms in benchmark scenarios"
 if grep -nE "duration_ms\s*=\s*[1-9][0-9]*\.?[0-9]*" \
-       demo/benchmark_v5.py 2>/dev/null \
+       demo/benchmark.py 2>/dev/null \
    | grep -v -E "scenario_id=.*duration_ms=0" \
    | grep -v "duration_ms=0," ; then
     violations=$((violations + 1))
@@ -47,7 +46,7 @@ fi
 # 2. Hardcoded vram_peak_gb in V5+ benchmarks.
 echo "▸ hardcoded vram_peak_gb (V5+ benchmarks only)"
 if grep -nE "vram_peak_gb\s*=\s*[0-9]+\.?[0-9]*" \
-       demo/benchmark_v5.py 2>/dev/null \
+       demo/benchmark.py 2>/dev/null \
    | grep -v "scenario_id=.*vram_peak_gb=0," ; then
     : # V5 scenarios still report indicative VRAM peaks until we wire
       # VRAMMonitor into the benchmark harness. This is documented

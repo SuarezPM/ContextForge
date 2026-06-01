@@ -5,7 +5,7 @@ through Llama-3-8B (or a smaller stand-in on CPU), capture the
 pre-RoPE keys/values at every layer, and persist them as numpy
 ``.npz`` files under ``logs/kv_snapshots/``.
 
-The downstream ``sprint5_v8_codec.py`` script reads these snapshots
+The downstream V8 codec script reads these snapshots
 and runs the V7-vs-V8 codec comparison. Decoupling the capture from
 the codec comparison lets us:
 

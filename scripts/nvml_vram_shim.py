@@ -1,7 +1,7 @@
 """NVIDIA pynvml VRAM reader — additive complement to apohara_context_forge.metrics.vram_monitor.
 
 Canonical VRAMMonitor reads AMD MI300X via PyRSMI. This shim provides
-the NVIDIA-side equivalent for benchmark harnesses (run_milan_h100.py)
+the NVIDIA-side equivalent for benchmark harnesses
 that need real H100 numbers, without modifying the AMD-targeted core.
 
 Apache-2.0 — Apohara ContextForge.

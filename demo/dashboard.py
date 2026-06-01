@@ -223,7 +223,7 @@ DEVLOUD_SPECS = """
 | Software   | PyRSMI, ROCm Profiler, HIP, Triton-ROCm |
 | Access      | https://developer.amd.com/devcloud/ (free credits) |
 | Cost Estimate | ~$1.99/hr (single MI300X), $9.95/hr (8-GPU) |
-| Benchmark Tool | demo/benchmark_v4.py --device rocm:0 --scenarios all |
+| Benchmark Tool | demo/benchmark.py --device rocm:0 --scenarios all |
 """
 
 # ---------------------------------------------------------------------------
