@@ -1,6 +1,6 @@
 """Build the vLLM invocation that loads LMCache as the OFFICIAL KVConnector.
 
-ATOM Fase 3: cross-worker KV sharing is config-driven. vLLM never
+ROMY Fase 3: cross-worker KV sharing is config-driven. vLLM never
 exposed an attention-hook registry (see ``LMCACHE.md`` / ``AUDIT.md``
 item 18), so the only honest way to intercept KV is vLLM's
 ``--kv-transfer-config`` flag pointing at LMCache's *built-in* connector

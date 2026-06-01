@@ -1,6 +1,6 @@
-"""vLLM-ATOM plugin for ContextForge.
+"""vLLM-ROMY plugin for ContextForge.
 
-ATOM (Anchor-driven Tensor Orchestration for Multi-agent) is the
+ROMY (Runtime for Orchestrated Matrix Yields) is the
 runtime side of ContextForge that lives inside vLLM. It exposes two
 pre/post attention hooks plus a top-level entry-point function so vLLM
 V1 can discover and register it through the `vllm.general_plugins`
@@ -42,7 +42,7 @@ group. The standalone PyPI package (``apohara_vllm_plugin``) declares::
     apohara_contextforge = "apohara_vllm_plugin:register"
 
 The ``register()`` callable below is what vLLM invokes once per worker;
-it constructs an ATOM plugin and (optionally) installs telemetry.
+it constructs an ROMY plugin and (optionally) installs telemetry.
 
 KV interception lives in the config-driven ``--kv-transfer-config`` path
 (LMCache), NOT in attention hooks — that platform API never existed in
@@ -66,8 +66,8 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 @dataclass
-class ATOMConfig:
-    """ATOM plugin configuration. All flags are intent-only — whether
+class ROMYConfig:
+    """ROMY plugin configuration. All flags are intent-only — whether
     each subsystem actually fires depends on whether its dependency is
     wired."""
 
@@ -130,7 +130,7 @@ class PreAttentionHook:
 
     def __init__(
         self,
-        config: ATOMConfig,
+        config: ROMYConfig,
         *,
         quantizer: Optional[_Quantizer] = None,
         lsh_matcher: Optional[_LSHMatcher] = None,
@@ -205,7 +205,7 @@ class PreAttentionHook:
             return True
         except Exception as exc:  # noqa: BLE001
             logger.warning(
-                "ATOM quantization failed at layer %s: %s",
+                "ROMY quantization failed at layer %s: %s",
                 layer_idx, type(exc).__name__,
             )
             return False
@@ -292,7 +292,7 @@ class PreAttentionHook:
         }
 
         logger.debug(
-            "ATOM pre-attention layer=%s blocks=%s qa=%s qb=%s anchor=%s jcr_dense=%s",
+            "ROMY pre-attention layer=%s blocks=%s qa=%s qb=%s anchor=%s jcr_dense=%s",
             layer_idx, len(block_ids),
             result["quantization_attempted"], result["quantization_applied"],
             "yes" if anchor_match else "no", jcr_dense,
@@ -330,7 +330,7 @@ class PostAttentionHook:
 
     def __init__(
         self,
-        config: ATOMConfig,
+        config: ROMYConfig,
         *,
         metrics: Optional[_Metrics] = None,
     ):
@@ -363,7 +363,7 @@ class PostAttentionHook:
             try:
                 self._metrics.record_register(matched=matched)
             except Exception as exc:  # noqa: BLE001
-                logger.warning("ATOM metrics.record_register failed: %s",
+                logger.warning("ROMY metrics.record_register failed: %s",
                                type(exc).__name__)
 
         return {
@@ -378,8 +378,8 @@ class PostAttentionHook:
 # Plugin                                                                     #
 # ---------------------------------------------------------------------------
 
-class vLLMAtomPlugin:
-    """vLLM-ATOM plugin object.
+class vLLMRomyPlugin:
+    """vLLM-ROMY plugin object.
 
     Holds a config and the two hooks. Lifecycle:
       * ``__init__`` wires the (optional) ContextForge dependencies.
@@ -391,14 +391,14 @@ class vLLMAtomPlugin:
 
     def __init__(
         self,
-        config: Optional[ATOMConfig] = None,
+        config: Optional[ROMYConfig] = None,
         *,
         quantizer: Optional[_Quantizer] = None,
         lsh_matcher: Optional[_LSHMatcher] = None,
         jcr_gate: Optional[_JCRGate] = None,
         metrics: Optional[_Metrics] = None,
     ):
-        self._config = config or ATOMConfig()
+        self._config = config or ROMYConfig()
         self._pre_hook = PreAttentionHook(
             self._config,
             quantizer=quantizer,
@@ -422,7 +422,7 @@ class vLLMAtomPlugin:
         self._worker_id = worker_id
         self._initialized = True
         logger.info(
-            "ATOM plugin initialised: worker=%s deps=%s",
+            "ROMY plugin initialised: worker=%s deps=%s",
             worker_id, self._dependency_status,
         )
 
@@ -460,7 +460,7 @@ class vLLMAtomPlugin:
 # Entry-point function for vLLM V1                                           #
 # ---------------------------------------------------------------------------
 
-def register() -> vLLMAtomPlugin:
+def register() -> vLLMRomyPlugin:
     """Entry-point for the ``vllm.general_plugins`` group.
 
     vLLM V1 invokes every entry point in that group once per worker on
@@ -477,6 +477,6 @@ def register() -> vLLMAtomPlugin:
     The function is safe to call even when vLLM is not installed: it
     constructs the plugin (which is just data) and returns it.
     """
-    plugin = vLLMAtomPlugin()
+    plugin = vLLMRomyPlugin()
     plugin.initialize(worker_id="default", vllm_config={})
     return plugin

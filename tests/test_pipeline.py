@@ -61,7 +61,7 @@ class TestPipeline:
 
 
 class TestPrefixCacheSalt:
-    """ATOM Fase 1: cross-agent prefix sharing via cache_salt."""
+    """ROMY Fase 1: cross-agent prefix sharing via cache_salt."""
 
     @pytest.mark.asyncio
     async def test_non_judge_agents_share_one_salt(self):

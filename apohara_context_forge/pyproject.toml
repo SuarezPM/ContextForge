@@ -39,8 +39,8 @@ dev = [
     "ruff>=0.4.0",
 ]
 
-[project.entry-points."vllm.plugin"]
-contextforge_atom = "contextforge.serving.atom_plugin:vLLMAtomPlugin"
+[project.entry-points."vllm.general_plugins"]
+contextforge_romy = "contextforge.serving.romy_plugin:vLLMRomyPlugin"
 
 [build-system]
 requires = ["setuptools>=61.0"]

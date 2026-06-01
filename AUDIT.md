@@ -874,6 +874,49 @@ KV-sharing relevance on sparse/linear frontier models.
   hardware (44 % tokens, 2026-05-26; 84.7 % KV-sharing, 2026-05-29), full-attention
   scope and frontier limit stated honestly.
 
+## 20. 🟢 ATOM plugin renamed to ROMY (naming collision with AMD ROCm/ATOM) + invalid entry-point group fixed (2026-05-31)
+
+**The naming collision.** We shipped the plugin under the name **ATOM**
+(*Anchor-driven Tensor Orchestration for Multi-agent*). AMD's official ROCm
+team ships an engine literally called **ATOM** (*AiTer Optimized Model*,
+[ROCm/ATOM](https://github.com/ROCm)) in **the same domain** — a vLLM
+acceleration path for the MI300X. Two "ATOM" plugins for vLLM-on-MI300X is a
+recipe for confusion and an implicit (false) association with AMD's project.
+Honesty extends to naming: we do not squat a name an upstream vendor already
+owns in our exact niche.
+
+**The rename.** ATOM → **ROMY** (*Runtime for Orchestrated Matrix Yields*).
+This is a pure identifier/prose rename — no behaviour changed:
+- `apohara_context_forge/serving/atom_plugin.py` → `serving/romy_plugin.py`
+  (and `tests/test_atom_plugin.py` → `tests/test_romy_plugin.py`).
+- `ATOMConfig` → `ROMYConfig`, `vLLMAtomPlugin` → `vLLMRomyPlugin`; the PyPI
+  shim re-exports, `__all__`, and docs updated to match.
+- No backwards-compat aliases were kept: the `ATOM` name is retired entirely
+  to avoid leaving the colliding identifier importable.
+
+**The entry-point fix (real bug, same commit).** `apohara_context_forge/pyproject.toml`
+declared the plugin under `[project.entry-points."vllm.plugin"]` — a group that
+**does not exist in vLLM**. vLLM V1 discovers plugins through the
+`vllm.general_plugins` group (verified against docs.vllm.ai); the PyPI shim
+already used the correct group, but the in-tree `contextforge` package would
+have registered an entry point vLLM never walks. Fixed:
+`vllm.plugin` → `vllm.general_plugins`, and
+`contextforge_atom = "...atom_plugin:vLLMAtomPlugin"` →
+`contextforge_romy = "contextforge.serving.romy_plugin:vLLMRomyPlugin"`.
+
+**Verification:**
+- `rg -i "\batom\b|atom_plugin|atomconfig|vLLMAtomPlugin"` over
+  `apohara_context_forge/ tests/ pypi/ deploy/ README.md LMCACHE.md` →
+  **0 matches**. The historical entries above (#18, #19) intentionally keep the
+  `ATOM` name as it was at the time.
+- Full suite: **487 passed, 25 skipped, 0 failed** (unchanged; the renamed
+  `tests/test_romy_plugin.py` keeps its 19 tests, no assertions weakened).
+- **Pending:** `paper/inv15_paper.tex` + `references.bib` still say "ATOM"; the
+  academic artifact (DOI-bearing) is left untouched here and gets a separate
+  editorial pass so the rename lands cleanly in the next paper revision.
+- **Status: 🟢 RESOLVED** — name no longer collides with AMD's ATOM engine; the
+  in-tree entry point now targets a real vLLM plugin group.
+
 ---
 
-*Last updated: 2026-05-29 · maintained by the same person who wrote the lies.*
+*Last updated: 2026-05-31 · maintained by the same person who wrote the lies.*

@@ -176,9 +176,9 @@ latest). Do this if 0.1.0 has a serious bug; otherwise ship 0.1.1.
 ## Why we publish as a thin shim
 
 The plugin's behaviour lives in
-[`apohara_context_forge.serving.atom_plugin`](../../apohara_context_forge/serving/atom_plugin.py)
+[`apohara_context_forge.serving.romy_plugin`](../../apohara_context_forge/serving/romy_plugin.py)
 (the in-tree implementation tested by
-[`tests/test_atom_plugin.py`](../../tests/test_atom_plugin.py)
+[`tests/test_romy_plugin.py`](../../tests/test_romy_plugin.py)
 — 19 tests, all passing as of V6.1). The `apohara-vllm-plugin`
 distribution exists for one reason: to declare the
 `vllm.general_plugins` entry point on a package that vLLM users
