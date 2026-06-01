@@ -329,7 +329,7 @@ class ContextRegistry:
             )
 
             # Compute total tokens saved.
-            # Bug fix (US-002): previously this was
+            # Bug fix: previously this was
             #   blocks_per_match * self._block_size * len(valid_matches)
             # which equals len(valid_matches)**2 * self._block_size — a
             # quadratic over-count that inflated any dashboard or log

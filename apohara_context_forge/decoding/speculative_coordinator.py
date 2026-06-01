@@ -264,7 +264,7 @@ class SpeculativeCoordinator:
                 "INV-12 (target distribution preservation) is NOT guaranteed."
             )
             # Stubbed value; INV-12 math is currently disabled on this
-            # fallback path.  Renamed in US-002 bug 7 to make the
+            # fallback path.  Renamed to make the
             # stub-nature visible at the call site (previously written
             # as a local ``estimate`` whose origin was opaque).  See
             # AUDIT.md item 12 and the V6.0 retraction.

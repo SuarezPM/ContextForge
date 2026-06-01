@@ -8,7 +8,7 @@
       "orcid": ""
     }
   ],
-  "description": "Apohara ContextForge V7.0.0-rc.2: paper v2.0.1 with 7 new citations + compiled PDF, on top of V7.0.0-rc.1 (Sprint 1-4 + Wave B MI300X validation). Real KV-cache reuse end-to-end. Hardware-validated on AMD Instinct MI300X (192 GB HBM3, ROCm 7.2.0, torch 2.5.1+rocm6.2). Measured 3.55x VRAM reduction constant across context lengths 4K-262K (64x scale span), correcting the literature 3.97x claim for our per-byte joint-quantization codec. Measured HBM3 effective bandwidth 3.73 TB/s (70.5% of advertised 5.3 TB/s peak under SR-IOV). Paper v2.0.1 includes 12 references with full author info (5 fixed + 7 new). See AUDIT.md for honesty discipline log (10/10 audit items closed) and paper/inv15_paper.pdf (409 KB).",
+  "description": "Apohara ContextForge V7.0.0-rc.2: paper v2.0.1 with 7 new citations + compiled PDF, on top of V7.0.0-rc.1 (full MI300X validation). Real KV-cache reuse end-to-end. Hardware-validated on AMD Instinct MI300X (192 GB HBM3, ROCm 7.2.0, torch 2.5.1+rocm6.2). Measured 3.55x VRAM reduction constant across context lengths 4K-262K (64x scale span), correcting the literature 3.97x claim for our per-byte joint-quantization codec. Measured HBM3 effective bandwidth 3.73 TB/s (70.5% of advertised 5.3 TB/s peak under SR-IOV). Paper v2.0.1 includes 12 references with full author info (5 fixed + 7 new). See AUDIT.md for honesty discipline log (10/10 audit items closed) and paper/inv15_paper.pdf (409 KB).",
   "keywords": [
     "kv-cache",
     "llm-inference",

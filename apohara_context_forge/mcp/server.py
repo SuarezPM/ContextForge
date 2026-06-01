@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     module before entering the context.
     """
     app.state.registry = ContextRegistry()
-    # Bug fix (US-002): ContextRegistry.start() launches the VRAM cache
+    # Bug fix: ContextRegistry.start() launches the VRAM cache
     # background monitor — without it, the registry never tracks GPU
     # pressure even though endpoints have been answering requests.
     # ``getattr`` keeps the call best-effort so monkeypatched test
@@ -83,7 +83,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         # Best-effort teardown — never let cleanup errors mask the original
         # request error during shutdown.
-        # Bug fix (US-002): symmetric stop() for the VRAM monitor started above.
+        # Bug fix: symmetric stop() for the VRAM monitor started above.
         stop = getattr(app.state.registry, "stop", None)
         if stop is not None:
             try:
@@ -269,7 +269,7 @@ async def root() -> dict:
 async def metrics_loop(app_: FastAPI | None = None) -> None:
     """Background metrics logger.
 
-    Bug fix (US-002): previously this loop snapshotted the module-level
+    Bug fix: previously this loop snapshotted the module-level
     ``metrics`` singleton, but every endpoint resolves ``MetricsCollector``
     via ``Depends(get_metrics)`` which returns ``request.app.state.metrics``.
     The two collectors are distinct instances, so the loop was logging an

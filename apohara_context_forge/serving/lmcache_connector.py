@@ -365,7 +365,7 @@ class LMCacheConnectorV2:
         - ``"fallback"`` — neither lmcache import strategy worked;
           the connector runs in honest-fallback mode.
 
-        Exposed for the Grafana dashboard + Sprint 5 deployment
+        Exposed for the Grafana dashboard + deployment
         readiness checks: a multi-node MI300X cluster expects
         ``"non_cuda"`` (the v1 path), never ``"cuda"``.
         """
